@@ -1,20 +1,3 @@
-# ![Icon](https://i.postimg.cc/d3c9vxzF/Music-App-Icon24x24.png) musicApp - an offline music player
-
-<td><img src="Resources/scr1.png" alt="Screenshot" /></td>
-
-musicApp is in early development, bugs are expected.
-
-If you want to use it, [download the latest release](https://github.com/fosterbarnes/MusicApp/releases), unzip, then run MusicApp.exe
-
-## Progress
-
-![Progress Bar](https://progress-bars.entcheneric.com/bar.svg?progress=36&backgroundColor=%23212121&height=40&width=800&borderRadius=10&striped=false&animated=false&gradientAnimated=false&animationSpeed=1&stripeAnimationSpeed=1&gradientAnimationSpeed=1&initialAnimationSpeed=1&color=%23705399)  
-**28 / 77 tasks complete (36.4%)**
-
-
-<details>
-<summary>Tasks</summary>
-    
 ## Main Window
 
 ### Title Bar
@@ -145,21 +128,3 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 - Automatic updates integrated with GitHub releases
 - Installer
 - Option for portable version
-</details>
-
-## Why does this exist?
-
-I hate streaming services. I have tried SO many music player apps like Foobar2000,
-Musicbee, AIMP, Clementine, Strawberry, etc. and just don't like them. No disrespect to the creators but they're just not for me. I tolerate iTunes, and while it is functional and has a UI that I find more functional than the alternatives, it's very out of date, sluggish overall and (for some reason????) makes my twitch stream lag when I play music with it lmao (I'm a twitch streamer).
-
-To be honest, this app is made so I can use as my daily music player. HOWEVER, if you agree with one or more of the previous statements, this app may also be for you too lol. It's made for Windows with WPF in C#, for this reason, Linux/macOS versions are not currently planned. My main concern is efficiency for my personal daily driver OS (Windows 10) not cross compatibility. The thought of making such a detailed and clean UI in Rust (my cross compat. language of choice) gives me goosebumps and shivers, ergo: WPF in C#, using XAML for styling.
-
-## Support
-
-If you have any issues, create an issue from the [Issues](https://github.com/fosterbarnes/rustitles/issues) tab and I will get back to you as quickly as possible.
-
-If you'd like to support me, follow me on twitch:
-[https://www.twitch.tv/fosterbarnes](https://www.twitch.tv/fosterbarnes)
-
-or if you're feeling generous drop a donation:
-[https://coff.ee/fosterbarnes](https://coff.ee/fosterbarnes)
