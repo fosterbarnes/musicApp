@@ -293,6 +293,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Search Icon -->
@@ -336,6 +337,20 @@
                             </Style>
                         </TextBox.Style>
                     </TextBox>
+
+                    <!-- Clear search button -->
+                    <Button x:Name="btnSearchClear"
+                            Grid.Column="2"
+                            Style="{StaticResource CustomMediaButton}"
+                            Width="20" Height="20"
+                            VerticalAlignment="Center"
+                            Margin="4,0,0,0"
+                            Padding="0"
+                            Visibility="Collapsed"
+                            Click="BtnSearchClear_Click"
+                            ToolTip="Clear search">
+                        <materialDesign:PackIcon Kind="Close" Width="12" Height="12" Foreground="#CCCCCC"/>
+                    </Button>
                 </Grid>
             </Border>
 

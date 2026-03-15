@@ -8,8 +8,8 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 
 ## Progress
 
-![Progress Bar](https://progress-bars.entcheneric.com/bar.svg?progress=36&backgroundColor=%23212121&height=40&width=800&borderRadius=10&striped=false&animated=false&gradientAnimated=false&animationSpeed=1&stripeAnimationSpeed=1&gradientAnimationSpeed=1&initialAnimationSpeed=1&color=%23705399)  
-**28 / 77 tasks complete (36.4%)**
+![Progress Bar](https://progress-bars.entcheneric.com/bar.svg?progress=41&backgroundColor=%23212121&height=40&width=800&borderRadius=10&striped=false&animated=false&gradientAnimated=false&animationSpeed=1&stripeAnimationSpeed=1&gradientAnimationSpeed=1&initialAnimationSpeed=1&color=%23705399)  
+**32 / 78 tasks complete (41%)**
 
 
 <details>
@@ -30,8 +30,9 @@ If you want to use it, [download the latest release](https://github.com/fosterba
   - Popout menu with re-orderable currently playing queue
 ##### Search bar:
   - ~~Editable text area to input search~~
-  - Menu with search results
-  - Ability to get to search result items in main window
+  - ~~Menu with search results~~
+  - ~~Ability to get to search result items in main window~~
+  - Context menu item: show in songs/artists/genre/album
 
 
 ### Main Window Buttons
@@ -115,13 +116,15 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 
 
 ## General
-#### Bugs
-- Unnecessary space between the scroll bar and track menu in artist/genre view
+#### UI Stuff
+- ~~Unnecessary space between the scroll bar and track menu in artist/genre view~~
 
 #### General Concerns
 - Split `MainWindow.xaml.cs` into multiple components
 - Cut down on if statements. Use more switch/loops
-- Use hard-coded "pop-ups" and info menus rather than built in windows pop-ups
+- ~~Use hard-coded custom "pop-ups" and info menus rather than built in windows pop-ups~~
+
+#### Bugs
 
 #### Planned Features
 - Ability to edit metadata

@@ -1,6 +1,8 @@
 using System;
 using System.Globalization;
 using System.Windows.Data;
+using MaterialDesignThemes.Wpf;
+using MusicApp.Helpers;
 
 namespace MusicApp.Converters
 {
@@ -142,6 +144,58 @@ namespace MusicApp.Converters
                 return intValue == 0 ? "" : intValue.ToString(culture);
             }
             return "";
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
+    /// Converts bool to Visibility: true -> Visible, false -> Collapsed.
+    /// </summary>
+    public class BoolToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is true ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is System.Windows.Visibility v && v == System.Windows.Visibility.Visible;
+        }
+    }
+
+    /// <summary>
+    /// Converts bool (IsPinned) to PackIconKind: true -> Star, false -> StarOutline.
+    /// </summary>
+    public class PinnedToStarIconKindConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is true ? PackIconKind.Star : PackIconKind.StarOutline;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
+    /// Converts Song or AlbumSearchItem to album art BitmapImage for search popup thumbnails.
+    /// </summary>
+    public class AlbumArtThumbnailConverter : IValueConverter
+    {
+        public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is Song song)
+                return AlbumArtThumbnailHelper.LoadForTrack(song);
+            if (value is AlbumSearchItem album && album.Songs.Count > 0)
+                return AlbumArtThumbnailHelper.LoadForTrack(album.Songs[0]);
+            return null;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

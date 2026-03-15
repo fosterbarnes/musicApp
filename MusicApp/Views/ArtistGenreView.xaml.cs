@@ -1,3 +1,7 @@
+using System;
+using System.Collections;
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -15,11 +19,14 @@ namespace MusicApp.Views
             set => SetValue(ViewNameProperty, value);
         }
 
+        private IEnumerable? _allTracks;
+        private readonly ObservableCollection<string> _namesList = new ObservableCollection<string>();
+
         public ArtistGenreView()
         {
             InitializeComponent();
-            trackList.ViewName = ViewName;
-            Loaded += (_, _) => UpdatePlaceholderVisibility();
+            lstArtistsOrGenres.ItemsSource = _namesList;
+            trackList.ViewName = "Songs";
             trackList.AddToPlaylistRequested += (s, track) => AddToPlaylistRequested?.Invoke(this, track);
             trackList.AddTrackToPlaylistRequested += (s, args) => AddTrackToPlaylistRequested?.Invoke(this, args);
             trackList.CreateNewPlaylistWithTrackRequested += (s, track) => CreateNewPlaylistWithTrackRequested?.Invoke(this, track);
@@ -29,44 +36,98 @@ namespace MusicApp.Views
             trackList.ShowInExplorerRequested += (s, track) => ShowInExplorerRequested?.Invoke(this, track);
             trackList.RemoveFromLibraryRequested += (s, track) => RemoveFromLibraryRequested?.Invoke(this, track);
             trackList.DeleteRequested += (s, track) => DeleteRequested?.Invoke(this, track);
+            Loaded += (_, _) => UpdateSidebarTitleAndPlaceholder();
         }
 
-        public System.Collections.IEnumerable? ItemsSource
+        /// <summary>Full library of tracks. Used to build artist/genre list and to filter when one is selected.</summary>
+        public IEnumerable? ItemsSource
         {
-            get => trackList.ItemsSource;
-            set => trackList.ItemsSource = value;
+            get => _allTracks;
+            set
+            {
+                _allTracks = value;
+                RefreshNamesList();
+            }
         }
 
-        public event System.EventHandler<Song>? PlayTrackRequested;
-
-        public event System.EventHandler<Song>? AddToPlaylistRequested;
-        public event System.EventHandler<(Song track, Playlist playlist)>? AddTrackToPlaylistRequested;
-        public event System.EventHandler<Song>? CreateNewPlaylistWithTrackRequested;
-        public event System.EventHandler<Song>? PlayNextRequested;
-        public event System.EventHandler<Song>? AddToQueueRequested;
-        public event System.EventHandler<Song>? InfoRequested;
-        public event System.EventHandler<Song>? ShowInExplorerRequested;
-        public event System.EventHandler<Song>? RemoveFromLibraryRequested;
-        public event System.EventHandler<Song>? DeleteRequested;
+        public event EventHandler<Song>? PlayTrackRequested;
+        public event EventHandler<Song>? AddToPlaylistRequested;
+        public event EventHandler<(Song track, Playlist playlist)>? AddTrackToPlaylistRequested;
+        public event EventHandler<Song>? CreateNewPlaylistWithTrackRequested;
+        public event EventHandler<Song>? PlayNextRequested;
+        public event EventHandler<Song>? AddToQueueRequested;
+        public event EventHandler<Song>? InfoRequested;
+        public event EventHandler<Song>? ShowInExplorerRequested;
+        public event EventHandler<Song>? RemoveFromLibraryRequested;
+        public event EventHandler<Song>? DeleteRequested;
 
         public void RebuildColumns() => trackList.RebuildColumns();
+
+        /// <summary>Select an artist by name (for search navigation). No-op if not in Artists view or name not found.</summary>
+        public void SelectArtist(string name)
+        {
+            if (!string.Equals(ViewName, "Artists", StringComparison.OrdinalIgnoreCase)) return;
+            if (string.IsNullOrWhiteSpace(name)) return;
+            if (_namesList.Contains(name))
+                lstArtistsOrGenres.SelectedItem = name;
+        }
 
         private static void OnViewNameChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             if (d is ArtistGenreView view && e.NewValue is string name)
             {
-                view.trackList.ViewName = name;
-                view.UpdatePlaceholderVisibility();
+                view.trackList.ViewName = "Songs";
+                view.UpdateSidebarTitleAndPlaceholder();
+                view.RefreshNamesList();
             }
         }
 
-        private void UpdatePlaceholderVisibility()
+        private void UpdateSidebarTitleAndPlaceholder()
         {
             bool isArtists = string.Equals(ViewName, "Artists", StringComparison.OrdinalIgnoreCase);
-            if (placeholderArtists != null)
-                placeholderArtists.Visibility = isArtists ? Visibility.Visible : Visibility.Collapsed;
-            if (placeholderGenres != null)
-                placeholderGenres.Visibility = isArtists ? Visibility.Collapsed : Visibility.Visible;
+            if (sidebarTitle != null)
+                sidebarTitle.Text = isArtists ? "Artists" : "Genres";
+            if (placeholderText != null)
+                placeholderText.Text = isArtists ? "Select an artist" : "Select a genre";
+        }
+
+        private void RefreshNamesList()
+        {
+            _namesList.Clear();
+            if (_allTracks == null) return;
+
+            var tracks = _allTracks.Cast<Song>().ToList();
+            bool isArtists = string.Equals(ViewName, "Artists", StringComparison.OrdinalIgnoreCase);
+
+            var names = isArtists
+                ? tracks.Where(t => !string.IsNullOrWhiteSpace(t.Artist)).Select(t => t.Artist).Distinct().OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList()
+                : tracks.Where(t => !string.IsNullOrWhiteSpace(t.Genre)).Select(t => t.Genre).Distinct().OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+
+            foreach (var name in names)
+                _namesList.Add(name);
+        }
+
+        private void LstArtistsOrGenres_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (lstArtistsOrGenres.SelectedItem is not string selectedName || _allTracks == null)
+            {
+                trackList.CurrentPlaylist = null;
+                trackList.ItemsSource = null;
+                trackList.Visibility = Visibility.Collapsed;
+                placeholderText.Visibility = Visibility.Visible;
+                return;
+            }
+
+            var tracks = _allTracks.Cast<Song>().ToList();
+            bool isArtists = string.Equals(ViewName, "Artists", StringComparison.OrdinalIgnoreCase);
+            var filtered = isArtists
+                ? tracks.Where(t => string.Equals(t.Artist, selectedName, StringComparison.Ordinal)).ToList()
+                : tracks.Where(t => string.Equals(t.Genre, selectedName, StringComparison.Ordinal)).ToList();
+
+            trackList.CurrentPlaylist = null;
+            trackList.ItemsSource = filtered;
+            trackList.Visibility = Visibility.Visible;
+            placeholderText.Visibility = Visibility.Collapsed;
         }
 
         private void TrackList_PlayTrackRequested(object? sender, Song e)

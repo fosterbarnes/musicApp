@@ -26,6 +26,7 @@
          =========================================== -->
     <Window.Resources>
         <ResourceDictionary>
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
             <!-- Material Design Theme and Custom Styles -->
             <ResourceDictionary.MergedDictionaries>
                 <materialDesign:BundledTheme BaseTheme="Dark" PrimaryColor="Purple" SecondaryColor="Lime" />
@@ -54,6 +55,14 @@
                  TITLE BAR SECTION
                  =========================================== -->
             <titleBar:TitleBar x:Name="titleBarPlayer" Grid.Row="0"/>
+
+            <!-- Search results popup (placement target set in code) -->
+            <Popup x:Name="searchPopup"
+                   StaysOpen="False"
+                   Placement="Bottom"
+                   AllowsTransparency="True">
+                <views:SearchPopupView x:Name="searchPopupView"/>
+            </Popup>
 
             <!-- ===========================================
                  MAIN CONTENT AREA
@@ -152,6 +161,24 @@
                                 <TextBlock Text="Queue" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
+
+                        <!-- Pinned playlists (visible only when any playlist is pinned) -->
+                        <StackPanel Visibility="{Binding HasPinnedPlaylists, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Separator Margin="0,5" Background="#404040"/>
+                            <ItemsControl ItemsSource="{Binding PinnedPlaylists}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource SidebarNavigationButton}"
+                                                Click="PinnedPlaylistSidebar_Click">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Kind="PlaylistMusic" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
 
                         <!-- Separator -->
                         <Separator Margin="0,5" Background="#404040"/>

@@ -1,7 +1,6 @@
-<Window x:Class="MusicApp.Views.NewPlaylistDialog"
+<Window x:Class="MusicApp.Dialogs.TextInputDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="New Playlist"
         Width="340"
         Height="165"
         ResizeMode="NoResize"
@@ -38,12 +37,11 @@
             <RowDefinition Height="16"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <TextBlock Grid.Row="0" Text="Playlist name:" VerticalAlignment="Center"/>
-        <TextBox x:Name="TxtName"
+        <TextBlock x:Name="TxtLabel" Grid.Row="0" VerticalAlignment="Center"/>
+        <TextBox x:Name="TxtInput"
                  Grid.Row="2"
-                 Text="New Playlist"
                  AcceptsReturn="False"
-                 KeyDown="TxtName_KeyDown"/>
+                 KeyDown="TxtInput_KeyDown"/>
         <StackPanel Grid.Row="4"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">

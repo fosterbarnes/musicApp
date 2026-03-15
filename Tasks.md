@@ -13,8 +13,9 @@
   - Popout menu with re-orderable currently playing queue
 ##### Search bar:
   - ~~Editable text area to input search~~
-  - Menu with search results
-  - Ability to get to search result items in main window
+  - ~~Menu with search results~~
+  - ~~Ability to get to search result items in main window~~
+  - Context menu item: show in songs/artists/genre/album
 
 
 ### Main Window Buttons
@@ -98,13 +99,15 @@
 
 
 ## General
-#### Bugs
-- Unnecessary space between the scroll bar and track menu in artist/genre view
+#### UI Stuff
+- ~~Unnecessary space between the scroll bar and track menu in artist/genre view~~
 
 #### General Concerns
 - Split `MainWindow.xaml.cs` into multiple components
 - Cut down on if statements. Use more switch/loops
-- Use hard-coded "pop-ups" and info menus rather than built in windows pop-ups
+- ~~Use hard-coded custom "pop-ups" and info menus rather than built in windows pop-ups~~
+
+#### Bugs
 
 #### Planned Features
 - Ability to edit metadata

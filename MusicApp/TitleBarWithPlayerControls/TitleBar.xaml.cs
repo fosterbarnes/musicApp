@@ -24,6 +24,8 @@ namespace MusicApp.TitleBarWithPlayerControls
         public event EventHandler? WindowCloseRequested;
         public event EventHandler<double>? VolumeChanged;
         public event EventHandler<bool>? ShuffleStateChanged;
+        /// <summary>Raised when search text changes (debounced). EventArgs is the current query; empty string when cleared or placeholder.</summary>
+        public event EventHandler<string>? SearchTextChanged;
 
         // === Audio Playback State ===
         private WaveOutEvent? waveOut;
@@ -62,6 +64,10 @@ namespace MusicApp.TitleBarWithPlayerControls
         private const double SEARCH_PLACEHOLDER_COLOR_R = 204;
         private const double SEARCH_PLACEHOLDER_COLOR_G = 204;
         private const double SEARCH_PLACEHOLDER_COLOR_B = 204;
+        private const int SEARCH_DEBOUNCE_MS = 300;
+        private const string SEARCH_PLACEHOLDER_TEXT = "Search";
+
+        private DispatcherTimer? _searchDebounceTimer;
 
         // === Properties ===
         public bool IsPlaying
@@ -174,16 +180,66 @@ namespace MusicApp.TitleBarWithPlayerControls
 
             if (txtSearch != null)
             {
-                txtSearch.Text = "Search";
+                txtSearch.Text = SEARCH_PLACEHOLDER_TEXT;
                 txtSearch.Foreground = new SolidColorBrush(Color.FromRgb((byte)SEARCH_PLACEHOLDER_COLOR_R, (byte)SEARCH_PLACEHOLDER_COLOR_G, (byte)SEARCH_PLACEHOLDER_COLOR_B));
                 txtSearch.GotFocus += TxtSearch_GotFocus;
                 txtSearch.LostFocus += TxtSearch_LostFocus;
+                txtSearch.TextChanged += TxtSearch_TextChanged;
             }
+            _searchDebounceTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
+            {
+                Interval = TimeSpan.FromMilliseconds(SEARCH_DEBOUNCE_MS)
+            };
+            _searchDebounceTimer.Tick += SearchDebounceTimer_Tick;
+            if (btnSearchClear != null)
+                btnSearchClear.Visibility = Visibility.Collapsed;
+        }
+
+        /// <summary>Returns the current search query; empty string if placeholder or blank.</summary>
+        public string GetSearchQuery()
+        {
+            if (txtSearch == null) return "";
+            var t = txtSearch.Text?.Trim() ?? "";
+            return (t == "" || t == SEARCH_PLACEHOLDER_TEXT) ? "" : t;
+        }
+
+        /// <summary>Search bar border for popup placement.</summary>
+        public Border? SearchBarBorder => searchBarBorder;
+
+        private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _searchDebounceTimer?.Stop();
+            if (txtSearch == null) return;
+            if (btnSearchClear != null)
+                btnSearchClear.Visibility = string.IsNullOrWhiteSpace(GetSearchQuery()) ? Visibility.Collapsed : Visibility.Visible;
+            var query = GetSearchQuery();
+            if (query.Length == 0)
+            {
+                SearchTextChanged?.Invoke(this, "");
+                return;
+            }
+            _searchDebounceTimer?.Start();
+        }
+
+        private void SearchDebounceTimer_Tick(object? sender, EventArgs e)
+        {
+            _searchDebounceTimer?.Stop();
+            var query = GetSearchQuery();
+            SearchTextChanged?.Invoke(this, query);
+        }
+
+        private void BtnSearchClear_Click(object sender, RoutedEventArgs e)
+        {
+            if (txtSearch == null) return;
+            txtSearch.Text = SEARCH_PLACEHOLDER_TEXT;
+            txtSearch.Foreground = new SolidColorBrush(Color.FromRgb((byte)SEARCH_PLACEHOLDER_COLOR_R, (byte)SEARCH_PLACEHOLDER_COLOR_G, (byte)SEARCH_PLACEHOLDER_COLOR_B));
+            if (btnSearchClear != null) btnSearchClear.Visibility = Visibility.Collapsed;
+            SearchTextChanged?.Invoke(this, "");
         }
 
         private void TxtSearch_GotFocus(object sender, RoutedEventArgs e)
         {
-            if (txtSearch != null && txtSearch.Text == "Search")
+            if (txtSearch != null && txtSearch.Text == SEARCH_PLACEHOLDER_TEXT)
             {
                 txtSearch.Text = "";
                 txtSearch.Foreground = new SolidColorBrush(Colors.White);
@@ -194,7 +250,7 @@ namespace MusicApp.TitleBarWithPlayerControls
         {
             if (txtSearch != null && string.IsNullOrWhiteSpace(txtSearch.Text))
             {
-                txtSearch.Text = "Search";
+                txtSearch.Text = SEARCH_PLACEHOLDER_TEXT;
                 txtSearch.Foreground = new SolidColorBrush(Color.FromRgb((byte)SEARCH_PLACEHOLDER_COLOR_R, (byte)SEARCH_PLACEHOLDER_COLOR_G, (byte)SEARCH_PLACEHOLDER_COLOR_B));
             }
         }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -20,11 +21,18 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using MusicApp.Views;
 using MusicApp.Helpers;
+using MusicApp.Dialogs;
 
 namespace MusicApp
 {
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
 
         // ===========================================
@@ -70,6 +78,12 @@ namespace MusicApp
         private ObservableCollection<Song> shuffledTracks = new ObservableCollection<Song>();
         private ObservableCollection<Playlist> playlists = new ObservableCollection<Playlist>();
         private ObservableCollection<Song> recentlyPlayed = new ObservableCollection<Song>();
+
+        /// <summary>Playlists pinned to the sidebar; used for the dynamic pinned section.</summary>
+        public ObservableCollection<Playlist> PinnedPlaylists { get; } = new ObservableCollection<Playlist>();
+
+        /// <summary>True when at least one playlist is pinned; drives visibility of the pinned section.</summary>
+        public bool HasPinnedPlaylists => PinnedPlaylists.Count > 0;
 
         /// <summary>Exposes current playlists for context menu and other consumers.</summary>
         public IReadOnlyList<Playlist> Playlists => playlists;
@@ -158,6 +172,7 @@ namespace MusicApp
             TrackListColumnConfig.Initialize();
             CreateViewsAndWirePlayback();
             SetupEventHandlers();
+            DataContext = this;
 
             // Load saved data asynchronously
             _ = LoadSavedDataAsync();
@@ -246,6 +261,7 @@ namespace MusicApp
             playlistsViewControl.ImportPlaylistRequested += PlaylistsViewControl_ImportPlaylistRequested;
             playlistsViewControl.ExportPlaylistRequested += PlaylistsViewControl_ExportPlaylistRequested;
             playlistsViewControl.DeletePlaylistRequested += PlaylistsViewControl_DeletePlaylistRequested;
+            playlistsViewControl.PlaylistPinnedChanged += PlaylistsViewControl_PlaylistPinnedChanged;
             playlistsViewControl.RemoveFromPlaylistRequested += OnRemoveFromPlaylistRequested;
 
             contentHost.Content = songsView;
@@ -285,6 +301,12 @@ namespace MusicApp
                 // Restore playlists
                 RestorePlaylists(playlistsCache);
 
+                // Sync pinned playlists for sidebar (so they appear in the menu on launch)
+                foreach (var p in playlists)
+                    if (p.IsPinned)
+                        PinnedPlaylists.Add(p);
+                OnPropertyChanged(nameof(HasPinnedPlaylists));
+
                 // Restore recently played
                 RestoreRecentlyPlayed(recentlyPlayedCache);
 
@@ -299,7 +321,7 @@ namespace MusicApp
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"Error loading saved data: {ex.Message}", "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                MessageDialog.Show(this, "Error", $"Error loading saved data: {ex.Message}", MessageDialog.Buttons.Ok);
             }
         }
 
@@ -513,7 +535,7 @@ namespace MusicApp
 
         private async void PlaylistsViewControl_CreatePlaylistRequested(object? sender, EventArgs e)
         {
-            var name = Microsoft.VisualBasic.Interaction.InputBox("Enter playlist name:", "Create Playlist", "New Playlist");
+            var name = TextInputDialog.Show(this, "Create Playlist", "Enter playlist name:", "New Playlist");
             if (string.IsNullOrWhiteSpace(name))
                 return;
 
@@ -528,13 +550,30 @@ namespace MusicApp
             if (e == null)
                 return;
 
-            var result = MessageBox.Show($"Delete playlist \"{e.Name}\"?", "Delete Playlist", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (result != MessageBoxResult.Yes)
+            var result = MessageDialog.Show(this, "Delete Playlist", $"Delete playlist \"{e.Name}\"?", MessageDialog.Buttons.YesNo);
+            if (result != true)
                 return;
 
+            PinnedPlaylists.Remove(e);
+            OnPropertyChanged(nameof(HasPinnedPlaylists));
             libraryManager.DeletePlaylist(playlists, e);
             await libraryManager.SavePlaylistsFromCollectionAsync(playlists);
             UpdateUI();
+        }
+
+        private async void PlaylistsViewControl_PlaylistPinnedChanged(object? sender, (Playlist playlist, bool isPinned) e)
+        {
+            if (e.isPinned)
+            {
+                if (!PinnedPlaylists.Contains(e.playlist))
+                    PinnedPlaylists.Add(e.playlist);
+            }
+            else
+            {
+                PinnedPlaylists.Remove(e.playlist);
+            }
+            OnPropertyChanged(nameof(HasPinnedPlaylists));
+            await libraryManager.SavePlaylistsFromCollectionAsync(playlists);
         }
 
         private async void PlaylistsViewControl_ImportPlaylistRequested(object? sender, EventArgs e)
@@ -558,7 +597,7 @@ namespace MusicApp
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to import playlist: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageDialog.Show(this, "Error", $"Failed to import playlist: {ex.Message}", MessageDialog.Buttons.Ok);
             }
         }
 
@@ -584,7 +623,7 @@ namespace MusicApp
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to export playlist: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageDialog.Show(this, "Error", $"Failed to export playlist: {ex.Message}", MessageDialog.Buttons.Ok);
             }
         }
 
@@ -717,8 +756,60 @@ namespace MusicApp
             // Wire up shuffle state change event
             titleBarPlayer.ShuffleStateChanged += TitleBarPlayer_ShuffleStateChanged;
 
+            // Wire up search
+            titleBarPlayer.SearchTextChanged += TitleBarPlayer_SearchTextChanged;
+            if (searchPopupView != null)
+            {
+                searchPopupView.SongSelected += SearchPopupView_SongSelected;
+                searchPopupView.ArtistSelected += SearchPopupView_ArtistSelected;
+                searchPopupView.AlbumSelected += SearchPopupView_AlbumSelected;
+                searchPopupView.PlayNextRequested += OnPlayNextRequested;
+                searchPopupView.AddToQueueRequested += OnAddToQueueRequested;
+                searchPopupView.AddTrackToPlaylistRequested += OnAddTrackToPlaylistRequested;
+                searchPopupView.CreateNewPlaylistWithTrackRequested += OnCreateNewPlaylistWithTrackRequested;
+                searchPopupView.ShowInExplorerRequested += OnShowInExplorerRequested;
+                searchPopupView.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
+                searchPopupView.DeleteRequested += OnDeleteRequested;
+            }
+
             // Wire up window size changed event
             this.SizeChanged += MainWindow_SizeChanged;
+        }
+
+        private void TitleBarPlayer_SearchTextChanged(object? sender, string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                searchPopup.IsOpen = false;
+                return;
+            }
+            var results = SearchHelper.Run(query, allTracks);
+            if (searchPopupView != null)
+                searchPopupView.Results = results;
+            if (searchPopup.PlacementTarget == null && titleBarPlayer.SearchBarBorder != null)
+                searchPopup.PlacementTarget = titleBarPlayer.SearchBarBorder;
+            searchPopup.IsOpen = true;
+        }
+
+        private void SearchPopupView_SongSelected(object? sender, Song song)
+        {
+            searchPopup.IsOpen = false;
+            PlayTrack(song);
+        }
+
+        private void SearchPopupView_ArtistSelected(object? sender, ArtistSearchItem artist)
+        {
+            searchPopup.IsOpen = false;
+            ShowArtistsView();
+            artistsViewControl?.SelectArtist(artist.Name);
+        }
+
+        private void SearchPopupView_AlbumSelected(object? sender, AlbumSearchItem album)
+        {
+            searchPopup.IsOpen = false;
+            ShowAlbumsView();
+            if (albumsViewControl != null && album.Songs.Count > 0)
+                albumsViewControl.ItemsSource = album.Songs;
         }
 
         #region Shuffle Management
@@ -1462,10 +1553,20 @@ namespace MusicApp
             UpdateQueueView();
         }
 
-        private void ShowPlaylistsView()
+        private void ShowPlaylistsView(Playlist? selectPlaylist = null)
         {
             contentHost.Content = playlistsViewControl;
-            if (playlistsViewControl != null) playlistsViewControl.Playlists = playlists;
+            if (playlistsViewControl != null)
+            {
+                playlistsViewControl.Playlists = playlists;
+                playlistsViewControl.SelectPlaylist(selectPlaylist);
+            }
+        }
+
+        private void PinnedPlaylistSidebar_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is Playlist playlist)
+                ShowPlaylistsView(playlist);
         }
 
         private void ShowRecentlyPlayedView()
@@ -1477,7 +1578,7 @@ namespace MusicApp
         private void ShowArtistsView()
         {
             contentHost.Content = artistsViewControl;
-            if (artistsViewControl != null) artistsViewControl.ItemsSource = null;
+            if (artistsViewControl != null) artistsViewControl.ItemsSource = allTracks;
         }
 
         private void ShowAlbumsView()
@@ -1489,7 +1590,7 @@ namespace MusicApp
         private void ShowGenresView()
         {
             contentHost.Content = genresViewControl;
-            if (genresViewControl != null) genresViewControl.ItemsSource = null;
+            if (genresViewControl != null) genresViewControl.ItemsSource = allTracks;
         }
 
         #endregion
@@ -1554,13 +1655,10 @@ namespace MusicApp
         {
             if (track == null)
                 return;
-            var dialog = new NewPlaylistDialog
-            {
-                Owner = this
-            };
-            if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.PlaylistName))
+            var name = TextInputDialog.Show(this, "New Playlist", "Playlist name:", "New Playlist");
+            if (string.IsNullOrWhiteSpace(name))
                 return;
-            var playlist = new Playlist(dialog.PlaylistName.Trim());
+            var playlist = new Playlist(name.Trim());
             playlist.AddTrack(track);
             libraryManager.AddPlaylist(playlists, playlist);
             await libraryManager.SavePlaylistsFromCollectionAsync(playlists);
@@ -1607,8 +1705,8 @@ namespace MusicApp
         {
             if (track == null || string.IsNullOrEmpty(track.FilePath))
                 return;
-            var result = MessageBox.Show($"Remove \"{track.Title}\" from the library? The file will stay on your computer.", "Remove from Library", MessageBoxButton.YesNo, MessageBoxImage.Question);
-            if (result != MessageBoxResult.Yes)
+            var result = MessageDialog.Show(this, "Remove from Library", $"Remove \"{track.Title}\" from the library? The file will stay on your computer.", MessageDialog.Buttons.YesNo);
+            if (result != true)
                 return;
             await RemoveTrackFromLibraryAsync(track);
         }
@@ -1620,8 +1718,8 @@ namespace MusicApp
         {
             if (track == null || string.IsNullOrEmpty(track.FilePath))
                 return;
-            var result = MessageBox.Show($"Move \"{track.Title}\" to the recycle bin?", "Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (result != MessageBoxResult.Yes)
+            var result = MessageDialog.Show(this, "Delete", $"Move \"{track.Title}\" to the recycle bin?", MessageDialog.Buttons.YesNo);
+            if (result != true)
                 return;
             if (!File.Exists(track.FilePath))
             {
@@ -1631,7 +1729,7 @@ namespace MusicApp
             }
             if (!MoveToRecycleBin(track.FilePath))
             {
-                System.Windows.MessageBox.Show($"Could not move file to recycle bin: {track.FilePath}", "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                MessageDialog.Show(this, "Error", $"Could not move file to recycle bin: {track.FilePath}", MessageDialog.Buttons.Ok);
                 return;
             }
             await RemoveTrackFromLibraryAsync(track);
@@ -1887,7 +1985,7 @@ namespace MusicApp
                 var musicFolders = await libraryManager.GetMusicFoldersAsync();
                 if (musicFolders == null || musicFolders.Count == 0)
                 {
-                    System.Windows.MessageBox.Show("No music folders have been added yet.", "No Folders", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    MessageDialog.Show(this, "No Folders", "No music folders have been added yet.", MessageDialog.Buttons.Ok);
                     return;
                 }
 
@@ -1903,11 +2001,11 @@ namespace MusicApp
                 }
 
                 UpdateUI();
-                System.Windows.MessageBox.Show($"Library re-scanned. Found {totalNewTracks} total tracks across all folders.", "Library Updated", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                MessageDialog.Show(this, "Library Updated", $"Library re-scanned. Found {totalNewTracks} total tracks across all folders.", MessageDialog.Buttons.Ok);
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"Error re-scanning library: {ex.Message}", "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                MessageDialog.Show(this, "Error", $"Error re-scanning library: {ex.Message}", MessageDialog.Buttons.Ok);
             }
         }
 
@@ -1918,7 +2016,7 @@ namespace MusicApp
                 var musicFolders = await libraryManager.GetMusicFoldersAsync();
                 if (musicFolders == null || musicFolders.Count == 0)
                 {
-                    System.Windows.MessageBox.Show("No music folders have been added yet.", "No Folders", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    MessageDialog.Show(this, "No Folders", "No music folders have been added yet.", MessageDialog.Buttons.Ok);
                     return;
                 }
 
@@ -1973,17 +2071,17 @@ namespace MusicApp
                         // Update status bar after removing tracks
                         UpdateStatusBar();
 
-                        System.Windows.MessageBox.Show($"Folder '{folderToRemove}' and {tracksToRemove.Count} tracks removed from library.", "Folder Removed", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                        MessageDialog.Show(this, "Folder Removed", $"Folder '{folderToRemove}' and {tracksToRemove.Count} tracks removed from library.", MessageDialog.Buttons.Ok);
                     }
                     else
                     {
-                        System.Windows.MessageBox.Show($"Folder '{folderToRemove}' not found in library.", "Folder Not Found", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                        MessageDialog.Show(this, "Folder Not Found", $"Folder '{folderToRemove}' not found in library.", MessageDialog.Buttons.Ok);
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"Error removing folder: {ex.Message}", "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                MessageDialog.Show(this, "Error", $"Error removing folder: {ex.Message}", MessageDialog.Buttons.Ok);
             }
         }
 
@@ -2118,7 +2216,7 @@ namespace MusicApp
                     progressBarFill.Visibility = Visibility.Collapsed;
                     progressBarFill.Width = 0;
                 });
-                System.Windows.MessageBox.Show($"Error loading music folder: {ex.Message}", "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                MessageDialog.Show(this, "Error", $"Error loading music folder: {ex.Message}", MessageDialog.Buttons.Ok);
             }
         }
 
@@ -2484,7 +2582,7 @@ namespace MusicApp
                 // Try to show error to user
                 try
                 {
-                    System.Windows.MessageBox.Show($"Error playing track: {ex.Message}", "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                    MessageDialog.Show(this, "Error", $"Error playing track: {ex.Message}", MessageDialog.Buttons.Ok);
                 }
                 catch
                 {
@@ -2602,7 +2700,7 @@ namespace MusicApp
                 // Try to show error to user
                 try
                 {
-                    System.Windows.MessageBox.Show($"Error loading track: {ex.Message}", "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                    MessageDialog.Show(this, "Error", $"Error loading track: {ex.Message}", MessageDialog.Buttons.Ok);
                 }
                 catch
                 {
@@ -3052,7 +3150,7 @@ namespace MusicApp
             try
             {
                 // Show confirmation dialog
-                var result = System.Windows.MessageBox.Show(
+                var result = MessageDialog.Show(this, "Clear Settings",
                     "This will clear all settings and return the app to a clean state. This action cannot be undone.\n\n" +
                     "The following will be cleared:\n" +
                     "• Music library cache\n" +
@@ -3061,11 +3159,9 @@ namespace MusicApp
                     "• Music folders\n" +
                     "• Window settings\n\n" +
                     "Are you sure you want to continue?",
-                    "Clear Settings",
-                    System.Windows.MessageBoxButton.YesNo,
-                    System.Windows.MessageBoxImage.Warning);
+                    MessageDialog.Buttons.YesNo);
 
-                if (result != System.Windows.MessageBoxResult.Yes)
+                if (result != true)
                 {
                     return;
                 }
@@ -3077,7 +3173,7 @@ namespace MusicApp
 
                 if (!Directory.Exists(appDataPath))
                 {
-                    System.Windows.MessageBox.Show("No settings found to clear.", "No Settings", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    MessageDialog.Show(this, "No Settings", "No settings found to clear.", MessageDialog.Buttons.Ok);
                     return;
                 }
 
@@ -3086,7 +3182,7 @@ namespace MusicApp
 
                 if (jsonFiles.Length == 0)
                 {
-                    System.Windows.MessageBox.Show("No settings files found to clear.", "No Settings", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    MessageDialog.Show(this, "No Settings", "No settings files found to clear.", MessageDialog.Buttons.Ok);
                     return;
                 }
 
@@ -3140,16 +3236,14 @@ namespace MusicApp
                 UpdateUI();
 
                 // Show success message
-                System.Windows.MessageBox.Show(
+                MessageDialog.Show(this, "Settings Cleared",
                     $"Successfully cleared {movedFiles} settings files.\n\n" +
                     "The app has been reset to a clean state.",
-                    "Settings Cleared",
-                    System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Information);
+                    MessageDialog.Buttons.Ok);
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"Error clearing settings: {ex.Message}", "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                MessageDialog.Show(this, "Error", $"Error clearing settings: {ex.Message}", MessageDialog.Buttons.Ok);
             }
         }
 

@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:views="clr-namespace:MusicApp.Views"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:converters="clr-namespace:MusicApp.Converters"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
@@ -12,6 +13,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="../Styles.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+            <converters:PinnedToStarIconKindConverter x:Key="PinnedToStarIconKindConverter"/>
             <!-- No ripple/click circle on playlist list items -->
             <Style x:Key="PlaylistListViewItemStyle" TargetType="ListViewItem">
                 <Setter Property="Background" Value="Transparent"/>
@@ -49,60 +51,79 @@
             <ColumnDefinition Width="5"/>
             <ColumnDefinition Width="*" MinWidth="200"/>
         </Grid.ColumnDefinitions>
-        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,13,0">
-            <StackPanel Margin="10,10,0,0">
-                <TextBlock Text="Playlists"
-                           FontSize="20"
-                           FontWeight="Bold"
-                           Foreground="White"
-                           Margin="0,0,0,20"/>
-                <StackPanel Orientation="Horizontal" Margin="12,0,0,20">
-                    <Button Style="{DynamicResource MaterialDesignToolButton}"
-                            materialDesign:RippleAssist.IsDisabled="True"
-                            Width="32" Height="32"
-                            ToolTip="Create new playlist"
-                            Click="CreatePlaylist_Click">
-                        <materialDesign:PackIcon Kind="PlusBox" Width="20" Height="20"/>
-                    </Button>
-                    <Button Style="{DynamicResource MaterialDesignToolButton}"
-                            materialDesign:RippleAssist.IsDisabled="True"
-                            Width="32" Height="32"
-                            Margin="8,0,0,0"
-                            ToolTip="Delete selected playlist"
-                            Click="DeletePlaylist_Click">
-                        <materialDesign:PackIcon Kind="MinusBox" Width="20" Height="20"/>
-                    </Button>
-                    <Button Style="{DynamicResource MaterialDesignToolButton}"
-                            materialDesign:RippleAssist.IsDisabled="True"
-                            Width="32" Height="32"
-                            Margin="8,0,0,0"
-                            ToolTip="Import playlist from .m3u"
-                            Click="ImportPlaylist_Click">
-                        <materialDesign:PackIcon Kind="FileImportOutline" Width="20" Height="20"/>
-                    </Button>
-                    <Button Style="{DynamicResource MaterialDesignToolButton}"
-                            materialDesign:RippleAssist.IsDisabled="True"
-                            Width="32" Height="32"
-                            Margin="8,0,0,0"
-                            ToolTip="Export selected playlist to .m3u"
-                            Click="ExportPlaylist_Click">
-                        <materialDesign:PackIcon Kind="FileExportOutline" Width="20" Height="20"/>
-                    </Button>
-                </StackPanel>
-                <ListView x:Name="lstPlaylists"
-                          Background="Transparent"
-                          Foreground="White"
-                          Padding="10,0,0,0"
-                          ItemContainerStyle="{StaticResource PlaylistListViewItemStyle}"
-                          SelectionChanged="LstPlaylists_SelectionChanged">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding Name}"/>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+        <Grid Grid.Column="0" Margin="-4,10,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0"
+                       Text="Playlists"
+                       FontSize="20"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       Margin="0,0,0,20"/>
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="26,0,0,20">
+                <Button Style="{DynamicResource MaterialDesignToolButton}"
+                        materialDesign:RippleAssist.IsDisabled="True"
+                        Width="32" Height="32"
+                        ToolTip="Create new playlist"
+                        Click="CreatePlaylist_Click">
+                    <materialDesign:PackIcon Kind="PlusBox" Width="20" Height="20"/>
+                </Button>
+                <Button Style="{DynamicResource MaterialDesignToolButton}"
+                        materialDesign:RippleAssist.IsDisabled="True"
+                        Width="32" Height="32"
+                        Margin="8,0,0,0"
+                        ToolTip="Delete selected playlist"
+                        Click="DeletePlaylist_Click">
+                    <materialDesign:PackIcon Kind="MinusBox" Width="20" Height="20"/>
+                </Button>
+                <Button Style="{DynamicResource MaterialDesignToolButton}"
+                        materialDesign:RippleAssist.IsDisabled="True"
+                        Width="32" Height="32"
+                        Margin="8,0,0,0"
+                        ToolTip="Import playlist from .m3u"
+                        Click="ImportPlaylist_Click">
+                    <materialDesign:PackIcon Kind="FileImportOutline" Width="20" Height="20"/>
+                </Button>
+                <Button Style="{DynamicResource MaterialDesignToolButton}"
+                        materialDesign:RippleAssist.IsDisabled="True"
+                        Width="32" Height="32"
+                        Margin="8,0,0,0"
+                        ToolTip="Export selected playlist to .m3u"
+                        Click="ExportPlaylist_Click">
+                    <materialDesign:PackIcon Kind="FileExportOutline" Width="20" Height="20"/>
+                </Button>
             </StackPanel>
-        </ScrollViewer>
+            <ListView x:Name="lstPlaylists"
+                      Grid.Row="2"
+                      Background="Transparent"
+                      Foreground="White"
+                      Padding="0,0,0,0"
+                      ItemContainerStyle="{StaticResource PlaylistListViewItemStyle}"
+                      SelectionChanged="LstPlaylists_SelectionChanged">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Style="{DynamicResource MaterialDesignToolButton}"
+                                    materialDesign:RippleAssist.IsDisabled="True"
+                                    Width="24" Height="24"
+                                    Padding="0"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,6,0"
+                                    ToolTip="Pin playlist"
+                                    Click="PlaylistPinToggle_Click">
+                                <materialDesign:PackIcon Kind="{Binding IsPinned, Converter={StaticResource PinnedToStarIconKindConverter}}"
+                                                         Width="16" Height="16"
+                                                         Foreground="White"/>
+                            </Button>
+                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
         <!-- Draggable divider matching main splitter -->
         <GridSplitter Grid.Column="1"
                       HorizontalAlignment="Stretch"

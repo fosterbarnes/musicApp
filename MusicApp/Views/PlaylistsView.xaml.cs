@@ -68,6 +68,15 @@ namespace MusicApp.Views
         public event EventHandler? ImportPlaylistRequested;
         public event EventHandler<Playlist>? ExportPlaylistRequested;
         public event EventHandler<Playlist>? DeletePlaylistRequested;
+        public event EventHandler<(Playlist playlist, bool isPinned)>? PlaylistPinnedChanged;
+
+        /// <summary>Selects the given playlist in the list and scrolls it into view.</summary>
+        public void SelectPlaylist(Playlist? playlist)
+        {
+            lstPlaylists.SelectedItem = playlist;
+            if (playlist != null)
+                lstPlaylists.ScrollIntoView(playlist);
+        }
 
         private void CreatePlaylist_Click(object sender, RoutedEventArgs e)
         {
@@ -108,6 +117,15 @@ namespace MusicApp.Views
             if (lstPlaylists.SelectedItem is Playlist playlist)
             {
                 DeletePlaylistRequested?.Invoke(this, playlist);
+            }
+        }
+
+        private void PlaylistPinToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.DataContext is Playlist playlist)
+            {
+                playlist.IsPinned = !playlist.IsPinned;
+                PlaylistPinnedChanged?.Invoke(this, (playlist, playlist.IsPinned));
             }
         }
     }
