@@ -1,5 +1,4 @@
 $Host.UI.RawUI.WindowTitle = "Draft musicApp Release"
-. $PROFILE; Center-PSWindow
 
 $basePath = (Get-Item $PSScriptRoot).Parent.FullName
 $sourceBuild = Join-Path $basePath "bin\Release\net8.0-windows"

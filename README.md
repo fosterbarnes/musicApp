@@ -42,11 +42,11 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 -~~Song list from selected artists~~
 
 #### Albums
-- ~~Main window of album thumbnails, alphabeticals~~
-- ~~Popout album view with large album artwork and list of songss~~
+- Main window of album thumbnails, alphabetical
+- Popout album view with large album artwork and list of songs
 
 #### Songs
-- ~~List of all songs in a scrollable, selectable lists~~
+- ~~List of all songs in a scrollable, selectable list~~
 
 #### Genres
 - ~~Scrollable, selectable genre list~~
@@ -79,7 +79,7 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 
 #### Clear Settings
 - ~~Simple button to clear all app settings and libraries~~
-- Will most likely be moved to a library management window/menu
+- Will most likely be moved to the settings menu
 
 
 ### Bottom Row
@@ -88,6 +88,9 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 - ~~Time and size calculation~~
 - ~~Progress bar for song scanning and other actions~~
 
+
+### General Main Window
+- Prompt to scan a folder on first launch/empty library
 
 
 
@@ -145,17 +148,18 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 - Possible media server integration (primarily emby/jellyfin because that's what I use)
 
 #### Backend/Boring Stuff
-- Automatic updates integrated with GitHub releases
-- Installer
-- Option for portable version
+- Automatic updates synced with GitHub releases
+- .exe installer
+- .msi installer
+- .zip portable install 
 </details>
 
 ## Why does this exist?
 
-I hate streaming services. I have tried SO many music player apps like Foobar2000,
-Musicbee, AIMP, Clementine, Strawberry, etc. and just don't like them. No disrespect to the creators but they're just not for me. I tolerate iTunes, and while it is functional and has a UI that I find more functional than the alternatives, it's very out of date, sluggish overall and (for some reason????) makes my twitch stream lag when I play music with it lmao (I'm a twitch streamer).
+I dislike streaming services. I have tried many music player apps like Foobar2000,
+Musicbee, AIMP, Clementine, Strawberry, etc. and just they're not for me. No disrespect to the creators, they're clearly very well-built apps. I like (tolerate) iTunes, and while it IS functional and has a ui that I find better than the alternatives, it's very out of date, sluggish overall and can cause other weird issues with other applications.
 
-To be honest, this app is made so I can use as my daily music player. HOWEVER, if you agree with one or more of the previous statements, this app may also be for you too lol. It's made for Windows with WPF in C#, for this reason, Linux/macOS versions are not currently planned. My main concern is efficiency for my personal daily driver OS (Windows 10) not cross compatibility. The thought of making such a detailed and clean UI in Rust (my cross compat. language of choice) gives me goosebumps and shivers, ergo: WPF in C#, using XAML for styling.
+To be honest, this app is made so I can use as my daily music player. HOWEVER, if you agree with one or more of the previous statements, this app may also be for you too. It's made for Windows with WPF in C#, for this reason, Linux/macOS versions are not currently planned. My main concern is efficiency for my personal daily driver OS (Windows 10) not cross compatibility. The thought of making such a detailed and clean UI in Rust (my cross compat. language of choice) gives me goosebumps and shivers, ergo: WPF in C#, using XAML for styling.
 
 ## Support
 

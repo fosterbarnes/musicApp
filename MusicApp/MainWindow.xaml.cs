@@ -249,6 +249,8 @@ namespace MusicApp
             albumsViewControl.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
             playlistsViewControl.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
 
+            songsView.AddMusicFolderRequested += OnAddMusicFolderRequested;
+
             songsView.DeleteRequested += OnDeleteRequested;
             queueViewControl.DeleteRequested += OnDeleteRequested;
             recentlyPlayedViewControl.DeleteRequested += OnDeleteRequested;
@@ -1522,6 +1524,11 @@ namespace MusicApp
             await AddMusicFolderAsync();
         }
 
+        private async void OnAddMusicFolderRequested(object? sender, EventArgs e)
+        {
+            await AddMusicFolderAsync();
+        }
+
         private async void BtnRescanLibrary_Click(object sender, RoutedEventArgs e)
         {
             await RescanLibraryAsync();
@@ -1584,7 +1591,7 @@ namespace MusicApp
         private void ShowAlbumsView()
         {
             contentHost.Content = albumsViewControl;
-            if (albumsViewControl != null) albumsViewControl.ItemsSource = null;
+            if (albumsViewControl != null) albumsViewControl.ItemsSource = allTracks;
         }
 
         private void ShowGenresView()
@@ -2115,7 +2122,6 @@ namespace MusicApp
 
                 var newTracks = new List<Song>();
                 int processedCount = 0;
-                const int updateInterval = 5; // Update UI every N files
 
                 // Process files on background thread
                 await Task.Run(async () =>
@@ -2149,27 +2155,23 @@ namespace MusicApp
                         }
                         finally
                         {
-                            // Update progress periodically to avoid excessive UI updates
                             processedCount++;
-                            if (processedCount % updateInterval == 0 || processedCount == musicFiles.Count)
+                            await Dispatcher.InvokeAsync(() =>
                             {
-                                await Dispatcher.InvokeAsync(() =>
+                                // Update progress bar fill width
+                                if (musicFiles.Count > 0)
                                 {
-                                    // Update progress bar fill width
-                                    if (musicFiles.Count > 0)
-                                    {
-                                        double progressPercent = (double)processedCount / musicFiles.Count;
-                                        progressBarFill.Width = progressBarBackground.ActualWidth * progressPercent;
-                                    }
-                                    // Update status bar statistics dynamically only during active loading
-                                    if (progressBarFill.Visibility == Visibility.Visible)
-                                    {
-                                        UpdateStatusBar();
-                                    }
-                                });
-                                // Yield to allow UI thread to process updates
-                                await Task.Yield();
-                            }
+                                    double progressPercent = (double)processedCount / musicFiles.Count;
+                                    progressBarFill.Width = progressBarBackground.ActualWidth * progressPercent;
+                                }
+                                // Update status bar with exact song count during loading
+                                if (progressBarFill.Visibility == Visibility.Visible)
+                                {
+                                    UpdateStatusBar();
+                                }
+                            });
+                            // Yield to allow UI thread to process updates
+                            await Task.Yield();
                         }
                     }
                 });

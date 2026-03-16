@@ -14,10 +14,10 @@
     </UserControl.Resources>
     <Grid>
         <ListView x:Name="lstTracks"
+                  ScrollViewer.HorizontalScrollBarVisibility="Hidden"
                   Background="Transparent"
                   BorderThickness="0"
                   Foreground="White"
-                  ScrollViewer.HorizontalScrollBarVisibility="Hidden"
                   ContextMenu="{StaticResource TrackContextMenu}" />
     </Grid>
 </UserControl>

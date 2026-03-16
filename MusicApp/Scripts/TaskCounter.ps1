@@ -1,8 +1,4 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-  Counts tasks in Tasks.md: total (non-header lines with words), completed (~), and percentage.
-#>
 
 param(
     [string] $Path = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'Tasks.md')
@@ -14,13 +10,11 @@ if (-not (Test-Path -LiteralPath $Path)) {
 }
 
 $lines = Get-Content -LiteralPath $Path -Encoding UTF8
-
-# Task lines: have at least one word character, and do NOT start with '#' (header)
 $taskLines = $lines | Where-Object {
     $trimmed = $_.TrimStart()
     $trimmed.Length -gt 0 -and
     -not $trimmed.StartsWith('#') -and
-    $trimmed -match '\S'  # at least one non-whitespace (words)
+    $trimmed -match '\S'  
 }
 
 $total = $taskLines.Count

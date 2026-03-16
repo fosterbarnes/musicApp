@@ -7,14 +7,78 @@
              mc:Ignorable="d"
              d:DesignHeight="400" d:DesignWidth="600">
     <Grid>
-        <views:TrackListView x:Name="trackList"
-                             ViewName="Albums"
-                             SingleClickPlays="True"
-                             PlayTrackRequested="TrackList_PlayTrackRequested" />
-        <TextBlock Text="No albums view yet :("
-                   Foreground="#888888"
-                   FontSize="16"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"/>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Control bar -->
+        <StackPanel Grid.Row="0"
+                    Orientation="Horizontal"
+                    Margin="24,10,24,4"
+                    HorizontalAlignment="Center">
+            <TextBlock Text="Sort by"
+                       Foreground="White"
+                       VerticalAlignment="Center"
+                       Margin="0,0,8,0"/>
+            <ComboBox x:Name="SortModeCombo"
+                      Width="140"
+                      SelectedIndex="0"
+                      VerticalAlignment="Center"
+                      SelectionChanged="SortModeCombo_SelectionChanged"
+                      Foreground="White">
+                <ComboBoxItem Content="Album"/>
+                <ComboBoxItem Content="Artist"/>
+            </ComboBox>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="24,8,24,16">
+            <ItemsControl x:Name="AlbumGrid">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"
+                                   HorizontalAlignment="Center"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Width="158" Margin="0,0,42,16" Cursor="Hand"
+                                MouseLeftButtonDown="AlbumItem_MouseLeftButtonDown">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="0.9"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel>
+                                <Border Width="158" Height="158" CornerRadius="5" SnapsToDevicePixels="True">
+                                    <Border.Background>
+                                        <ImageBrush ImageSource="{Binding AlbumArtSource}"
+                                                    Stretch="UniformToFill"/>
+                                    </Border.Background>
+                                </Border>
+                                <TextBlock Text="{Binding AlbumTitle}"
+                                           Foreground="White"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Margin="0,6,0,0"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding Artist}"
+                                           Foreground="#CCCCCC"
+                                           FontSize="12"
+                                           Margin="0,2,0,0"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
     </Grid>
 </UserControl>
