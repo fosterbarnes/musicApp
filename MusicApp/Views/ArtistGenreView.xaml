@@ -44,7 +44,7 @@
     </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="200" MinWidth="200" MaxWidth="500"/>
+            <ColumnDefinition Width="300" MinWidth="200" MaxWidth="500"/>
             <ColumnDefinition Width="5"/>
             <ColumnDefinition Width="*" MinWidth="200"/>
         </Grid.ColumnDefinitions>

@@ -2,7 +2,9 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Threading;
 using MusicApp;
 using MusicApp.Helpers;
 
@@ -10,11 +12,18 @@ namespace MusicApp.Views;
 
 public partial class SearchPopupView : UserControl
 {
+    private const double MinSearchPopupHeight = 160;
+    private const double DefaultSearchPopupHeight = 575;
+    private const double MaxSearchPopupHeight = 850;
     private Song? _contextMenuSong;
+    private int _heightAdjustGeneration;
 
     public SearchPopupView()
     {
         InitializeComponent();
+        PopupBorder.MinHeight = MinSearchPopupHeight;
+        PopupBorder.Height = DefaultSearchPopupHeight;
+        PopupBorder.MaxHeight = MaxSearchPopupHeight;
     }
 
     public SearchResults? Results
@@ -35,11 +44,13 @@ public partial class SearchPopupView : UserControl
         // Show list and text immediately (no images yet)
         var albumRows = new ObservableCollection<AlbumRowViewModel>(
             results.Albums.Select(a => new AlbumRowViewModel(a)));
+        var artistRows = new ObservableCollection<ArtistRowViewModel>(
+            results.Artists.Select(a => new ArtistRowViewModel(a)));
         var songRows = new ObservableCollection<SongRowViewModel>(
             results.Songs.Select(s => new SongRowViewModel(s)));
 
         view.AlbumsList.ItemsSource = albumRows;
-        view.ArtistsList.ItemsSource = results.Artists;
+        view.ArtistsList.ItemsSource = artistRows;
         view.SongsList.ItemsSource = songRows;
 
         bool any = results.Albums.Count > 0 || results.Artists.Count > 0 || results.Songs.Count > 0;
@@ -74,9 +85,12 @@ public partial class SearchPopupView : UserControl
             if (results.Songs.Count > 0) view.SectionsPanel.Children.Insert(index++, view.SongsSection);
         }
 
+        // Height must run after popup is open + ItemsControl has laid out; see ScheduleAdjustHeightForSearch.
+        view.ScheduleAdjustHeightForSearch();
+
         // Populate images when ready (band-aid: load async after list is shown).
         // TODO: Implement a better solution (e.g. dedicated image cache, virtualization-friendly loading, cancel on new search).
-        _ = view.LoadAlbumArtWhenReadyAsync(albumRows, songRows);
+        _ = view.LoadAlbumArtWhenReadyAsync(artistRows, albumRows, songRows);
     }
 
     private StackPanel SectionPanelFor(SearchSection section) => section switch
@@ -87,10 +101,67 @@ public partial class SearchPopupView : UserControl
         _ => SongsSection
     };
 
+    public void RefreshHeightForSearch() => ScheduleAdjustHeightForSearch();
+
+    private void ScheduleAdjustHeightForSearch()
+    {
+        int gen = ++_heightAdjustGeneration;
+        _ = Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (gen != _heightAdjustGeneration)
+                return;
+            AdjustPopupHeightToResults();
+        }), DispatcherPriority.ContextIdle);
+    }
+
+    private void AdjustPopupHeightToResults()
+    {
+        PopupBorder.Height = DefaultSearchPopupHeight;
+        SectionsPanel.InvalidateMeasure();
+        SearchScrollViewer.InvalidateMeasure();
+        UpdateLayout();
+        SearchScrollViewer.UpdateLayout();
+
+        double viewportHeight = SearchScrollViewer.ViewportHeight;
+        double actualBorderHeight = PopupBorder.ActualHeight;
+        if (viewportHeight <= 0 || actualBorderHeight <= 0)
+        {
+            PopupBorder.Height = DefaultSearchPopupHeight;
+            return;
+        }
+
+        double overhead = actualBorderHeight - viewportHeight;
+
+        double measureWidth = SearchScrollViewer.ViewportWidth;
+        if (measureWidth <= 0)
+            measureWidth = Math.Max(PopupBorder.ActualWidth - 24, PopupBorder.MinWidth - 24);
+
+        SectionsPanel.Measure(new Size(measureWidth, double.PositiveInfinity));
+        double contentHeight = Math.Max(SectionsPanel.DesiredSize.Height, SearchScrollViewer.ExtentHeight);
+
+        double desiredTotalHeight = contentHeight + overhead;
+
+        PopupBorder.Height = desiredTotalHeight >= DefaultSearchPopupHeight
+            ? DefaultSearchPopupHeight
+            : Math.Max(MinSearchPopupHeight, desiredTotalHeight);
+    }
+
     private async System.Threading.Tasks.Task LoadAlbumArtWhenReadyAsync(
+        ObservableCollection<ArtistRowViewModel> artistRows,
         ObservableCollection<AlbumRowViewModel> albumRows,
         ObservableCollection<SongRowViewModel> songRows)
     {
+        foreach (var row in artistRows)
+        {
+            var rep = row.RepresentativeTrack;
+            if (rep == null) continue;
+
+            var img = await System.Threading.Tasks.Task.Run(() => AlbumArtThumbnailHelper.LoadForTrack(rep))
+                .ConfigureAwait(false);
+            if (img != null)
+                await Dispatcher.InvokeAsync(() => row.AlbumArtSource = img);
+        }
+
         foreach (var row in albumRows)
         {
             var song = row.Album.Songs.FirstOrDefault();
@@ -119,6 +190,9 @@ public partial class SearchPopupView : UserControl
     public event EventHandler<(Song track, Playlist playlist)>? AddTrackToPlaylistRequested;
     public event EventHandler<Song>? CreateNewPlaylistWithTrackRequested;
     public event EventHandler<Song>? InfoRequested;
+    public event EventHandler<Song>? ShowInArtistsRequested;
+    public event EventHandler<Song>? ShowInSongsRequested;
+    public event EventHandler<Song>? ShowInAlbumsRequested;
     public event EventHandler<Song>? ShowInExplorerRequested;
     public event EventHandler<Song>? RemoveFromLibraryRequested;
     public event EventHandler<Song>? DeleteRequested;
@@ -134,9 +208,9 @@ public partial class SearchPopupView : UserControl
 
     private void ArtistItem_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (sender is FrameworkElement el && el.DataContext is ArtistSearchItem artist)
+        if (sender is FrameworkElement el && el.DataContext is ArtistRowViewModel row)
         {
-            ArtistSelected?.Invoke(this, artist);
+            ArtistSelected?.Invoke(this, row.Artist);
             e.Handled = true;
         }
     }
@@ -201,7 +275,32 @@ public partial class SearchPopupView : UserControl
     private void SearchContextMenu_AddToPlaylistClick(object sender, RoutedEventArgs e) { }
     private void SearchContextMenu_NewPlaylistClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) CreateNewPlaylistWithTrackRequested?.Invoke(this, _contextMenuSong); }
     private void SearchContextMenu_InfoClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) InfoRequested?.Invoke(this, _contextMenuSong); }
+    private void SearchContextMenu_ShowInArtistsClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInArtistsRequested?.Invoke(this, _contextMenuSong); }
+    private void SearchContextMenu_ShowInSongsClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInSongsRequested?.Invoke(this, _contextMenuSong); }
+    private void SearchContextMenu_ShowInAlbumsClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInAlbumsRequested?.Invoke(this, _contextMenuSong); }
     private void SearchContextMenu_ShowInExplorerClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInExplorerRequested?.Invoke(this, _contextMenuSong); }
     private void SearchContextMenu_RemoveFromLibraryClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) RemoveFromLibraryRequested?.Invoke(this, _contextMenuSong); }
     private void SearchContextMenu_DeleteClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) DeleteRequested?.Invoke(this, _contextMenuSong); }
+
+    private void ResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)
+    {
+        var currentHeight = !double.IsNaN(PopupBorder.Height) ? PopupBorder.Height : PopupBorder.ActualHeight;
+        if (currentHeight <= 0)
+            currentHeight = MinSearchPopupHeight;
+
+        var maxHeight = GetAvailableMaxHeight();
+        var newHeight = Math.Clamp(currentHeight + e.VerticalChange, MinSearchPopupHeight, maxHeight);
+        PopupBorder.Height = newHeight;
+    }
+
+    private double GetAvailableMaxHeight()
+    {
+        var hostWindow = Window.GetWindow(this);
+        if (hostWindow == null || hostWindow.ActualHeight <= 0)
+            return MaxSearchPopupHeight;
+
+        // Leave space so popup does not extend beyond the app window.
+        var windowLimitedMax = hostWindow.ActualHeight - 140;
+        return Math.Clamp(windowLimitedMax, MinSearchPopupHeight, MaxSearchPopupHeight);
+    }
 }

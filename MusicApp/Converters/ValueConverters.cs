@@ -203,4 +203,70 @@ namespace MusicApp.Converters
             throw new NotImplementedException();
         }
     }
+
+    public class AlternatingRowBrushConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is int trackNumber)
+            {
+                bool invert = parameter is string p &&
+                    p.Equals("invert", StringComparison.OrdinalIgnoreCase);
+                bool isEven = trackNumber % 2 == 0;
+                if (invert)
+                    isEven = !isEven;
+
+                return isEven
+                    ? new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#1C1C1C"))
+                    : new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#151515"));
+            }
+            return System.Windows.Data.Binding.DoNothing;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
+    /// Returns true when two string values are equal (case-insensitive).
+    /// Useful for comparing a row's data (e.g. Song.FilePath) to a selected value.
+    /// </summary>
+    public class StringEqualsMultiConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (values == null || values.Length < 2)
+                return false;
+
+            var a = values[0]?.ToString();
+            var b = values[1]?.ToString();
+
+            if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
+                return false;
+
+            return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class HalfWidthConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is double width && width > 0)
+                return width / 2.0;
+            return value;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 } 

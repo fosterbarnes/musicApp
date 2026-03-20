@@ -76,6 +76,8 @@ namespace MusicApp
         private ObservableCollection<Song> allTracks = new ObservableCollection<Song>();
         private ObservableCollection<Song> filteredTracks = new ObservableCollection<Song>();
         private ObservableCollection<Song> shuffledTracks = new ObservableCollection<Song>();
+        private ObservableCollection<Song>? contextualPlaybackQueue;
+        private int contextualPlaybackIndex = -1;
         private ObservableCollection<Playlist> playlists = new ObservableCollection<Playlist>();
         private ObservableCollection<Song> recentlyPlayed = new ObservableCollection<Song>();
 
@@ -194,7 +196,7 @@ namespace MusicApp
             albumsViewControl = new AlbumsView();
             playlistsViewControl = new PlaylistsView();
 
-            void OnPlayTrackRequested(object? s, Song track) => PlayTrack(track);
+            void OnPlayTrackRequested(object? s, Song track) => PlayTrack(track, s);
             songsView.PlayTrackRequested += OnPlayTrackRequested;
             queueViewControl.PlayTrackRequested += OnPlayTrackRequested;
             recentlyPlayedViewControl.PlayTrackRequested += OnPlayTrackRequested;
@@ -240,6 +242,20 @@ namespace MusicApp
             genresViewControl.ShowInExplorerRequested += OnShowInExplorerRequested;
             albumsViewControl.ShowInExplorerRequested += OnShowInExplorerRequested;
             playlistsViewControl.ShowInExplorerRequested += OnShowInExplorerRequested;
+            songsView.ShowInArtistsRequested += OnShowInArtistsRequested;
+            queueViewControl.ShowInArtistsRequested += OnShowInArtistsRequested;
+            recentlyPlayedViewControl.ShowInArtistsRequested += OnShowInArtistsRequested;
+            artistsViewControl.ShowInArtistsRequested += OnShowInArtistsRequested;
+            genresViewControl.ShowInArtistsRequested += OnShowInArtistsRequested;
+            albumsViewControl.ShowInArtistsRequested += OnShowInArtistsRequested;
+            playlistsViewControl.ShowInArtistsRequested += OnShowInArtistsRequested;
+            songsView.ShowInAlbumsRequested += OnShowInAlbumsRequested;
+            queueViewControl.ShowInAlbumsRequested += OnShowInAlbumsRequested;
+            recentlyPlayedViewControl.ShowInAlbumsRequested += OnShowInAlbumsRequested;
+            artistsViewControl.ShowInAlbumsRequested += OnShowInAlbumsRequested;
+            genresViewControl.ShowInAlbumsRequested += OnShowInAlbumsRequested;
+            albumsViewControl.ShowInAlbumsRequested += OnShowInAlbumsRequested;
+            playlistsViewControl.ShowInAlbumsRequested += OnShowInAlbumsRequested;
 
             songsView.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
             queueViewControl.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
@@ -258,6 +274,9 @@ namespace MusicApp
             genresViewControl.DeleteRequested += OnDeleteRequested;
             albumsViewControl.DeleteRequested += OnDeleteRequested;
             playlistsViewControl.DeleteRequested += OnDeleteRequested;
+
+            albumsViewControl.ArtistNavigationRequested += AlbumsView_ArtistNavigationRequested;
+            albumsViewControl.GenreNavigationRequested += AlbumsView_GenreNavigationRequested;
 
             playlistsViewControl.CreatePlaylistRequested += PlaylistsViewControl_CreatePlaylistRequested;
             playlistsViewControl.ImportPlaylistRequested += PlaylistsViewControl_ImportPlaylistRequested;
@@ -288,9 +307,6 @@ namespace MusicApp
                 // Load library cache (tracks only)
                 var libraryCache = await libraryManager.LoadLibraryCacheAsync();
 
-                // Load library folders (music folders and scan times)
-                var libraryFolders = await libraryManager.LoadLibraryFoldersAsync();
-
                 // Load recently played
                 var recentlyPlayedCache = await libraryManager.LoadRecentlyPlayedAsync();
 
@@ -298,7 +314,7 @@ namespace MusicApp
                 var playlistsCache = await libraryManager.LoadPlaylistsAsync();
 
                 // Load music from saved folders
-                await LoadMusicFromSavedFoldersAsync();
+                await LoadMusicFromSavedFoldersAsync(libraryCache);
 
                 // Restore playlists
                 RestorePlaylists(playlistsCache);
@@ -361,11 +377,13 @@ namespace MusicApp
         /// <summary>
         /// Loads music from previously saved folders
         /// </summary>
-        private async Task LoadMusicFromSavedFoldersAsync()
+        private async Task LoadMusicFromSavedFoldersAsync(LibraryManager.LibraryCache? libraryCache = null)
         {
             var musicFolders = await libraryManager.GetMusicFoldersAsync();
             if (musicFolders == null || musicFolders.Count == 0)
                 return;
+
+            libraryCache ??= await libraryManager.LoadLibraryCacheAsync();
 
             foreach (var folderPath in musicFolders)
             {
@@ -382,7 +400,7 @@ namespace MusicApp
                     else
                     {
                         // Load from cache
-                        await LoadMusicFromCacheAsync(folderPath);
+                        await LoadMusicFromCacheAsync(folderPath, libraryCache);
                     }
                 }
             }
@@ -391,11 +409,11 @@ namespace MusicApp
         /// <summary>
         /// Loads music from cache for a specific folder
         /// </summary>
-        private async Task LoadMusicFromCacheAsync(string folderPath)
+        private async Task LoadMusicFromCacheAsync(string folderPath, LibraryManager.LibraryCache? libraryCache = null)
         {
             try
             {
-                var libraryCache = await libraryManager.LoadLibraryCacheAsync();
+                libraryCache ??= await libraryManager.LoadLibraryCacheAsync();
                 var cachedTracks = libraryCache.Tracks.Where(t => t.FilePath.StartsWith(folderPath)).ToList();
 
                 foreach (var track in cachedTracks)
@@ -495,6 +513,24 @@ namespace MusicApp
                         allTracks.Add(track);
                         filteredTracks.Add(track);
                     }
+                }
+
+                // Backfill thumbnail cache in background for tracks that don't have one yet.
+                // This avoids blocking startup; the cache paths are written back on completion.
+                var tracksNeedingThumbnails = allTracks
+                    .Where(t => string.IsNullOrEmpty(t.ThumbnailCachePath) || !File.Exists(t.ThumbnailCachePath))
+                    .ToList();
+
+                if (tracksNeedingThumbnails.Count > 0)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        foreach (var t in tracksNeedingThumbnails)
+                        {
+                            t.ThumbnailCachePath = AlbumArtCacheManager.GenerateAndCache(t);
+                        }
+                        await Dispatcher.InvokeAsync(async () => await UpdateLibraryCacheAsync());
+                    });
                 }
 
                 // Update shuffled tracks if shuffle is enabled
@@ -758,6 +794,10 @@ namespace MusicApp
             // Wire up shuffle state change event
             titleBarPlayer.ShuffleStateChanged += TitleBarPlayer_ShuffleStateChanged;
 
+            // Wire up song info navigation
+            titleBarPlayer.ArtistNavigationRequested += TitleBarPlayer_ArtistNavigationRequested;
+            titleBarPlayer.AlbumNavigationRequested += TitleBarPlayer_AlbumNavigationRequested;
+
             // Wire up search
             titleBarPlayer.SearchTextChanged += TitleBarPlayer_SearchTextChanged;
             if (searchPopupView != null)
@@ -769,6 +809,9 @@ namespace MusicApp
                 searchPopupView.AddToQueueRequested += OnAddToQueueRequested;
                 searchPopupView.AddTrackToPlaylistRequested += OnAddTrackToPlaylistRequested;
                 searchPopupView.CreateNewPlaylistWithTrackRequested += OnCreateNewPlaylistWithTrackRequested;
+                searchPopupView.ShowInArtistsRequested += OnShowInArtistsRequested;
+                searchPopupView.ShowInSongsRequested += OnShowInSongsRequested;
+                searchPopupView.ShowInAlbumsRequested += OnShowInAlbumsRequested;
                 searchPopupView.ShowInExplorerRequested += OnShowInExplorerRequested;
                 searchPopupView.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
                 searchPopupView.DeleteRequested += OnDeleteRequested;
@@ -791,6 +834,7 @@ namespace MusicApp
             if (searchPopup.PlacementTarget == null && titleBarPlayer.SearchBarBorder != null)
                 searchPopup.PlacementTarget = titleBarPlayer.SearchBarBorder;
             searchPopup.IsOpen = true;
+            searchPopupView?.RefreshHeightForSearch();
         }
 
         private void SearchPopupView_SongSelected(object? sender, Song song)
@@ -812,6 +856,30 @@ namespace MusicApp
             ShowAlbumsView();
             if (albumsViewControl != null && album.Songs.Count > 0)
                 albumsViewControl.ItemsSource = album.Songs;
+        }
+
+        private void TitleBarPlayer_ArtistNavigationRequested(object? sender, string artistName)
+        {
+            ShowArtistsView();
+            artistsViewControl?.SelectArtist(artistName);
+        }
+
+        private void TitleBarPlayer_AlbumNavigationRequested(object? sender, string albumName)
+        {
+            ShowAlbumsView();
+            albumsViewControl?.ScrollToAlbum(albumName);
+        }
+
+        private void AlbumsView_ArtistNavigationRequested(object? sender, string artistName)
+        {
+            ShowArtistsView();
+            artistsViewControl?.SelectArtist(artistName);
+        }
+
+        private void AlbumsView_GenreNavigationRequested(object? sender, string genreName)
+        {
+            ShowGenresView();
+            genresViewControl?.SelectGenre(genreName);
         }
 
         #region Shuffle Management
@@ -1018,6 +1086,12 @@ namespace MusicApp
         {
             try
             {
+                if (contextualPlaybackQueue != null && contextualPlaybackQueue.Count > 0)
+                {
+                    Console.WriteLine($"GetCurrentPlayQueue - using contextual queue with {contextualPlaybackQueue.Count} tracks");
+                    return contextualPlaybackQueue;
+                }
+
                 var queue = titleBarPlayer.IsShuffleEnabled ? shuffledTracks : filteredTracks;
 
                 // Safety check - ensure we have a valid queue
@@ -1050,6 +1124,12 @@ namespace MusicApp
         {
             try
             {
+                if (contextualPlaybackQueue != null && contextualPlaybackQueue.Count > 0)
+                {
+                    Console.WriteLine($"GetCurrentTrackIndex - using contextual index: {contextualPlaybackIndex}");
+                    return contextualPlaybackIndex;
+                }
+
                 var index = titleBarPlayer.IsShuffleEnabled ? currentShuffledIndex : currentTrackIndex;
                 Console.WriteLine($"GetCurrentTrackIndex - shuffle enabled: {titleBarPlayer.IsShuffleEnabled}, index: {index}");
                 return index;
@@ -1066,6 +1146,12 @@ namespace MusicApp
         /// </summary>
         private void SetCurrentTrackIndex(int index)
         {
+            if (contextualPlaybackQueue != null && contextualPlaybackQueue.Count > 0)
+            {
+                contextualPlaybackIndex = index;
+                return;
+            }
+
             if (titleBarPlayer.IsShuffleEnabled)
             {
                 currentShuffledIndex = index;
@@ -1249,6 +1335,7 @@ namespace MusicApp
                     currentTrack = null;
                     currentTrackIndex = -1;
                     currentShuffledIndex = -1;
+                    ClearContextualPlaybackQueue();
                     titleBarPlayer.SetTrackInfo("No track selected", "", "");
 
                     // Update queue view if it's visible
@@ -1551,7 +1638,6 @@ namespace MusicApp
         private void ShowLibraryView()
         {
             contentHost.Content = songsView;
-            if (songsView != null) songsView.ItemsSource = allTracks;
         }
 
         private void ShowQueueView()
@@ -1579,25 +1665,21 @@ namespace MusicApp
         private void ShowRecentlyPlayedView()
         {
             contentHost.Content = recentlyPlayedViewControl;
-            if (recentlyPlayedViewControl != null) recentlyPlayedViewControl.ItemsSource = recentlyPlayed;
         }
 
         private void ShowArtistsView()
         {
             contentHost.Content = artistsViewControl;
-            if (artistsViewControl != null) artistsViewControl.ItemsSource = allTracks;
         }
 
         private void ShowAlbumsView()
         {
             contentHost.Content = albumsViewControl;
-            if (albumsViewControl != null) albumsViewControl.ItemsSource = allTracks;
         }
 
         private void ShowGenresView()
         {
             contentHost.Content = genresViewControl;
-            if (genresViewControl != null) genresViewControl.ItemsSource = allTracks;
         }
 
         #endregion
@@ -1705,6 +1787,33 @@ namespace MusicApp
             }
         }
 
+        private void OnShowInArtistsRequested(object? sender, Song track)
+        {
+            if (track == null || string.IsNullOrWhiteSpace(track.Artist))
+                return;
+
+            ShowArtistsView();
+            artistsViewControl?.SelectTrack(track);
+        }
+
+        private void OnShowInAlbumsRequested(object? sender, Song track)
+        {
+            if (track == null || string.IsNullOrWhiteSpace(track.Album))
+                return;
+
+            ShowAlbumsView();
+            albumsViewControl?.SelectAlbum(track);
+        }
+
+        private void OnShowInSongsRequested(object? sender, Song track)
+        {
+            if (track == null)
+                return;
+
+            ShowLibraryView();
+            songsView?.SelectTrack(track);
+        }
+
         /// <summary>
         /// Removes the track from the MusicApp library (in-memory and persisted). Does not delete the file.
         /// </summary>
@@ -1759,6 +1868,7 @@ namespace MusicApp
                 currentTrack = null;
                 currentTrackIndex = -1;
                 currentShuffledIndex = -1;
+                ClearContextualPlaybackQueue();
                 titleBarPlayer.SetTrackInfo("No track selected", "", "");
             }
 
@@ -1995,6 +2105,9 @@ namespace MusicApp
                     MessageDialog.Show(this, "No Folders", "No music folders have been added yet.", MessageDialog.Buttons.Ok);
                     return;
                 }
+
+                // Clear thumbnail cache so changed artwork is regenerated during scan
+                await Task.Run(() => AlbumArtCacheManager.InvalidateAll());
 
                 var totalNewTracks = 0;
                 foreach (var folderPath in musicFolders)
@@ -2395,6 +2508,9 @@ namespace MusicApp
                         track.AlbumArtPath = "embedded";
                     }
 
+                    // Generate and cache album art thumbnail
+                    track.ThumbnailCachePath = AlbumArtCacheManager.GenerateAndCache(track);
+
                     Console.WriteLine($"ATL metadata: Title='{track.Title}', Artist='{track.Artist}', Album='{track.Album}'");
                 }
                 catch (Exception ex)
@@ -2460,7 +2576,7 @@ namespace MusicApp
 
         #region Playback Control
 
-        private void PlayTrack(Song track)
+        private void PlayTrack(Song track, object? requestSource = null)
         {
             try
             {
@@ -2484,6 +2600,7 @@ namespace MusicApp
                 }
 
                 Console.WriteLine($"Playing track: {track.Title} - {track.Artist}");
+                TryInitializeAlbumContextQueue(requestSource, track);
 
                 // Clean up existing audio objects without triggering PlaybackStopped
                 // We need to do this manually to avoid resetting the current track
@@ -2522,19 +2639,18 @@ namespace MusicApp
 
                 currentTrack = track;
 
-                // Set the current track index in both queues
-                currentTrackIndex = filteredTracks.IndexOf(track);
-                currentShuffledIndex = shuffledTracks.IndexOf(track);
+                // Set the current track index in the active queue context.
+                SyncCurrentTrackIndices(track);
 
                 // If shuffle is enabled and this is NOT manual navigation, regenerate shuffled queue
                 // Manual navigation (skip forward/backward) should maintain the existing shuffled order
-                if (titleBarPlayer.IsShuffleEnabled && !isManualNavigation)
+                if (titleBarPlayer.IsShuffleEnabled && !isManualNavigation && !HasContextualPlaybackQueue())
                 {
                     Console.WriteLine("Shuffle enabled and not manual navigation - regenerating shuffled queue");
                     RegenerateShuffledTracks();
                     currentShuffledIndex = shuffledTracks.IndexOf(track);
                 }
-                else if (titleBarPlayer.IsShuffleEnabled && isManualNavigation)
+                else if (titleBarPlayer.IsShuffleEnabled && isManualNavigation && !HasContextualPlaybackQueue())
                 {
                     Console.WriteLine("Shuffle enabled but manual navigation - maintaining existing shuffled queue");
                     // Just update the index to the new track position
@@ -2640,19 +2756,18 @@ namespace MusicApp
 
                 currentTrack = track;
 
-                // Set the current track index in both queues
-                currentTrackIndex = filteredTracks.IndexOf(track);
-                currentShuffledIndex = shuffledTracks.IndexOf(track);
+                // Set the current track index in the active queue context.
+                SyncCurrentTrackIndices(track);
 
                 // If shuffle is enabled and this is NOT manual navigation, regenerate shuffled queue
                 // Manual navigation (skip forward/backward) should maintain the existing shuffled order
-                if (titleBarPlayer.IsShuffleEnabled && !isManualNavigation)
+                if (titleBarPlayer.IsShuffleEnabled && !isManualNavigation && !HasContextualPlaybackQueue())
                 {
                     Console.WriteLine("Shuffle enabled and not manual navigation - regenerating shuffled queue");
                     RegenerateShuffledTracks();
                     currentShuffledIndex = shuffledTracks.IndexOf(track);
                 }
-                else if (titleBarPlayer.IsShuffleEnabled && isManualNavigation)
+                else if (titleBarPlayer.IsShuffleEnabled && isManualNavigation && !HasContextualPlaybackQueue())
                 {
                     Console.WriteLine("Shuffle enabled but manual navigation - maintaining existing shuffled queue");
                     // Just update the index to the new track position
@@ -2726,6 +2841,14 @@ namespace MusicApp
         {
             try
             {
+                // Fast path: use cached thumbnail (JPEG from disk, no ATL/GDI+ overhead)
+                if (!string.IsNullOrEmpty(track.ThumbnailCachePath))
+                {
+                    var cached = AlbumArtCacheManager.LoadFromCachePath(track.ThumbnailCachePath);
+                    if (cached != null)
+                        return cached;
+                }
+
                 // First try to load embedded album art using ATL.NET
                 try
                 {
@@ -2734,9 +2857,9 @@ namespace MusicApp
 
                     if (embeddedPictures != null && embeddedPictures.Count > 0)
                     {
-                        var picture = embeddedPictures[0]; // Get the first picture (usually the album art)
+                        var picture = embeddedPictures[0];
                         var scaledBitmap = CreateHighQualityScaledImage(picture.PictureData);
-                        return scaledBitmap; // Successfully loaded embedded art
+                        return scaledBitmap;
                     }
                 }
                 catch (Exception ex)
@@ -2753,7 +2876,6 @@ namespace MusicApp
                         .Where(file => imageExtensions.Contains(Path.GetExtension(file).ToLower()))
                         .ToList();
 
-                    // Look for common album art filenames
                     var albumArtFile = imageFiles.FirstOrDefault(file =>
                     {
                         var fileName = Path.GetFileNameWithoutExtension(file).ToLower();
@@ -2763,7 +2885,6 @@ namespace MusicApp
                                fileName.Contains("folder");
                     });
 
-                    // If no specific album art found, use the first image file
                     if (albumArtFile == null && imageFiles.Count > 0)
                     {
                         albumArtFile = imageFiles[0];
@@ -2776,7 +2897,6 @@ namespace MusicApp
                     }
                     else
                     {
-                        // No album art found, return null
                         return null;
                     }
                 }
@@ -2787,7 +2907,6 @@ namespace MusicApp
             }
             catch (Exception ex)
             {
-                // If we can't load album art, return null
                 Console.WriteLine($"Error loading album art for {track.Title}: {ex.Message}");
                 return null;
             }
@@ -2953,6 +3072,7 @@ namespace MusicApp
                 currentTrack = null;
                 currentTrackIndex = -1;
                 currentShuffledIndex = -1;
+                ClearContextualPlaybackQueue();
 
                 // Update title bar player to show no track is playing
                 titleBarPlayer.SetTrackInfo("No track selected", "", "");
@@ -2969,6 +3089,77 @@ namespace MusicApp
             {
                 Console.WriteLine($"Error resetting to idle state: {ex.Message}");
             }
+        }
+
+        private bool HasContextualPlaybackQueue()
+        {
+            return contextualPlaybackQueue != null && contextualPlaybackQueue.Count > 0;
+        }
+
+        private void ClearContextualPlaybackQueue()
+        {
+            contextualPlaybackQueue = null;
+            contextualPlaybackIndex = -1;
+        }
+
+        private bool IsPlaybackIdleAndQueueEmpty()
+        {
+            bool noTrackPlaying = currentTrack == null && !titleBarPlayer.IsPlaying;
+            bool noQueueState = !HasContextualPlaybackQueue() && currentTrackIndex < 0 && currentShuffledIndex < 0;
+            return noTrackPlaying && noQueueState;
+        }
+
+        private void TryInitializeAlbumContextQueue(object? requestSource, Song selectedTrack)
+        {
+            if (!ReferenceEquals(requestSource, albumsViewControl) || !IsPlaybackIdleAndQueueEmpty())
+                return;
+
+            string albumTitle = selectedTrack.Album ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(albumTitle))
+                return;
+
+            string selectedAlbumArtist = !string.IsNullOrWhiteSpace(selectedTrack.AlbumArtist)
+                ? selectedTrack.AlbumArtist
+                : selectedTrack.Artist ?? string.Empty;
+
+            var albumTracks = allTracks
+                .Where(s =>
+                    string.Equals(s.Album, albumTitle, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(
+                        !string.IsNullOrWhiteSpace(s.AlbumArtist) ? s.AlbumArtist : s.Artist,
+                        selectedAlbumArtist,
+                        StringComparison.OrdinalIgnoreCase))
+                .OrderBy(s => int.TryParse(s.DiscNumber, out int d) ? d : 0)
+                .ThenBy(s => s.TrackNumber)
+                .ToList();
+
+            if (albumTracks.Count == 0)
+                return;
+
+            contextualPlaybackQueue = new ObservableCollection<Song>(albumTracks);
+            contextualPlaybackIndex = contextualPlaybackQueue.IndexOf(selectedTrack);
+            Console.WriteLine($"Initialized album contextual queue with {contextualPlaybackQueue.Count} tracks at index {contextualPlaybackIndex}");
+        }
+
+        private void SyncCurrentTrackIndices(Song track)
+        {
+            if (HasContextualPlaybackQueue())
+            {
+                int contextIndex = contextualPlaybackQueue!.IndexOf(track);
+                if (contextIndex >= 0)
+                {
+                    contextualPlaybackIndex = contextIndex;
+                    currentTrackIndex = filteredTracks.IndexOf(track);
+                    currentShuffledIndex = shuffledTracks.IndexOf(track);
+                    return;
+                }
+
+                Console.WriteLine("Track not found in contextual queue; clearing contextual queue");
+                ClearContextualPlaybackQueue();
+            }
+
+            currentTrackIndex = filteredTracks.IndexOf(track);
+            currentShuffledIndex = shuffledTracks.IndexOf(track);
         }
 
         /// <summary>
@@ -3022,6 +3213,7 @@ namespace MusicApp
             {
                 // Use the safe cleanup method
                 CleanupAudioObjects();
+                ClearContextualPlaybackQueue();
             }
             finally
             {
@@ -3076,6 +3268,7 @@ namespace MusicApp
                 {
                     Console.WriteLine("No tracks in queue, stopping playback");
                     CleanupAudioObjects();
+                    ClearContextualPlaybackQueue();
                     return;
                 }
 
@@ -3104,6 +3297,7 @@ namespace MusicApp
                         Console.WriteLine("Next track is null or has invalid file path, stopping playback");
                         // Clean up and reset to idle state
                         CleanupAudioObjects();
+                        ClearContextualPlaybackQueue();
                     }
                 }
                 else
@@ -3113,6 +3307,7 @@ namespace MusicApp
 
                     // Clean up audio objects and reset to idle state
                     CleanupAudioObjects();
+                    ClearContextualPlaybackQueue();
 
                     Console.WriteLine("Playback stopped - app reset to idle state");
                 }
@@ -3126,6 +3321,7 @@ namespace MusicApp
                 try
                 {
                     CleanupAudioObjects();
+                    ClearContextualPlaybackQueue();
                 }
                 catch (Exception stopEx)
                 {
@@ -3217,6 +3413,7 @@ namespace MusicApp
                 currentTrack = null;
                 currentTrackIndex = -1;
                 currentShuffledIndex = -1;
+                ClearContextualPlaybackQueue();
 
                 // Stop any current playback
                 StopPlayback();

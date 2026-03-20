@@ -32,5 +32,7 @@ public class ArtistSearchItem
     public string Name { get; set; } = "";
     public int AlbumCount { get; set; }
     public int SongCount { get; set; }
+    // Used by the UI to display album artwork for the artist (e.g. oldest album).
+    public Song? RepresentativeTrack { get; set; }
     public string Subtitle => $"{AlbumCount} albums, {SongCount} songs";
 }

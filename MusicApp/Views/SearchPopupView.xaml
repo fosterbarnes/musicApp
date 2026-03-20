@@ -21,7 +21,9 @@
                 <MenuItem Header="New Playlist" Click="SearchContextMenu_NewPlaylistClick"/>
                 <Separator/>
             </MenuItem>
-            <Separator/>
+            <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Show in Artists" Click="SearchContextMenu_ShowInArtistsClick"/>
+            <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Show in Songs" Click="SearchContextMenu_ShowInSongsClick"/>
+            <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Show in Albums" Click="SearchContextMenu_ShowInAlbumsClick"/>
             <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Info" Click="SearchContextMenu_InfoClick"/>
             <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Show in Explorer" Click="SearchContextMenu_ShowInExplorerClick"/>
             <Separator/>
@@ -29,114 +31,151 @@
             <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Delete" Click="SearchContextMenu_DeleteClick"/>
         </ContextMenu>
     </UserControl.Resources>
-    <Border Background="#2D2D2D" BorderBrush="#404040" BorderThickness="1" CornerRadius="6" Padding="12" MinWidth="360" MaxHeight="400">
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel x:Name="SectionsPanel">
-                <!-- Albums section (order set in code from SectionOrder) -->
-                <StackPanel x:Name="AlbumsSection">
-                    <TextBlock Text="Albums" FontWeight="Bold" Foreground="White" FontSize="14" Margin="0,0,0,6"/>
-                    <ItemsControl x:Name="AlbumsList" Margin="0,0,0,12">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Background="Transparent" Padding="4,6" Cursor="Hand" MouseLeftButtonDown="AlbumItem_MouseLeftButtonDown" ContextMenu="{StaticResource SearchResultContextMenu}">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#404040"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="40"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Border Width="40" Height="40" Background="#404040" CornerRadius="2" Grid.Column="0">
-                                        <Image Source="{Binding AlbumArtSource}" Stretch="UniformToFill"/>
-                                    </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
-                                        <TextBlock Text="{Binding AlbumTitle}" Foreground="White" FontSize="13" TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Text="{Binding Artist}" Foreground="#CCCCCC" FontSize="11" TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+    <Border x:Name="PopupBorder" Background="#2D2D2D" BorderBrush="#404040" BorderThickness="1" CornerRadius="6" Padding="12" MinWidth="360">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-                <!-- Artists section -->
-                <StackPanel x:Name="ArtistsSection">
-                    <TextBlock Text="Artists" FontWeight="Bold" Foreground="White" FontSize="14" Margin="0,0,0,6"/>
-                    <ItemsControl x:Name="ArtistsList" Margin="0,0,0,12">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Background="Transparent" Padding="4,6" Cursor="Hand" MouseLeftButtonDown="ArtistItem_MouseLeftButtonDown">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#404040"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="40"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Border Width="40" Height="40" Background="#505050" CornerRadius="20" Grid.Column="0"/>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
-                                        <TextBlock Text="{Binding Name}" Foreground="White" FontSize="13" TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Text="{Binding Subtitle}" Foreground="#CCCCCC" FontSize="11"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+            <ScrollViewer x:Name="SearchScrollViewer" Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Grid MinHeight="0">
+                    <StackPanel x:Name="SectionsPanel">
+                    <!-- Albums section (order set in code from SectionOrder) -->
+                    <StackPanel x:Name="AlbumsSection">
+                        <TextBlock Text="Albums" FontWeight="Bold" Foreground="White" FontSize="14" Margin="0,0,0,6"/>
+                        <ItemsControl x:Name="AlbumsList" Margin="0,0,0,12">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="Transparent" Padding="4,6" Cursor="Hand" MouseLeftButtonDown="AlbumItem_MouseLeftButtonDown" ContextMenu="{StaticResource SearchResultContextMenu}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#404040"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="40" Height="40" Background="#404040" CornerRadius="2" Grid.Column="0">
+                                            <Image Source="{Binding AlbumArtSource}" Stretch="UniformToFill"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
+                                            <TextBlock Text="{Binding AlbumTitle}" Foreground="White" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Artist}" Foreground="#CCCCCC" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
 
-                <!-- Songs section -->
-                <StackPanel x:Name="SongsSection">
-                    <TextBlock Text="Songs" FontWeight="Bold" Foreground="White" FontSize="14" Margin="0,0,0,6"/>
-                    <ItemsControl x:Name="SongsList" Margin="0,0,0,0">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Background="Transparent" Padding="4,6" Cursor="Hand" MouseLeftButtonDown="SongItem_MouseLeftButtonDown" ContextMenu="{StaticResource SearchResultContextMenu}">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#404040"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="40"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Border Width="40" Height="40" Background="#404040" CornerRadius="2" Grid.Column="0">
-                                        <Image Source="{Binding AlbumArtSource}" Stretch="UniformToFill"/>
-                                    </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
-                                        <TextBlock Text="{Binding Title}" Foreground="White" FontSize="13" TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Text="{Binding Artist}" Foreground="#CCCCCC" FontSize="11" TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+                    <!-- Artists section -->
+                    <StackPanel x:Name="ArtistsSection">
+                        <TextBlock Text="Artists" FontWeight="Bold" Foreground="White" FontSize="14" Margin="0,0,0,6"/>
+                        <ItemsControl x:Name="ArtistsList" Margin="0,0,0,12">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="Transparent" Padding="4,6" Cursor="Hand" MouseLeftButtonDown="ArtistItem_MouseLeftButtonDown">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#404040"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="40"
+                                                Height="40"
+                                                Background="#505050"
+                                                CornerRadius="20"
+                                                Grid.Column="0"
+                                                ClipToBounds="True">
+                                            <Border.Clip>
+                                                <EllipseGeometry RadiusX="20" RadiusY="20" Center="20,20"/>
+                                            </Border.Clip>
+                                            <Image Source="{Binding AlbumArtSource}" Stretch="UniformToFill"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
+                                            <TextBlock Text="{Binding Name}" Foreground="White" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Subtitle}" Foreground="#CCCCCC" FontSize="11"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
 
-                <TextBlock x:Name="NoResultsText" Text="No results" Foreground="#888888" FontSize="13" Margin="0,12,0,0" Visibility="Collapsed"/>
-            </StackPanel>
-        </ScrollViewer>
+                    <!-- Songs section -->
+                    <StackPanel x:Name="SongsSection">
+                        <TextBlock Text="Songs" FontWeight="Bold" Foreground="White" FontSize="14" Margin="0,0,0,6"/>
+                        <ItemsControl x:Name="SongsList" Margin="0,0,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="Transparent" Padding="4,6" Cursor="Hand" MouseLeftButtonDown="SongItem_MouseLeftButtonDown" ContextMenu="{StaticResource SearchResultContextMenu}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#404040"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="40" Height="40" Background="#404040" CornerRadius="2" Grid.Column="0">
+                                            <Image Source="{Binding AlbumArtSource}" Stretch="UniformToFill"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
+                                            <TextBlock Text="{Binding Title}" Foreground="White" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Artist}" Foreground="#CCCCCC" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                        <TextBlock x:Name="NoResultsText" Text="No results" Foreground="#888888" FontSize="13" Margin="0,12,0,0" Visibility="Collapsed"/>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+
+            <Grid Grid.Row="1" Margin="0,0,0,0" Height="1" Background="#2D2D2D">
+                <Thumb x:Name="ResizeThumb"
+                       Cursor="SizeNS"
+                       DragDelta="ResizeThumb_DragDelta"
+                       Height="13"
+                       VerticalAlignment="Top"
+                       Margin="0,0,0,-12"
+                       IsHitTestVisible="True">
+                    <Thumb.Template>
+                        <ControlTemplate TargetType="Thumb">
+                            <Grid Background="Transparent">
+                                <Border Height="1" Background="#505050" VerticalAlignment="Top"/>
+                            </Grid>
+                        </ControlTemplate>
+                    </Thumb.Template>
+                </Thumb>
+            </Grid>
+        </Grid>
     </Border>
 </UserControl>

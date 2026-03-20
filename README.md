@@ -1,20 +1,48 @@
 # ![Icon](https://i.postimg.cc/d3c9vxzF/Music-App-Icon24x24.png) musicApp - an offline music player
 
-<td><img src="Resources/scr1.png" alt="Screenshot" /></td>
+<img src="Resources/scr/album.png" alt="Screenshot" />
+
+<details>
+<summary>More Screenshots:</summary>
+
+### Artists
+<img src="Resources/scr/artist.png" alt="Artists" />
+
+### Albums
+<img src="Resources/scr/album.png" alt="Albums" />
+
+### Songs
+<img src="Resources/scr/song.png" alt="Songs" />
+
+### Genres
+<img src="Resources/scr/genre.png" alt="Genres" />
+
+### Playlists
+<img src="Resources/scr/playlist.png" alt="Playlists" />
+
+### Recently Played
+<img src="Resources/scr/recent.png" alt="Recently Played" />
+
+### Queue
+<img src="Resources/scr/queue.png" alt="Queue" />
+
+### Search
+<img src="Resources/scr/search.png" alt="Search" />
+
+</details>
 
 musicApp is in early development, bugs are expected.
 
-If you want to use it, [download the latest release](https://github.com/fosterbarnes/MusicApp/releases), unzip, then run MusicApp.exe
+If you want to use it, [download the latest release](https://github.com/fosterbarnes/musicApp/releases/download/v0.0.17/musicApp_v0.0.17_papiFunkin.zip), unzip, then run MusicApp.exe
 
 ## Progress
 
-![Progress Bar](https://progress-bars.entcheneric.com/bar.svg?progress=41&backgroundColor=%23212121&height=40&width=800&borderRadius=10&striped=false&animated=false&gradientAnimated=false&animationSpeed=1&stripeAnimationSpeed=1&gradientAnimationSpeed=1&initialAnimationSpeed=1&color=%23705399)  
-**32 / 78 tasks complete (41%)**
+![Progress Bar](https://progress-bars.entcheneric.com/bar.svg?progress=45&backgroundColor=%23212121&height=40&width=800&borderRadius=10&striped=false&animated=false&gradientAnimated=false&animationSpeed=1&stripeAnimationSpeed=1&gradientAnimationSpeed=1&initialAnimationSpeed=1&color=%23705399)  
+**43 / 95 tasks complete (45.3%)**
 
 
 <details>
 <summary>Tasks</summary>
-    
 ## Main Window
 
 ### Title Bar
@@ -22,7 +50,7 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 - ~~Volume control~~
 ##### Song info view:
   - ~~Currently playing song info (album art, artist, album)~~
-  - Ability to get to song album/artist from info view
+  - ~~Ability to get to song album/artist from info view~~
   - ~~Clickable, selectable seek bar~~
   - ~~Shuffle button~~
   - ~~Repeat button~~
@@ -32,7 +60,9 @@ If you want to use it, [download the latest release](https://github.com/fosterba
   - ~~Editable text area to input search~~
   - ~~Menu with search results~~
   - ~~Ability to get to search result items in main window~~
-  - Context menu item: show in songs/artists/genre/album
+  - ~~Context menu item: show in songs/artists/genre/album~~
+  - ~~Dynamically re-sizable window based on amount of results~~
+  - ~~Ability to resize window~~
 
 
 ### Main Window Buttons
@@ -42,11 +72,21 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 -~~Song list from selected artists~~
 
 #### Albums
-- Main window of album thumbnails, alphabetical
-- Popout album view with large album artwork and list of songs
+- ~~Main window of album thumbnails, alphabetical~~
+- ~~Popout album view with large album artwork and list of songs~~
+- ~~Sort by Artist/Album~~
+- ~~Album art size slider~~
+- ~~Album song selection flyout menu:~~
+  - ~~Dynamically resizing columns~~
+  - ~~Album length and song count info~~
+  - ~~High quality album art~~
+  - ~~Artist, genre and year with ability to click artist or genre~~
+- Improve load time
+- Cache the albums list (entire list and image data)
+- Loading indicator when building album cache
 
 #### Songs
-- ~~List of all songs in a scrollable, selectable list~~
+- ~~List of all songs in a scrollable, selectable lists~~
 
 #### Genres
 - ~~Scrollable, selectable genre list~~
@@ -79,7 +119,7 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 
 #### Clear Settings
 - ~~Simple button to clear all app settings and libraries~~
-- Will most likely be moved to the settings menu
+- Will most likely be moved to a library management window/menu
 
 
 ### Bottom Row
@@ -88,9 +128,6 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 - ~~Time and size calculation~~
 - ~~Progress bar for song scanning and other actions~~
 
-
-### General Main Window
-- Prompt to scan a folder on first launch/empty library
 
 
 
@@ -126,8 +163,13 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 - Split `MainWindow.xaml.cs` into multiple components
 - Cut down on if statements. Use more switch/loops
 - ~~Use hard-coded custom "pop-ups" and info menus rather than built in windows pop-ups~~
+- Improve startup load times
+- Improve album art load time
 
 #### Bugs
+- General sluggishness/startup time
+- Window sized is not always properly remembered and restored
+- Queue does not work as intended and needs fixing
 
 #### Planned Features
 - Ability to edit metadata
@@ -148,11 +190,85 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 - Possible media server integration (primarily emby/jellyfin because that's what I use)
 
 #### Backend/Boring Stuff
-- Automatic updates synced with GitHub releases
-- .exe installer
-- .msi installer
-- .zip portable install 
+- Automatic updates integrated with GitHub releases
+- Installer
+- Option for portable version
 </details>
+
+# General Usage Info
+
+
+
+## Main Window
+
+### Title Bar
+- Play/pause/skip buttons
+- Volume control
+
+##### Song info view:
+  - Currently playing song info (album art, artist, album)
+  - Ability to get to song album/artist from info view
+  - Clickable, selectable seek bar
+  - Shuffle button
+  - Repeat button
+
+##### Queue button:
+
+##### Search bar:
+  - Editable text area to input search
+  - Menu with search results
+  - Ability to get to search result items in main window
+  - Context menu item: show in songs/artists/genre/album
+  - Dynamically re-sizable window based on amount of results
+  - Ability to resize window
+
+
+### Main Window Buttons
+
+#### Artists
+- Scrollable, selectable artist list
+- Song list from selected artists
+
+#### Albums
+- Main window of album thumbnails, alphabetical
+- Popout album view with large album artwork and list of songs
+- Sort by Artist/Album
+- Album art size slider
+- Album song selection flyout menu:
+  - Dynamically resizing columns
+  - Album length and song count info
+  - High quality album art
+  - Artist, genre and year with ability to click artist or genre
+
+#### Songs
+- List of all songs in a scrollable, selectable lists
+#### Genres
+- Scrollable, selectable genre list
+- Song list from selected genres
+
+#### Playlists
+- Scrollable, selectable playlist list
+- Add/remove buttons
+- Import/export buttons
+- Ability to pin playlists to the main button menu
+
+#### Recently Played
+- Similar to songs, but only shows recently played tracks
+#### Queue
+- List of queued songs in a scrollable, selectable list
+#### Add Music Folder
+- Simple button to recursively scan a given folder, then add it to the library
+#### Re-Scan Library
+- Simple button to re-scan the current library folder(s)
+#### Remove Music Folder
+- Simple button to remove a given folder from the library
+#### Clear Settings
+- Simple button to clear all app settings and libraries
+### Bottom Row
+- Song count
+- Album count
+- Time and size calculation
+- Progress bar for song scanning and other actions
 
 ## Why does this exist?
 
@@ -170,3 +286,5 @@ If you'd like to support me, follow me on twitch:
 
 or if you're feeling generous drop a donation:
 [https://coff.ee/fosterbarnes](https://coff.ee/fosterbarnes)
+
+

@@ -26,6 +26,8 @@ namespace MusicApp.TitleBarWithPlayerControls
         public event EventHandler<bool>? ShuffleStateChanged;
         /// <summary>Raised when search text changes (debounced). EventArgs is the current query; empty string when cleared or placeholder.</summary>
         public event EventHandler<string>? SearchTextChanged;
+        public event EventHandler<string>? ArtistNavigationRequested;
+        public event EventHandler<string>? AlbumNavigationRequested;
 
         // === Audio Playback State ===
         private WaveOutEvent? waveOut;
@@ -441,6 +443,27 @@ namespace MusicApp.TitleBarWithPlayerControls
         private void BtnQueue_Click(object sender, RoutedEventArgs e)
         {
             e.Handled = true;
+        }
+
+        // === Song Info Navigation Events ===
+        private void TxtCurrentArtist_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var artist = txtCurrentArtist?.Text;
+            if (!string.IsNullOrWhiteSpace(artist))
+            {
+                e.Handled = true;
+                ArtistNavigationRequested?.Invoke(this, artist);
+            }
+        }
+
+        private void TxtCurrentAlbum_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var album = txtCurrentAlbum?.Text;
+            if (!string.IsNullOrWhiteSpace(album))
+            {
+                e.Handled = true;
+                AlbumNavigationRequested?.Invoke(this, album);
+            }
         }
 
         // === Volume Control Events ===

@@ -5,7 +5,7 @@
 - ~~Volume control~~
 ##### Song info view:
   - ~~Currently playing song info (album art, artist, album)~~
-  - Ability to get to song album/artist from info view
+  - ~~Ability to get to song album/artist from info view~~
   - ~~Clickable, selectable seek bar~~
   - ~~Shuffle button~~
   - ~~Repeat button~~
@@ -15,7 +15,9 @@
   - ~~Editable text area to input search~~
   - ~~Menu with search results~~
   - ~~Ability to get to search result items in main window~~
-  - Context menu item: show in songs/artists/genre/album
+  - ~~Context menu item: show in songs/artists/genre/album~~
+  - ~~Dynamically re-sizable window based on amount of results~~
+  - ~~Ability to resize window~~
 
 
 ### Main Window Buttons
@@ -25,8 +27,18 @@
 -~~Song list from selected artists~~
 
 #### Albums
-- ~~Main window of album thumbnails, alphabeticals~~
-- ~~Popout album view with large album artwork and list of songss~~
+- ~~Main window of album thumbnails, alphabetical~~
+- ~~Popout album view with large album artwork and list of songs~~
+- ~~Sort by Artist/Album~~
+- ~~Album art size slider~~
+- ~~Album song selection flyout menu:~~
+  - ~~Dynamically resizing columns~~
+  - ~~Album length and song count info~~
+  - ~~High quality album art~~
+  - ~~Artist, genre and year with ability to click artist or genre~~
+- Improve load time
+- Cache the albums list (entire list and image data)
+- Loading indicator when building album cache
 
 #### Songs
 - ~~List of all songs in a scrollable, selectable lists~~
@@ -106,8 +118,13 @@
 - Split `MainWindow.xaml.cs` into multiple components
 - Cut down on if statements. Use more switch/loops
 - ~~Use hard-coded custom "pop-ups" and info menus rather than built in windows pop-ups~~
+- Improve startup load times
+- Improve album art load time
 
 #### Bugs
+- General sluggishness/startup time
+- Window sized is not always properly remembered and restored
+- Queue does not work as intended and needs fixing
 
 #### Planned Features
 - Ability to edit metadata

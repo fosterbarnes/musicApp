@@ -31,6 +31,12 @@
                   Visibility="Collapsed" />
         <Separator />
         <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Show in Artists"
+                  Click="ShowInArtistsMenuItem_Click" />
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Show in Albums"
+                  Click="ShowInAlbumsMenuItem_Click" />
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
                   Header="Info"
                   Click="InfoMenuItem_Click" />
         <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"

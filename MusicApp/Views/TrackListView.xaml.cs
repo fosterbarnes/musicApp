@@ -55,11 +55,19 @@ namespace MusicApp.Views
         public event EventHandler<Song>? PlayNextRequested;
         public event EventHandler<Song>? AddToQueueRequested;
         public event EventHandler<Song>? InfoRequested;
+        public event EventHandler<Song>? ShowInArtistsRequested;
+        public event EventHandler<Song>? ShowInAlbumsRequested;
         public event EventHandler<Song>? ShowInExplorerRequested;
         public event EventHandler<Song>? RemoveFromLibraryRequested;
         public event EventHandler<Song>? DeleteRequested;
 
         public Song? SelectedTrack => lstTracks.SelectedItem as Song;
+
+        public void ScrollToSong(Song song)
+        {
+            lstTracks.SelectedItem = song;
+            lstTracks.ScrollIntoView(song);
+        }
 
         /// <summary>When set (e.g. by PlaylistsView), the track context menu shows "Remove from Playlist" and it removes the track from this playlist.</summary>
         public Playlist? CurrentPlaylist { get; set; }
@@ -291,7 +299,6 @@ namespace MusicApp.Views
         {
             if (lstTracks.View is not GridView) return;
             lstTracks.Loaded += (s, e) => Dispatcher.BeginInvoke(new Action(WireUpHeadersForListView), DispatcherPriority.Loaded);
-            lstTracks.LayoutUpdated += (s, e) => WireUpHeadersForListView();
         }
 
         private void WireUpHeadersForListView()
@@ -410,7 +417,6 @@ namespace MusicApp.Views
         {
             if (lstTracks.View is not GridView) return;
             lstTracks.Loaded += (s, e) => Dispatcher.BeginInvoke(new Action(() => WireUpContextMenuForHeaders()), DispatcherPriority.Loaded);
-            lstTracks.LayoutUpdated += (s, e) => WireUpContextMenuForHeaders();
         }
 
         private void WireUpContextMenuForHeaders()
@@ -551,6 +557,18 @@ namespace MusicApp.Views
         {
             if (song != null)
                 InfoRequested?.Invoke(this, song);
+        }
+
+        public void RequestShowInArtists(Song song)
+        {
+            if (song != null)
+                ShowInArtistsRequested?.Invoke(this, song);
+        }
+
+        public void RequestShowInAlbums(Song song)
+        {
+            if (song != null)
+                ShowInAlbumsRequested?.Invoke(this, song);
         }
 
         public void RequestShowInExplorer(Song song)

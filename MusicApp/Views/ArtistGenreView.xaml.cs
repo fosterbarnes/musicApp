@@ -20,6 +20,7 @@ namespace MusicApp.Views
         }
 
         private IEnumerable? _allTracks;
+        private int _itemsSourceCount = -1;
         private readonly ObservableCollection<string> _namesList = new ObservableCollection<string>();
 
         public ArtistGenreView()
@@ -33,6 +34,8 @@ namespace MusicApp.Views
             trackList.PlayNextRequested += (s, track) => PlayNextRequested?.Invoke(this, track);
             trackList.AddToQueueRequested += (s, track) => AddToQueueRequested?.Invoke(this, track);
             trackList.InfoRequested += (s, track) => InfoRequested?.Invoke(this, track);
+            trackList.ShowInArtistsRequested += (s, track) => ShowInArtistsRequested?.Invoke(this, track);
+            trackList.ShowInAlbumsRequested += (s, track) => ShowInAlbumsRequested?.Invoke(this, track);
             trackList.ShowInExplorerRequested += (s, track) => ShowInExplorerRequested?.Invoke(this, track);
             trackList.RemoveFromLibraryRequested += (s, track) => RemoveFromLibraryRequested?.Invoke(this, track);
             trackList.DeleteRequested += (s, track) => DeleteRequested?.Invoke(this, track);
@@ -45,7 +48,12 @@ namespace MusicApp.Views
             get => _allTracks;
             set
             {
+                int newCount = value is ICollection col ? col.Count : -1;
+                if (ReferenceEquals(_allTracks, value) && newCount == _itemsSourceCount)
+                    return;
+
                 _allTracks = value;
+                _itemsSourceCount = newCount;
                 RefreshNamesList();
             }
         }
@@ -57,19 +65,54 @@ namespace MusicApp.Views
         public event EventHandler<Song>? PlayNextRequested;
         public event EventHandler<Song>? AddToQueueRequested;
         public event EventHandler<Song>? InfoRequested;
+        public event EventHandler<Song>? ShowInArtistsRequested;
+        public event EventHandler<Song>? ShowInAlbumsRequested;
         public event EventHandler<Song>? ShowInExplorerRequested;
         public event EventHandler<Song>? RemoveFromLibraryRequested;
         public event EventHandler<Song>? DeleteRequested;
 
         public void RebuildColumns() => trackList.RebuildColumns();
 
-        /// <summary>Select an artist by name (for search navigation). No-op if not in Artists view or name not found.</summary>
+        /// <summary>
+        /// Selects the track's artist in the sidebar and highlights that track in the right-side track list.
+        /// </summary>
+        public void SelectTrack(Song track)
+        {
+            if (track == null) return;
+            if (!string.Equals(ViewName, "Artists", StringComparison.OrdinalIgnoreCase)) return;
+            if (string.IsNullOrWhiteSpace(track.Artist)) return;
+
+            SelectArtist(track.Artist);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                var matched = FindTrackInCurrentList(track);
+                if (matched != null)
+                    trackList.ScrollToSong(matched);
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        /// <summary>Select an artist by name and scroll it into view. No-op if not in Artists view or name not found.</summary>
         public void SelectArtist(string name)
         {
             if (!string.Equals(ViewName, "Artists", StringComparison.OrdinalIgnoreCase)) return;
             if (string.IsNullOrWhiteSpace(name)) return;
             if (_namesList.Contains(name))
+            {
                 lstArtistsOrGenres.SelectedItem = name;
+                lstArtistsOrGenres.ScrollIntoView(name);
+            }
+        }
+
+        /// <summary>Select a genre by name and scroll it into view. No-op if not in Genres view or name not found.</summary>
+        public void SelectGenre(string name)
+        {
+            if (!string.Equals(ViewName, "Genres", StringComparison.OrdinalIgnoreCase)) return;
+            if (string.IsNullOrWhiteSpace(name)) return;
+            if (_namesList.Contains(name))
+            {
+                lstArtistsOrGenres.SelectedItem = name;
+                lstArtistsOrGenres.ScrollIntoView(name);
+            }
         }
 
         private static void OnViewNameChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -133,6 +176,38 @@ namespace MusicApp.Views
         private void TrackList_PlayTrackRequested(object? sender, Song e)
         {
             PlayTrackRequested?.Invoke(this, e);
+        }
+
+        private Song? FindTrackInCurrentList(Song track)
+        {
+            if (trackList.ItemsSource is not IEnumerable items)
+                return null;
+
+            Song? fallback = null;
+            foreach (var item in items)
+            {
+                if (item is not Song song)
+                    continue;
+
+                if (ReferenceEquals(song, track))
+                    return song;
+
+                if (!string.IsNullOrWhiteSpace(song.FilePath) &&
+                    !string.IsNullOrWhiteSpace(track.FilePath) &&
+                    string.Equals(song.FilePath, track.FilePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return song;
+                }
+
+                if (fallback == null &&
+                    string.Equals(song.Title, track.Title, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(song.Album, track.Album, StringComparison.OrdinalIgnoreCase))
+                {
+                    fallback = song;
+                }
+            }
+
+            return fallback;
         }
     }
 }

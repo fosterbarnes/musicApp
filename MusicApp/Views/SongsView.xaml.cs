@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Specialized;
 using System.Windows;
@@ -23,6 +24,8 @@ namespace MusicApp.Views
             trackList.PlayNextRequested += (s, track) => PlayNextRequested?.Invoke(this, track);
             trackList.AddToQueueRequested += (s, track) => AddToQueueRequested?.Invoke(this, track);
             trackList.InfoRequested += (s, track) => InfoRequested?.Invoke(this, track);
+            trackList.ShowInArtistsRequested += (s, track) => ShowInArtistsRequested?.Invoke(this, track);
+            trackList.ShowInAlbumsRequested += (s, track) => ShowInAlbumsRequested?.Invoke(this, track);
             trackList.ShowInExplorerRequested += (s, track) => ShowInExplorerRequested?.Invoke(this, track);
             trackList.RemoveFromLibraryRequested += (s, track) => RemoveFromLibraryRequested?.Invoke(this, track);
             trackList.DeleteRequested += (s, track) => DeleteRequested?.Invoke(this, track);
@@ -64,11 +67,62 @@ namespace MusicApp.Views
         public event System.EventHandler<Song>? PlayNextRequested;
         public event System.EventHandler<Song>? AddToQueueRequested;
         public event System.EventHandler<Song>? InfoRequested;
+        public event System.EventHandler<Song>? ShowInArtistsRequested;
+        public event System.EventHandler<Song>? ShowInAlbumsRequested;
         public event System.EventHandler<Song>? ShowInExplorerRequested;
         public event System.EventHandler<Song>? RemoveFromLibraryRequested;
         public event System.EventHandler<Song>? DeleteRequested;
 
         public void RebuildColumns() => trackList.RebuildColumns();
+
+        public void ScrollToSong(Song song) => trackList.ScrollToSong(song);
+
+        /// <summary>
+        /// Selects (highlights) the matching song in the list and scrolls it into view.
+        /// Matching prefers FilePath when available.
+        /// </summary>
+        public void SelectTrack(Song track)
+        {
+            if (track == null)
+                return;
+
+            if (trackList.ItemsSource == null)
+            {
+                trackList.ScrollToSong(track);
+                return;
+            }
+
+            // Prefer file-path matching so selection works even if the Song instance differs.
+            if (!string.IsNullOrWhiteSpace(track.FilePath))
+            {
+                foreach (var item in trackList.ItemsSource)
+                {
+                    if (item is not Song s) continue;
+                    if (!string.IsNullOrWhiteSpace(s.FilePath) &&
+                        string.Equals(s.FilePath, track.FilePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        trackList.ScrollToSong(s);
+                        return;
+                    }
+                }
+            }
+
+            // Fallback: title/artist/album.
+            foreach (var item in trackList.ItemsSource)
+            {
+                if (item is not Song s) continue;
+                if (string.Equals(s.Title, track.Title, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(s.Artist, track.Artist, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(s.Album, track.Album, StringComparison.OrdinalIgnoreCase))
+                {
+                    trackList.ScrollToSong(s);
+                    return;
+                }
+            }
+
+            // Last resort: set selection to the provided instance.
+            trackList.ScrollToSong(track);
+        }
 
         public Song? SelectedTrack => trackList.SelectedTrack;
 

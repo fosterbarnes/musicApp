@@ -15,6 +15,7 @@ namespace MusicApp
         public TimeSpan DurationTimeSpan { get; set; }
         
         public string AlbumArtPath { get; set; } = "";
+        public string ThumbnailCachePath { get; set; } = "";
         public int TrackNumber { get; set; }
         public int Year { get; set; }
         public string Genre { get; set; } = "";

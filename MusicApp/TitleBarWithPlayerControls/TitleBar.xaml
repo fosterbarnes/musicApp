@@ -57,6 +57,38 @@
                 </Setter>
             </Style>
 
+            <!-- Slightly smaller media controls (prev/next) -->
+            <Style x:Key="CustomSmallMediaButton" TargetType="Button" BasedOn="{StaticResource CustomMediaButton}">
+                <Setter Property="Width" Value="40"/>
+                <Setter Property="Height" Value="40"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="22"
+                                    Width="{TemplateBinding Width}"
+                                    Height="{TemplateBinding Height}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#2D2D2D"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="RenderTransform">
+                                        <Setter.Value>
+                                            <ScaleTransform ScaleX="0.9" ScaleY="0.9"/>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <!-- Generic Scalable Button Style -->
             <Style x:Key="ScalableButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="Transparent"/>
@@ -221,11 +253,11 @@
 
                 <!-- Previous Track Button -->
                 <Button x:Name="btnPrevious" 
-                        Style="{StaticResource CustomMediaButton}" 
+                        Style="{StaticResource CustomSmallMediaButton}" 
                         Foreground="White" 
                         Margin="0,0" 
                         Click="BtnPrevious_Click">
-                    <materialDesign:PackIcon Kind="SkipPrevious" Width="24" Height="24"/>
+                    <materialDesign:PackIcon Kind="SkipPrevious" Width="20" Height="20"/>
                 </Button>
 
                 <!-- Play/Pause Button -->
@@ -239,11 +271,11 @@
 
                 <!-- Next Track Button -->
                 <Button x:Name="btnNext" 
-                        Style="{StaticResource CustomMediaButton}" 
+                        Style="{StaticResource CustomSmallMediaButton}" 
                         Foreground="White" 
                         Margin="0,0" 
                         Click="BtnNext_Click">
-                    <materialDesign:PackIcon Kind="SkipNext" Width="24" Height="24"/>
+                    <materialDesign:PackIcon Kind="SkipNext" Width="20" Height="20"/>
                 </Button>
             </StackPanel>
 
@@ -396,7 +428,19 @@
                                 <TextBlock x:Name="txtCurrentArtist" 
                                            Text="" 
                                            Foreground="#CCCCCC" 
-                                           FontSize="12"/>
+                                           FontSize="12"
+                                           Cursor="Hand"
+                                           MouseLeftButtonDown="TxtCurrentArtist_MouseLeftButtonDown">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="TextDecorations" Value="Underline"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                                 <TextBlock x:Name="txtDashSeparator" 
                                            Text=" - " 
                                            Foreground="#CCCCCC" 
@@ -406,7 +450,19 @@
                                 <TextBlock x:Name="txtCurrentAlbum" 
                                            Text="" 
                                            Foreground="#CCCCCC" 
-                                           FontSize="12"/>
+                                           FontSize="12"
+                                           Cursor="Hand"
+                                           MouseLeftButtonDown="TxtCurrentAlbum_MouseLeftButtonDown">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="TextDecorations" Value="Underline"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                             </StackPanel>
                         </StackPanel>
                     </Grid>

@@ -13,6 +13,8 @@ namespace MusicApp.Views
             trackList.PlayNextRequested += (s, track) => PlayNextRequested?.Invoke(this, track);
             trackList.AddToQueueRequested += (s, track) => AddToQueueRequested?.Invoke(this, track);
             trackList.InfoRequested += (s, track) => InfoRequested?.Invoke(this, track);
+            trackList.ShowInArtistsRequested += (s, track) => ShowInArtistsRequested?.Invoke(this, track);
+            trackList.ShowInAlbumsRequested += (s, track) => ShowInAlbumsRequested?.Invoke(this, track);
             trackList.ShowInExplorerRequested += (s, track) => ShowInExplorerRequested?.Invoke(this, track);
             trackList.RemoveFromLibraryRequested += (s, track) => RemoveFromLibraryRequested?.Invoke(this, track);
             trackList.DeleteRequested += (s, track) => DeleteRequested?.Invoke(this, track);
@@ -32,6 +34,8 @@ namespace MusicApp.Views
         public event System.EventHandler<Song>? PlayNextRequested;
         public event System.EventHandler<Song>? AddToQueueRequested;
         public event System.EventHandler<Song>? InfoRequested;
+        public event System.EventHandler<Song>? ShowInArtistsRequested;
+        public event System.EventHandler<Song>? ShowInAlbumsRequested;
         public event System.EventHandler<Song>? ShowInExplorerRequested;
         public event System.EventHandler<Song>? RemoveFromLibraryRequested;
         public event System.EventHandler<Song>? DeleteRequested;

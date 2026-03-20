@@ -1,0 +1,35 @@
+Song Info View (Title Bar):
+- Add ability to click artist or album to show it in context
+
+Album View:
+- Add album art size slider
+- Optimize image loading
+- Add album song selection flyout menu:
+	- Dynamically resizing columns
+	- Album length and song count info
+	- High quality album art
+	- Artist, genre and year with ability to click artist or genre
+
+Album Art:
+- Store a cache of album art on disk to speed up load times and reduce pop-in
+- Improve resizing logic
+
+Artist/Genre View:
+- Change default artists/genre list width
+
+Search:
+- Improve search results by having stricter filtering
+- Adjust minimum, default and max window size
+- Add ability to click and drag to resize window
+- Add right click context menu
+- Add artist artwork (use oldest album art from artist)
+- Dynamically resize window based on amount of results
+
+Right Click Context Menu:
+- Add " Show in 'Artists' " and " Show in 'Albums' "
+
+Scripts:
+- Improve task counter
+
+.md
+- Consolodate .md files (features & tasks) to their own folder

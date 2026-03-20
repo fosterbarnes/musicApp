@@ -13,7 +13,7 @@ public static class SearchHelper
 
     private static readonly StringComparison IgnoreCase = StringComparison.OrdinalIgnoreCase;
 
-    /// <summary>Run search and return sectioned results for Albums, Artists, Songs. Uses exact substring match (case-insensitive).</summary>
+    /// <summary>Run search and return sectioned results for Albums, Artists, Songs. Uses case-insensitive word-prefix matching.</summary>
     public static SearchResults Run(string query, IEnumerable<Song> allTracks)
     {
         var tracks = allTracks.ToList();
@@ -21,38 +21,44 @@ public static class SearchHelper
             return new SearchResults();
 
         var q = query.Trim();
+        var queryWords = q.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (queryWords.Length == 0)
+            return new SearchResults();
         var results = new SearchResults();
 
-        // Songs: only hits where the query is in the song's own title, artist, or genre (not album — those appear in Albums section only)
+        // Songs: only hits where query words match the start of one or more words
+        // in the song's own title, artist, or genre (not album — those appear in Albums section only).
         var matchedSongs = tracks
-            .Where(s => (s.Title?.Contains(q, IgnoreCase) == true) ||
-                        (s.Artist?.Contains(q, IgnoreCase) == true) ||
-                        (s.Genre?.Contains(q, IgnoreCase) == true))
+            .Where(s => MatchesQueryWords(s.Title, queryWords) ||
+                        MatchesQueryWords(s.Artist, queryWords) ||
+                        MatchesQueryWords(s.Genre, queryWords))
             .Take(SongLimit)
             .ToList();
         results.Songs = matchedSongs;
 
-        // Artists: distinct names that contain the query, with album/song counts
+        // Artists: distinct names where query words match start of words, with album/song counts.
         var distinctArtists = tracks
-            .Where(t => !string.IsNullOrWhiteSpace(t.Artist) && t.Artist.Contains(q, IgnoreCase))
+            .Where(t => !string.IsNullOrWhiteSpace(t.Artist) && MatchesQueryWords(t.Artist, queryWords))
             .Select(t => t.Artist)
             .Distinct()
             .Take(ArtistLimit);
         foreach (var name in distinctArtists)
         {
             var artistTracks = tracks.Where(t => t.Artist == name).ToList();
+            var representative = GetArtistOldestAlbumRepresentativeTrack(artistTracks);
             results.Artists.Add(new ArtistSearchItem
             {
                 Name = name,
                 AlbumCount = artistTracks.Select(t => (t.Album ?? "", t.Artist ?? "")).Distinct().Count(),
-                SongCount = artistTracks.Count
+                SongCount = artistTracks.Count,
+                RepresentativeTrack = representative
             });
         }
 
-        // Albums: distinct (Album, Artist) where Album or Artist contains the query
+        // Albums: distinct (Album, Artist) where Album or Artist matches query word prefixes.
         var albumKeys = tracks
             .Where(t => !string.IsNullOrWhiteSpace(t.Album) && t.Album != "Unknown Album" &&
-                       ((t.Album?.Contains(q, IgnoreCase) == true) || (t.Artist?.Contains(q, IgnoreCase) == true)))
+                       (MatchesQueryWords(t.Album, queryWords) || MatchesQueryWords(t.Artist, queryWords)))
             .GroupBy(t => (Album: t.Album, Artist: t.Artist ?? ""))
             .Select(g => new { Key = g.Key, Songs = g.ToList() })
             .Take(AlbumLimit);
@@ -83,5 +89,94 @@ public static class SearchHelper
             results.SectionOrder = new List<SearchSection> { SearchSection.Songs, SearchSection.Artists, SearchSection.Albums };
 
         return results;
+    }
+
+    private static bool MatchesQueryWords(string? text, IReadOnlyList<string> queryWords)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        for (var i = 0; i < queryWords.Count; i++)
+        {
+            if (!ContainsWordStartingWith(text, queryWords[i]))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool ContainsWordStartingWith(string text, string queryWord)
+    {
+        if (queryWord.Length == 0)
+            return true;
+
+        var span = text.AsSpan();
+        var querySpan = queryWord.AsSpan();
+        var index = 0;
+
+        while (index < span.Length)
+        {
+            while (index < span.Length && !char.IsLetterOrDigit(span[index]))
+                index++;
+
+            var start = index;
+
+            while (index < span.Length && char.IsLetterOrDigit(span[index]))
+                index++;
+
+            if (start < index && span[start..index].StartsWith(querySpan, IgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static Song? GetArtistOldestAlbumRepresentativeTrack(List<Song> artistTracks)
+    {
+        if (artistTracks == null || artistTracks.Count == 0)
+            return null;
+
+        // Prefer real album names; fall back to everything if we can't find any.
+        var preferredTracks = artistTracks
+            .Where(t => !string.IsNullOrWhiteSpace(t.Album) &&
+                        !string.Equals(t.Album, "Unknown Album", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var candidates = preferredTracks.Count > 0 ? preferredTracks : artistTracks;
+
+        static DateTime GetSongDate(Song s)
+        {
+            if (s.ReleaseDate.HasValue)
+                return s.ReleaseDate.Value.Date;
+            if (s.Year > 0)
+                return new DateTime(s.Year, 1, 1);
+            return DateTime.MaxValue;
+        }
+
+        // Group by album name (case-insensitive), then pick the album whose oldest track date is earliest.
+        var albumGroups = candidates
+            .Where(t => !string.IsNullOrWhiteSpace(t.Album))
+            .GroupBy(t => t.Album, StringComparer.OrdinalIgnoreCase);
+
+        Song? best = null;
+        DateTime bestDate = DateTime.MaxValue;
+
+        foreach (var g in albumGroups)
+        {
+            var oldestTrack = g.OrderBy(GetSongDate).FirstOrDefault();
+            if (oldestTrack == null)
+                continue;
+
+            var date = GetSongDate(oldestTrack);
+            if (date < bestDate)
+            {
+                bestDate = date;
+                best = oldestTrack;
+            }
+        }
+
+        // If all album groups had unknown dates, fall back to the earliest-dated track in the artist.
+        best ??= artistTracks.OrderBy(GetSongDate).FirstOrDefault();
+        return best;
     }
 }
