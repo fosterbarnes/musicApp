@@ -87,6 +87,8 @@ namespace MusicApp.Views
                 lstPlaylists.ScrollIntoView(playlist);
         }
 
+        public void RefreshTrackListBindings() => trackList.RefreshItemBindings();
+
         private void CreatePlaylist_Click(object sender, RoutedEventArgs e)
         {
             CreatePlaylistRequested?.Invoke(this, EventArgs.Empty);

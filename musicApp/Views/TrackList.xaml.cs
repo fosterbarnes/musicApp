@@ -76,6 +76,18 @@ namespace MusicApp.Views
 
         public Song? SelectedTrack => lstTracks.SelectedItem as Song;
 
+        public void RefreshItemBindings()
+        {
+            try
+            {
+                lstTracks.Items.Refresh();
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
         public void ScrollToSong(Song song)
         {
             lstTracks.SelectedItem = song;

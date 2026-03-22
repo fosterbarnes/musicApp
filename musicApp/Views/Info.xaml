@@ -3,6 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:const="clr-namespace:MusicApp.Constants"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         Title="Info"
         Width="510"
@@ -16,10 +18,22 @@
         Background="{StaticResource AppBackground-brush}">
     <Window.Resources>
         <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextInfoLabel-brush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary-brush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Margin" Value="{StaticResource FieldLabelMargin-thk}" />
+        </Style>
+        <Style x:Key="OptionsFieldLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource FieldLabelStyle}">
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Margin" Value="0,0,10,10" />
+        </Style>
+        <Style x:Key="FileInfoValueStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary-brush}" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="{StaticResource FieldRowGap-thk}" />
         </Style>
         <Style x:Key="FieldInputStyle" TargetType="Control">
             <Setter Property="Foreground" Value="{StaticResource TextSecondary-brush}" />
@@ -32,6 +46,9 @@
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Padding" Value="{StaticResource Uniform2-thk}" />
             <Setter Property="CaretBrush" Value="{StaticResource TextSecondary-brush}" />
+            <Setter Property="SelectionBrush" Value="{StaticResource TextSelection-brush}" />
+            <Setter Property="SelectionOpacity" Value="{StaticResource TextSelection-opacity}" />
+            <Setter Property="SelectionTextBrush" Value="{StaticResource TextPrimary-brush}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
@@ -53,10 +70,10 @@
                                 <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AccentHover-brush}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource FieldHoverBorder-brush}" />
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AccentPrimary-brush}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource FieldFocusBorder-brush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -234,19 +251,21 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-        <Style x:Key="SectionButtonStyle" TargetType="Button">
+        <Style x:Key="SectionSegmentInactiveStyle" TargetType="Button">
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Foreground" Value="{StaticResource TextTertiary-brush}" />
-            <Setter Property="Padding" Value="12,5" />
-            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="Margin" Value="0" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Chrome"
                                 Background="{StaticResource ControlBackgroundAlt-brush}"
                                 BorderBrush="{StaticResource BorderMuted-brush}"
-                                BorderThickness="1"
+                                BorderThickness="0,0,1,0"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
@@ -267,19 +286,77 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style x:Key="SectionButtonActiveStyle" TargetType="Button">
+        <Style x:Key="SectionSegmentInactiveLastStyle" TargetType="Button" BasedOn="{StaticResource SectionSegmentInactiveStyle}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{StaticResource ControlBackgroundAlt-brush}"
+                                BorderBrush="{StaticResource BorderMuted-brush}"
+                                BorderThickness="0"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Hover-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Pressed-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SectionSegmentActiveStyle" TargetType="Button">
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimary-brush}" />
-            <Setter Property="Padding" Value="12,5" />
-            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="Margin" Value="0" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Chrome"
                                 Background="{StaticResource Selected-brush}"
                                 BorderBrush="{StaticResource BorderStrong-brush}"
-                                BorderThickness="1"
+                                BorderThickness="0,0,1,0"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource SelectedHover-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource PressedAlt-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SectionSegmentActiveLastStyle" TargetType="Button" BasedOn="{StaticResource SectionSegmentActiveStyle}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{StaticResource Selected-brush}"
+                                BorderBrush="{StaticResource BorderStrong-brush}"
+                                BorderThickness="0"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
@@ -328,6 +405,59 @@
                                 <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
                             </Trigger>
                         </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="LyricsPlusButtonStyle" TargetType="Button" BasedOn="{StaticResource MetadataDialogFooterButtonStyle}">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="MinWidth" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="{StaticResource Top8-thk}" />
+        </Style>
+        <Style x:Key="InfoOptionsVolumeAdjustSliderStyle" TargetType="Slider">
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary-brush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid SnapsToDevicePixels="True">
+                            <Border Height="4"
+                                    VerticalAlignment="Center"
+                                    Background="{StaticResource BorderDefault-brush}"
+                                    CornerRadius="2" />
+                            <Track x:Name="PART_Track" VerticalAlignment="Center">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge"
+                                                  Opacity="0"
+                                                  Focusable="False" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge"
+                                                  Opacity="0"
+                                                  Focusable="False" />
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Path Width="10"
+                                                      Height="7"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      Data="M 0 0 L 10 0 L 5 7 Z"
+                                                      Fill="{StaticResource TextSecondary-brush}"
+                                                      SnapsToDevicePixels="True"
+                                                      Stretch="Fill" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -392,38 +522,60 @@
             </Grid>
         </Border>
 
-        <WrapPanel Grid.Row="1" Margin="{StaticResource Bottom10-thk}">
-            <Button x:Name="DetailsSectionButton"
-                    Content="Details"
-                    Style="{StaticResource SectionButtonStyle}"
-                    Click="SectionButton_Click"
-                    Tag="Details" />
-            <Button x:Name="ArtworkSectionButton"
-                    Content="Artwork"
-                    Style="{StaticResource SectionButtonStyle}"
-                    Click="SectionButton_Click"
-                    Tag="Artwork" />
-            <Button x:Name="LyricsSectionButton"
-                    Content="Lyrics"
-                    Style="{StaticResource SectionButtonStyle}"
-                    Click="SectionButton_Click"
-                    Tag="Lyrics" />
-            <Button x:Name="OptionsSectionButton"
-                    Content="Options"
-                    Style="{StaticResource SectionButtonStyle}"
-                    Click="SectionButton_Click"
-                    Tag="Options" />
-            <Button x:Name="SortingSectionButton"
-                    Content="Sorting"
-                    Style="{StaticResource SectionButtonStyle}"
-                    Click="SectionButton_Click"
-                    Tag="Sorting" />
-            <Button x:Name="FileSectionButton"
-                    Content="File"
-                    Style="{StaticResource SectionButtonStyle}"
-                    Click="SectionButton_Click"
-                    Tag="File" />
-        </WrapPanel>
+        <Border Grid.Row="1"
+                Margin="{StaticResource Bottom10-thk}"
+                Background="{StaticResource ControlBackgroundAlt-brush}"
+                BorderBrush="{StaticResource BorderMuted-brush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource Sm-cr}"
+                ClipToBounds="True">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="DetailsSectionButton"
+                        Grid.Column="0"
+                        Content="Details"
+                        Style="{StaticResource SectionSegmentInactiveStyle}"
+                        Click="SectionButton_Click"
+                        Tag="Details" />
+                <Button x:Name="ArtworkSectionButton"
+                        Grid.Column="1"
+                        Content="Artwork"
+                        Style="{StaticResource SectionSegmentInactiveStyle}"
+                        Click="SectionButton_Click"
+                        Tag="Artwork" />
+                <Button x:Name="LyricsSectionButton"
+                        Grid.Column="2"
+                        Content="Lyrics"
+                        Style="{StaticResource SectionSegmentInactiveStyle}"
+                        Click="SectionButton_Click"
+                        Tag="Lyrics" />
+                <Button x:Name="OptionsSectionButton"
+                        Grid.Column="3"
+                        Content="Options"
+                        Style="{StaticResource SectionSegmentInactiveStyle}"
+                        Click="SectionButton_Click"
+                        Tag="Options" />
+                <Button x:Name="SortingSectionButton"
+                        Grid.Column="4"
+                        Content="Sorting"
+                        Style="{StaticResource SectionSegmentInactiveStyle}"
+                        Click="SectionButton_Click"
+                        Tag="Sorting" />
+                <Button x:Name="FileSectionButton"
+                        Grid.Column="5"
+                        Content="File"
+                        Style="{StaticResource SectionSegmentInactiveLastStyle}"
+                        Click="SectionButton_Click"
+                        Tag="File" />
+            </Grid>
+        </Border>
 
         <Border Grid.Row="2"
                 Background="{StaticResource SurfaceLowered-brush}"
@@ -437,7 +589,7 @@
                                   HorizontalScrollBarVisibility="Disabled">
                         <Grid Margin="{StaticResource Right6-thk}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="{StaticResource InfoMetadataLabelColumnWidth}" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
@@ -466,7 +618,7 @@
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Album" Style="{StaticResource FieldLabelStyle}" />
                             <TextBox x:Name="AlbumTextBox" Grid.Row="2" Grid.Column="1" Margin="{StaticResource FieldRowGap-thk}" Style="{StaticResource FieldTextBoxStyle}" />
 
-                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Album artist" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Album Artist" Style="{StaticResource FieldLabelStyle}" />
                             <TextBox x:Name="AlbumArtistTextBox" Grid.Row="3" Grid.Column="1" Margin="{StaticResource FieldRowGap-thk}" Style="{StaticResource FieldTextBoxStyle}" />
 
                             <TextBlock Grid.Row="4" Grid.Column="0" Text="Composer" Style="{StaticResource FieldLabelStyle}" />
@@ -477,6 +629,7 @@
                                       Grid.Row="5"
                                       Grid.Column="1"
                                       Margin="{StaticResource FieldRowGap-thk}"
+                                      IsEditable="True"
                                       Style="{StaticResource DarkFieldComboBoxStyle}" />
 
                             <TextBlock Grid.Row="6" Grid.Column="0" Text="Year" Style="{StaticResource FieldLabelStyle}" />
@@ -501,7 +654,7 @@
                                       Grid.Row="9"
                                       Grid.Column="1"
                                       Content="Album is part of a compilation"
-                                      Foreground="{StaticResource TextSecondary-brush}"
+                                      Foreground="{StaticResource TextPrimary-brush}"
                                       Margin="0,2,0,10" />
 
                             <TextBlock Grid.Row="10" Grid.Column="0" Text="Favorite" Style="{StaticResource FieldLabelStyle}" />
@@ -509,7 +662,7 @@
                                       Grid.Row="10"
                                       Grid.Column="1"
                                       Content="Favorite"
-                                      Foreground="{StaticResource TextSecondary-brush}"
+                                      Foreground="{StaticResource TextPrimary-brush}"
                                       Margin="0,2,0,10" />
 
                             <TextBlock Grid.Row="11" Grid.Column="0" Text="Bpm" Style="{StaticResource FieldLabelStyle}" />
@@ -529,73 +682,531 @@
                 </Grid>
 
                 <Grid x:Name="ArtworkSectionPanel" Visibility="Collapsed">
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <TextBlock Text="Artwork"
-                                   Foreground="{StaticResource TextPrimary-brush}"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Text="Artwork menu placeholder."
-                                   Foreground="{StaticResource TextSoft-brush}"
-                                   Margin="{StaticResource Top8-thk}"
-                                   HorizontalAlignment="Center" />
-                    </StackPanel>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0"
+                               Text="Album Artwork"
+                               Style="{StaticResource FieldLabelStyle}"
+                               Margin="0,0,0,8" />
+                    <Viewbox Grid.Row="1"
+                             Margin="{StaticResource Uniform12-thk}"
+                             Stretch="Uniform"
+                             HorizontalAlignment="Stretch"
+                             VerticalAlignment="Stretch">
+                        <Border Width="{x:Static const:UILayoutConstants.InfoMetadataArtworkViewboxLogicalExtent}"
+                                Height="{x:Static const:UILayoutConstants.InfoMetadataArtworkViewboxLogicalExtent}"
+                                Background="{StaticResource PanelBackground-brush}"
+                                BorderBrush="{StaticResource BorderStrong-brush}"
+                                BorderThickness="{StaticResource Border1-thk}"
+                                CornerRadius="{StaticResource Md-cr}"
+                                ClipToBounds="True">
+                            <Image x:Name="ArtworkPreviewImage"
+                                   Stretch="Uniform"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+                    </Viewbox>
                 </Grid>
 
                 <Grid x:Name="LyricsSectionPanel" Visibility="Collapsed">
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <TextBlock Text="Lyrics"
-                                   Foreground="{StaticResource TextPrimary-brush}"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Text="Lyrics menu placeholder."
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0"
+                               Text="Lyrics"
+                               Style="{StaticResource FieldLabelStyle}"
+                               Margin="0,0,0,8" />
+                    <StackPanel x:Name="LyricsEmptyPanel"
+                                Grid.Row="1"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center">
+                        <TextBlock Text="No Lyric Metadata"
                                    Foreground="{StaticResource TextSoft-brush}"
-                                   Margin="{StaticResource Top8-thk}"
+                                   FontSize="14"
                                    HorizontalAlignment="Center" />
+                        <Button x:Name="AddLyricsButton"
+                                HorizontalAlignment="Center"
+                                Style="{StaticResource LyricsPlusButtonStyle}"
+                                Click="OpenLyricsInExternalEditor_Click">
+                            <materialDesign:PackIcon Kind="NotePlus"
+                                                     Width="22"
+                                                     Height="22"
+                                                     Foreground="{StaticResource TextSecondary-brush}"
+                                                     HorizontalAlignment="Center"
+                                                     VerticalAlignment="Center" />
+                        </Button>
                     </StackPanel>
+                    <Grid x:Name="LyricsContentPanel"
+                          Grid.Row="1"
+                          Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <ScrollViewer Grid.Row="0"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <TextBlock x:Name="LyricsBodyTextBlock"
+                                       Foreground="{StaticResource TextSecondary-brush}"
+                                       FontSize="13"
+                                       LineHeight="18"
+                                       TextWrapping="Wrap" />
+                        </ScrollViewer>
+                        <Button Grid.Row="1"
+                                x:Name="EditLyricsButton"
+                                Content="Edit"
+                                HorizontalAlignment="Left"
+                                Margin="{StaticResource Top8-thk}"
+                                MinWidth="110"
+                                Width="Auto"
+                                Style="{StaticResource MetadataDialogFooterButtonStyle}"
+                                Click="OpenLyricsInExternalEditor_Click" />
+                    </Grid>
                 </Grid>
 
                 <Grid x:Name="OptionsSectionPanel" Visibility="Collapsed">
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <TextBlock Text="Options"
-                                   Foreground="{StaticResource TextPrimary-brush}"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Text="Options menu placeholder."
-                                   Foreground="{StaticResource TextSoft-brush}"
-                                   Margin="{StaticResource Top8-thk}"
-                                   HorizontalAlignment="Center" />
-                    </StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Grid Margin="{StaticResource Right6-thk}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Button x:Name="OpenInMp3TagButton"
+                                    Grid.Row="0"
+                                    Grid.Column="0"
+                                    Grid.ColumnSpan="2"
+                                    HorizontalAlignment="Left"
+                                    Content="Open in MP3Tag"
+                                    MinWidth="140"
+                                    Width="Auto"
+                                    Margin="{StaticResource Bottom10-thk}"
+                                    Style="{StaticResource MetadataDialogFooterButtonStyle}"
+                                    Click="OpenInMp3TagButton_Click" />
+
+                            <TextBlock Grid.Row="1"
+                                       Grid.Column="0"
+                                       Text="Start"
+                                       Style="{StaticResource OptionsFieldLabelStyle}" />
+                            <StackPanel Grid.Row="1"
+                                        Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        Margin="{StaticResource Bottom10-thk}">
+                                <CheckBox x:Name="OptionsStartTimeCheckBox"
+                                          VerticalAlignment="Center"
+                                          Margin="{StaticResource Right6-thk}" />
+                                <TextBox x:Name="OptionsStartTimeTextBox"
+                                         Width="120"
+                                         Text="0:00"
+                                         Style="{StaticResource FieldTextBoxStyle}" />
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="2"
+                                       Grid.Column="0"
+                                       Text="Stop"
+                                       Style="{StaticResource OptionsFieldLabelStyle}" />
+                            <StackPanel Grid.Row="2"
+                                        Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        Margin="{StaticResource Bottom10-thk}">
+                                <CheckBox x:Name="OptionsStopTimeCheckBox"
+                                          VerticalAlignment="Center"
+                                          Margin="{StaticResource Right6-thk}" />
+                                <TextBox x:Name="OptionsStopTimeTextBox"
+                                         Width="120"
+                                         Text="2:48.437"
+                                         Style="{StaticResource FieldTextBoxStyle}" />
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="3"
+                                       Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       Text="Playback"
+                                       Style="{StaticResource OptionsFieldLabelStyle}" />
+                            <StackPanel Grid.Row="3"
+                                        Grid.Column="1"
+                                        Margin="{StaticResource Bottom10-thk}">
+                                <CheckBox x:Name="OptionsRememberPlaybackPositionCheckBox"
+                                          Content="Remember playback position"
+                                          Foreground="{StaticResource TextSecondary-brush}"
+                                          Margin="0,2,0,10" />
+                                <CheckBox x:Name="OptionsSkipWhenShufflingCheckBox"
+                                          Content="Skip when shuffling"
+                                          Foreground="{StaticResource TextSecondary-brush}" />
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="4"
+                                       Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       Text="Volume Adjust"
+                                       Style="{StaticResource OptionsFieldLabelStyle}" />
+                            <StackPanel Grid.Row="4"
+                                        Grid.Column="1"
+                                        Margin="{StaticResource Bottom10-thk}">
+                                <Slider x:Name="OptionsVolumeAdjustSlider"
+                                        Minimum="-100"
+                                        Maximum="100"
+                                        Value="0"
+                                        Height="28"
+                                        VerticalAlignment="Center"
+                                        IsMoveToPointEnabled="True"
+                                        Style="{StaticResource InfoOptionsVolumeAdjustSliderStyle}" />
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0"
+                                            Width="1"
+                                            Height="4"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Top"
+                                            Background="{StaticResource TextTertiary-brush}" />
+                                    <Border Grid.Column="1"
+                                            Width="1"
+                                            Height="4"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Top"
+                                            Background="{StaticResource TextTertiary-brush}" />
+                                    <Border Grid.Column="2"
+                                            Width="1"
+                                            Height="4"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Top"
+                                            Background="{StaticResource TextTertiary-brush}" />
+                                </Grid>
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               FontSize="11"
+                                               Foreground="{StaticResource TextTertiary-brush}"
+                                               HorizontalAlignment="Left"
+                                               Text="-100%" />
+                                    <TextBlock Grid.Column="1"
+                                               FontSize="11"
+                                               Foreground="{StaticResource TextTertiary-brush}"
+                                               HorizontalAlignment="Center"
+                                               Text="None" />
+                                    <TextBlock Grid.Column="2"
+                                               FontSize="11"
+                                               Foreground="{StaticResource TextTertiary-brush}"
+                                               HorizontalAlignment="Right"
+                                               Text="+100%" />
+                                </Grid>
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="5"
+                                       Grid.Column="0"
+                                       Margin="0,0,10,0"
+                                       Text="Equalizer"
+                                       Style="{StaticResource OptionsFieldLabelStyle}" />
+                            <ComboBox x:Name="OptionsEqualizerComboBox"
+                                      Grid.Row="5"
+                                      Grid.Column="1"
+                                      Margin="0,0,0,0"
+                                      Style="{StaticResource DarkFieldComboBoxStyle}">
+                                <ComboBoxItem Content="None" IsSelected="True" />
+                            </ComboBox>
+                        </Grid>
+                    </ScrollViewer>
                 </Grid>
 
                 <Grid x:Name="SortingSectionPanel" Visibility="Collapsed">
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <TextBlock Text="Sorting"
-                                   Foreground="{StaticResource TextPrimary-brush}"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Text="Sorting menu placeholder."
-                                   Foreground="{StaticResource TextSoft-brush}"
-                                   Margin="{StaticResource Top8-thk}"
-                                   HorizontalAlignment="Center" />
-                    </StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Grid Margin="{StaticResource Right6-thk}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{StaticResource InfoMetadataLabelColumnWidth}" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="SortingSongTitleTextBox"
+                                     Grid.Row="0"
+                                     Grid.Column="1"
+                                     Margin="{StaticResource FieldRowGap-thk}"
+                                     Style="{StaticResource FieldTextBoxStyle}" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Sort As" Style="{StaticResource FieldLabelStyle}" />
+                            <Grid Grid.Row="1"
+                                  Grid.Column="1"
+                                  Margin="{StaticResource FieldRowGap-thk}">
+                                <Border Height="{StaticResource FieldHeight-size}"
+                                        ClipToBounds="True"
+                                        VerticalAlignment="Top">
+                                    <Grid>
+                                        <TextBlock x:Name="SortAsTitlePlaceholder"
+                                                   Text="{Binding Text, ElementName=SortingSongTitleTextBox, UpdateSourceTrigger=PropertyChanged}"
+                                                   Foreground="{StaticResource TextSoft-brush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="{StaticResource InfoSortAsPlaceholderInset-thk}"
+                                                   TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   IsHitTestVisible="False"
+                                                   Visibility="Collapsed" />
+                                        <TextBox x:Name="SortAsTitleTextBox"
+                                                 Style="{StaticResource FieldTextBoxStyle}"
+                                                 Background="Transparent" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Album" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="SortingAlbumTextBox"
+                                     Grid.Row="2"
+                                     Grid.Column="1"
+                                     Margin="{StaticResource FieldRowGap-thk}"
+                                     Style="{StaticResource FieldTextBoxStyle}" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Sort As" Style="{StaticResource FieldLabelStyle}" />
+                            <Grid Grid.Row="3"
+                                  Grid.Column="1"
+                                  Margin="{StaticResource FieldRowGap-thk}">
+                                <Border Height="{StaticResource FieldHeight-size}"
+                                        ClipToBounds="True"
+                                        VerticalAlignment="Top">
+                                    <Grid>
+                                        <TextBlock x:Name="SortAsAlbumPlaceholder"
+                                                   Text="{Binding Text, ElementName=SortingAlbumTextBox, UpdateSourceTrigger=PropertyChanged}"
+                                                   Foreground="{StaticResource TextSoft-brush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="{StaticResource InfoSortAsPlaceholderInset-thk}"
+                                                   TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   IsHitTestVisible="False"
+                                                   Visibility="Collapsed" />
+                                        <TextBox x:Name="SortAsAlbumTextBox"
+                                                 Style="{StaticResource FieldTextBoxStyle}"
+                                                 Background="Transparent" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Album Artist" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="SortingAlbumArtistTextBox"
+                                     Grid.Row="4"
+                                     Grid.Column="1"
+                                     Margin="{StaticResource FieldRowGap-thk}"
+                                     Style="{StaticResource FieldTextBoxStyle}" />
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Sort As" Style="{StaticResource FieldLabelStyle}" />
+                            <Grid Grid.Row="5"
+                                  Grid.Column="1"
+                                  Margin="{StaticResource FieldRowGap-thk}">
+                                <Border Height="{StaticResource FieldHeight-size}"
+                                        ClipToBounds="True"
+                                        VerticalAlignment="Top">
+                                    <Grid>
+                                        <TextBlock x:Name="SortAsAlbumArtistPlaceholder"
+                                                   Text="{Binding Text, ElementName=SortingAlbumArtistTextBox, UpdateSourceTrigger=PropertyChanged}"
+                                                   Foreground="{StaticResource TextSoft-brush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="{StaticResource InfoSortAsPlaceholderInset-thk}"
+                                                   TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   IsHitTestVisible="False"
+                                                   Visibility="Collapsed" />
+                                        <TextBox x:Name="SortAsAlbumArtistTextBox"
+                                                 Style="{StaticResource FieldTextBoxStyle}"
+                                                 Background="Transparent" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Artist" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="SortingArtistTextBox"
+                                     Grid.Row="6"
+                                     Grid.Column="1"
+                                     Margin="{StaticResource FieldRowGap-thk}"
+                                     Style="{StaticResource FieldTextBoxStyle}" />
+
+                            <TextBlock Grid.Row="7" Grid.Column="0" Text="Sort As" Style="{StaticResource FieldLabelStyle}" />
+                            <Grid Grid.Row="7"
+                                  Grid.Column="1"
+                                  Margin="{StaticResource FieldRowGap-thk}">
+                                <Border Height="{StaticResource FieldHeight-size}"
+                                        ClipToBounds="True"
+                                        VerticalAlignment="Top">
+                                    <Grid>
+                                        <TextBlock x:Name="SortAsArtistPlaceholder"
+                                                   Text="{Binding Text, ElementName=SortingArtistTextBox, UpdateSourceTrigger=PropertyChanged}"
+                                                   Foreground="{StaticResource TextSoft-brush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="{StaticResource InfoSortAsPlaceholderInset-thk}"
+                                                   TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   IsHitTestVisible="False"
+                                                   Visibility="Collapsed" />
+                                        <TextBox x:Name="SortAsArtistTextBox"
+                                                 Style="{StaticResource FieldTextBoxStyle}"
+                                                 Background="Transparent" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+
+                            <TextBlock Grid.Row="8" Grid.Column="0" Text="Composer" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="SortingComposerTextBox"
+                                     Grid.Row="8"
+                                     Grid.Column="1"
+                                     Margin="{StaticResource FieldRowGap-thk}"
+                                     Style="{StaticResource FieldTextBoxStyle}" />
+
+                            <TextBlock Grid.Row="9" Grid.Column="0" Text="Sort As" Style="{StaticResource FieldLabelStyle}" />
+                            <Grid Grid.Row="9"
+                                  Grid.Column="1"
+                                  Margin="{StaticResource FieldRowGap-thk}">
+                                <Border Height="{StaticResource FieldHeight-size}"
+                                        ClipToBounds="True"
+                                        VerticalAlignment="Top">
+                                    <Grid>
+                                        <TextBlock x:Name="SortAsComposerPlaceholder"
+                                                   Text="{Binding Text, ElementName=SortingComposerTextBox, UpdateSourceTrigger=PropertyChanged}"
+                                                   Foreground="{StaticResource TextSoft-brush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="{StaticResource InfoSortAsPlaceholderInset-thk}"
+                                                   TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   IsHitTestVisible="False"
+                                                   Visibility="Collapsed" />
+                                        <TextBox x:Name="SortAsComposerTextBox"
+                                                 Style="{StaticResource FieldTextBoxStyle}"
+                                                 Background="Transparent" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Grid>
+                    </ScrollViewer>
                 </Grid>
 
                 <Grid x:Name="FileSectionPanel" Visibility="Collapsed">
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <TextBlock Text="File"
-                                   Foreground="{StaticResource TextPrimary-brush}"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Text="File menu placeholder."
-                                   Foreground="{StaticResource TextSoft-brush}"
-                                   Margin="{StaticResource Top8-thk}"
-                                   HorizontalAlignment="Center" />
-                    </StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Grid Margin="{StaticResource Right6-thk}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{StaticResource InfoMetadataLabelColumnWidth}" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Kind" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBlock x:Name="FileKindValueText"
+                                       Grid.Row="0"
+                                       Grid.Column="1"
+                                       Style="{StaticResource FileInfoValueStyle}" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Duration" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBlock x:Name="FileDurationValueText"
+                                       Grid.Row="1"
+                                       Grid.Column="1"
+                                       Style="{StaticResource FileInfoValueStyle}" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Size" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBlock x:Name="FileSizeValueText"
+                                       Grid.Row="2"
+                                       Grid.Column="1"
+                                       Style="{StaticResource FileInfoValueStyle}" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Bit rate" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBlock x:Name="FileBitrateValueText"
+                                       Grid.Row="3"
+                                       Grid.Column="1"
+                                       Style="{StaticResource FileInfoValueStyle}" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Sample Size" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBlock x:Name="FileSampleSizeValueText"
+                                       Grid.Row="4"
+                                       Grid.Column="1"
+                                       Style="{StaticResource FileInfoValueStyle}" />
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Sample Rate" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBlock x:Name="FileSampleRateValueText"
+                                       Grid.Row="5"
+                                       Grid.Column="1"
+                                       Style="{StaticResource FileInfoValueStyle}" />
+
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Channels" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBlock x:Name="FileChannelsValueText"
+                                       Grid.Row="6"
+                                       Grid.Column="1"
+                                       Style="{StaticResource FileInfoValueStyle}" />
+
+                            <TextBlock Grid.Row="7" Grid.Column="0" Text="Volume" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBlock x:Name="FileVolumeValueText"
+                                       Grid.Row="7"
+                                       Grid.Column="1"
+                                       Style="{StaticResource FileInfoValueStyle}" />
+
+                            <TextBlock Grid.Row="8"
+                                       Grid.Column="0"
+                                       Margin="{StaticResource FileInfoSectionBreakLabelMargin-thk}"
+                                       Text="Date Modified"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBlock x:Name="FileDateModifiedValueText"
+                                       Grid.Row="8"
+                                       Grid.Column="1"
+                                       Margin="{StaticResource FileInfoSectionBreakValueMargin-thk}"
+                                       Style="{StaticResource FileInfoValueStyle}" />
+
+                            <TextBlock Grid.Row="9" Grid.Column="0" Text="Date Added" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBlock x:Name="FileDateAddedValueText"
+                                       Grid.Row="9"
+                                       Grid.Column="1"
+                                       Style="{StaticResource FileInfoValueStyle}" />
+
+                            <TextBlock Grid.Row="10"
+                                       Grid.Column="0"
+                                       Margin="{StaticResource FileInfoLocationLabelMargin-thk}"
+                                       Text="Location"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       VerticalAlignment="Top" />
+                            <TextBlock x:Name="FileLocationValueText"
+                                       Grid.Row="10"
+                                       Grid.Column="1"
+                                       Margin="{StaticResource FileInfoLocationValueMargin-thk}"
+                                       Style="{StaticResource FileInfoValueStyle}"
+                                       VerticalAlignment="Top" />
+                        </Grid>
+                    </ScrollViewer>
                 </Grid>
             </Grid>
         </Border>
@@ -605,6 +1216,16 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
+
+            <Button x:Name="AddArtworkButton"
+                    Grid.Column="0"
+                    HorizontalAlignment="Left"
+                    Content="Add Artwork"
+                    MinWidth="110"
+                    Width="Auto"
+                    Visibility="Collapsed"
+                    Style="{StaticResource MetadataDialogFooterButtonStyle}"
+                    Click="AddArtworkButton_Click" />
 
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"

@@ -1,87 +1,44 @@
-Installer:
-- Add 64 bit .exe installer
-- Add 32 bit .exe installer
+Main Window:
+- Change look and feel of view selection rows
 
-Info/Metadata View:
-- Add menu to show metadata and song info. Opens with "right click > info"
-- Top Info Bar
-  - Song name
-  - Artist name
-  - Album name
-  - Album art
-  
- - Details
-  - Song title (text field)
-  - Artist (text field)
-  - Album (text field)
-  - Album artist (text field)
-  - Composer (text field)
-  - Genre (dropdown menu)
-  - Year (text field)
-  - Track "#" of "#" (two text fields)
-  - Disc number "#" of "#" (two text fields)
-  - Compilation (tick box)
-  - Favorite (tick box)
-  - Bpm (text box)
-  - Play Count (text field)
-
-Todo:
+Info/Metadata View: 
+- Add ability to edit metadata
+- Fine tune colors
 - Artwork
+	- Display full size, resizable artwork
+	- Ability to change album art
+
 - Lyrics
+	- Display lyrics if available
+	- Ability to add lyrics
+
 - Options
-- Sorting
-- File
+	- Open in MP3Tag
+	- Start/Stop Position (placeholder)
+	- Remember playback position (placeholder)
+	- Skip when shuffling (placeholder)
+	- Volume slider for individual tracks (placeholder)
+	- EQ (placeholder)
 
-Right-Click Context Menu:
-- Add divider between "Add to ..." and "Info" sections
-- Fix missing/extra items in menu:
-	General Items
-	- Play Next
-	- Add to Queue
-	- Add to Playlist:
-		-  New playlist
-		-  Add to existing
-	- Show in Artists
-	- Show in Albums
-	- Show in Songs
-	- Show in Queue
-	- Info
-	- Show in Explorer
-	- Remove from Library
-	- Delete
+   Sorting
+  - Change sorting options for specific items (placeholder)
 
-	Artists View:
-	- Hide "Show in Artists"
+   File
+  - Show file-type, length, size, bit rate, and other info
 
-	Albums View:
-	- Wire up right click context menu
-	- Hide "Show in Albums"
+Theming:
+- Consolidate opacity values for future theme usage
 
-	Songs View:
-	- Hide "Show in Songs"
-
-	Genres View:
-	- Use all general items
-
-	Playlists View:
-	- Use all general items
-
-	Recently Played View:
-	- Hide "Show in Albums"
-
-	Queue View:
-	- Hide "Show in Queue"
+General/Backend:
+- Refactor MainWindow.xaml.cs:
+	- Dead code cleanup
+	- Remove unnecessary, obvious comments
+	- Refactor duplicate usage to helpers
+	- Split into partial files: `MainWindow.Navigation.cs`, `MainWindow.Library.cs`, `MainWindow.Settings.cs`, `MainWindow.Playback.cs`, 
+	- Move some stuff to helper files: `RecycleBinHelper.cs`, `TrackMetadataLoader.cs`, `AlbumArtLoader.cs`
+	- Replace messy if statements with loops/switches
+- Add ToDo.md to keep track of un-done tasks. Update taskCounter script to update ToDo
 
 Scripts:
-- Simplify build script
-- Write build installer script
-- Add installer to draft release script
-- Improve draft release script
-
-Boring Stuff:
-- Consolodate 'Resources' folders
-- Consolodate magic numbers and other shared values
-- Keep track of shared color/spacing values
-- Start preparing for themes
-- Rename a bunch of shit
-- General cleanup
+- Rename some shit
+- Clean shit up

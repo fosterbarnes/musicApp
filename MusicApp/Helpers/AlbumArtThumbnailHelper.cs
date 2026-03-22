@@ -136,6 +136,13 @@ public static class AlbumArtThumbnailHelper
         return result;
     }
 
+    public static void InvalidateFullSizeCache(string? filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+            return;
+        _fullSizeCache.TryRemove(filePath, out _);
+    }
+
     /// <summary>Scale raw image data to a square-ish thumbnail and return as frozen WPF BitmapImage.</summary>
     public static BitmapImage? ScaleToBitmapImage(byte[] imageData, int targetSizePx)
     {

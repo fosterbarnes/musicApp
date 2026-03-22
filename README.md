@@ -36,12 +36,12 @@
 
 musicApp is in early development, bugs are expected.
 
-If you want to use it, [download the latest release](https://github.com/fosterbarnes/musicApp/releases/download/v0.0.18/musicApp_v0.0.18_stainedMonkey.zip), unzip, then run MusicApp.exe
+If you want to use it, [download the latest release](https://github.com/fosterbarnes/musicApp/releases/download/v0.1.0/musicApp_v0.1.0_dollyShakeswerve-portable.zip), unzip, then run MusicApp.exe
 
 ## Progress
 
-![Progress Bar](https://progress-bars.entcheneric.com/bar.svg?progress=60&backgroundColor=%23212121&height=40&width=800&borderRadius=10&striped=false&animated=false&gradientAnimated=false&animationSpeed=1&stripeAnimationSpeed=1&gradientAnimationSpeed=1&initialAnimationSpeed=1&color=%23705399)  
-**82 / 137 tasks complete (59.9%)**
+![Progress Bar](https://progress-bars.entcheneric.com/bar.svg?progress=62&backgroundColor=%23212121&height=40&width=800&borderRadius=10&striped=false&animated=false&gradientAnimated=false&animationSpeed=1&stripeAnimationSpeed=1&gradientAnimationSpeed=1&initialAnimationSpeed=1&color=%23705399)  
+**89 / 144 tasks complete (61.8%)**
 
 
 <details>
@@ -51,15 +51,18 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 ### Title Bar
 - ~~Play/pause/skip buttons~~
 - ~~Volume control~~
-##### Song info view:
+
+#### Song info view:
   - ~~Currently playing song info (album art, artist, album)~~
   - ~~Ability to get to song album/artist from info view~~
   - ~~Clickable, selectable seek bar~~
   - ~~Shuffle button~~
   - ~~Repeat button~~
-##### Queue button:
+
+#### Queue button:
   - Popout menu with re-orderable currently playing queue
-##### Search bar:
+
+#### Search bar:
   - ~~Editable text area to input search~~
   - ~~Menu with search results~~
   - ~~Ability to get to search result items in main window~~
@@ -67,8 +70,11 @@ If you want to use it, [download the latest release](https://github.com/fosterba
   - ~~Dynamically re-sizable window based on amount of results~~
   - ~~Ability to resize window~~
 
-
 ### Main Window Buttons
+
+#### Recently Added
+- Inherit albums view, but sort by most recently added songs
+- Option to view 'recently added' as albums, songs, or artists view
 
 #### Artists
 - ~~Scrollable, selectable artist list~~
@@ -124,21 +130,19 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 - ~~Simple button to clear all app settings and libraries~~
 - Will most likely be moved to a library management window/menu
 
-
 ### Bottom Row
 - ~~Song count~~
 - ~~Album count~~
 - ~~Time and size calculation~~
 - ~~Progress bar for song scanning and other actions~~
 
-
-
 ## Settings Menu
-##### EQ
+
+### EQ
   - Pre-made EQ options
   - Custom EQ selector
   - Save/load custom EQs
-##### Themes/colors
+### Themes/colors
   - Pre-made color options
   - Custom color picker
   - Multiple custom save slots
@@ -154,27 +158,26 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 - Keyboard shortcuts
 - Toggle donation links
 
-
-
 ## General
-#### UI Stuff
+
+### UI Stuff
 - ~~Unnecessary space between the scroll bar and track menu in artist/genre view~~
 
-#### General Concerns
-- Split `MainWindow.xaml.cs` into multiple components
+### General Concerns
+- ~~Split `MainWindow.xaml.cs` into multiple components~~
 - Cut down on if statements. Use more switch/loops
 - ~~Use hard-coded custom "pop-ups" and info menus rather than built in windows pop-ups~~
 - Improve startup load times
 - Improve album art load time
 
-#### Bugs
+### Bugs
 - General sluggishness/startup time
 - Window sized is not always properly remembered and restored
 - Queue does not work as intended and needs fixing
 
-#### Right-Click Context Menu
+### Right-Click Context Menu
 
-##### General Items
+#### General Items
 - ~~Play Next~~
 - ~~Add to Queue~~
 - ~~Add to Playlist:~~
@@ -184,15 +187,15 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 - ~~Show in Albums~~
 - ~~Show in Songs~~
 - ~~Show in Queue~~
-- ~~Info/metadata menu:~~
+#### Info/Metadata
   
-  ###### Top Info Bar
+  ##### Top Info Bar
   - ~~Song name~~
   - ~~Artist name~~
   - ~~Album name~~
   - ~~Album art~~
   
-  ###### Details
+  ##### Details
   - ~~Song title (text field)~~
   - ~~Artist (text field)~~
   - ~~Album (text field)~~
@@ -206,21 +209,29 @@ If you want to use it, [download the latest release](https://github.com/fosterba
   - ~~Favorite (tick box)~~
   - ~~Bpm (text box)~~
   - ~~Play Count (text field)~~
+  - ~~Ability to edit metadata~~
 
-  ###### Artwork
-  - To:do
+  ##### Artwork
+  - ~~Display full size, resizable artwork~~
+  - ~~Ability to change album art~~
 
-  ###### Lyrics
-  - To:do
+  ##### Lyrics
+  - ~~Display lyrics if available~~
+  - ~~Ability to add lyrics~~
 
-  ###### Options
-  - To:do
+  ##### Options
+  - ~~Open in MP3Tag~~
+  - Start/Stop Position
+  - Remember playback position
+  - Skip when shuffling
+  - Volume slider for individual tracks
+  - EQ
 
-  ###### Sorting
-  - To:do
+  ##### Sorting
+  - Change sorting options for specific items
 
-  ###### File
-  - To:do
+  ##### File
+  - ~~Show file-type, length, size, bit rate, and other info~~
 
 - ~~Show in Explorer~~
 - ~~Remove from Library~~
@@ -248,9 +259,7 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 - ~~Hide "Show in Queue"~~
 
 #### Planned Features
-- Ability to edit metadata
 - Visualizer
-- Playlist import support
 - _POSSIBLE_ iTunes library import support
 - Audio file converting/compressing
 - Album art scraper
@@ -272,10 +281,6 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 </details>
 
 # General Usage Info
-
-
-
-
 
 ## Main Window
 
@@ -364,3 +369,4 @@ If you'd like to support me, follow me on twitch:
 
 or if you're feeling generous drop a donation:
 [https://coff.ee/fosterbarnes](https://coff.ee/fosterbarnes)
+

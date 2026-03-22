@@ -270,6 +270,8 @@ namespace MusicApp.Views
 
         public void RebuildColumns() { }
 
+        public void RefreshAlbumGridFromLibrary() => _ = RebuildAlbumItemsAsync();
+
         public void ScrollToAlbum(string albumName)
         {
             SelectAlbum(albumName, null, openDetails: true, selectedTrackFilePath: null);

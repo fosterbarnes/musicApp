@@ -15,10 +15,14 @@
     <!-- Thickness tokens (-thk suffix) -->
     <Thickness x:Key="Zero-thk">0</Thickness>
     <Thickness x:Key="Border1-thk">1</Thickness>
-    <Thickness x:Key="SidebarButtonMargin-thk">0,5</Thickness>
-    <Thickness x:Key="SidebarButtonPadding-thk">10,8</Thickness>
-    <Thickness x:Key="SidebarButtonContentMargin-thk">10,0</Thickness>
+    <Thickness x:Key="SidebarButtonMargin-thk">0</Thickness>
+    <Thickness x:Key="SidebarButtonPadding-thk">10,8,10,8</Thickness>
+    <Thickness x:Key="SidebarButtonContentMargin-thk">0</Thickness>
     <Thickness x:Key="FieldRowGap-thk">0,0,0,8</Thickness>
+    <Thickness x:Key="FileInfoSectionBreakLabelMargin-thk">0,10,10,8</Thickness>
+    <Thickness x:Key="FileInfoSectionBreakValueMargin-thk">0,10,0,8</Thickness>
+    <Thickness x:Key="FileInfoLocationLabelMargin-thk">0,10,10,0</Thickness>
+    <Thickness x:Key="FileInfoLocationValueMargin-thk">0,10,0,0</Thickness>
     <Thickness x:Key="SectionHeaderGap-thk">0,0,0,6</Thickness>
     <Thickness x:Key="MenuItemPadding-thk">12,2</Thickness>
     <Thickness x:Key="MenuItemContentMargin-thk">10,1</Thickness>
@@ -56,12 +60,16 @@
     <Thickness x:Key="Left20-thk">20,0,0,0</Thickness>
     <Thickness x:Key="Left180-thk">180,0,0,0</Thickness>
     <Thickness x:Key="Left26-thk">26,0,0,20</Thickness>
+    <Thickness x:Key="InfoSortAsPlaceholderInset-thk">7,3,3,3</Thickness>
     <Thickness x:Key="FieldLabelMargin-thk">0,0,10,8</Thickness>
     <Thickness x:Key="ComboBoxContentMargin-thk">6,2,28,2</Thickness>
     <Thickness x:Key="HeaderPanelPadding-thk">15,10</Thickness>
     <Thickness x:Key="SearchBarPadding-thk">8,4</Thickness>
     <Thickness x:Key="IconButtonPadding-thk">8</Thickness>
     <Thickness x:Key="Border0-thk">0</Thickness>
+
+    <!-- Info metadata dialog: label column for Details / Sorting (and matching) two-column field grids -->
+    <GridLength x:Key="InfoMetadataLabelColumnWidth">130</GridLength>
 
     <!-- Corner radius tokens (-cr suffix) -->
     <CornerRadius x:Key="None-cr">0</CornerRadius>

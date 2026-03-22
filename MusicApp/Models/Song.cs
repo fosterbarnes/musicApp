@@ -35,6 +35,13 @@ namespace MusicApp
         public string FileType { get; set; } = "";
         public DateTime? ReleaseDate { get; set; }
         public int BeatsPerMinute { get; set; } = 0;
+        public string Comment { get; set; } = "";
+        [JsonIgnore]
+        public string Lyrics { get; set; } = "";
+        public bool IsCompilation { get; set; }
+        public bool IsFavorite { get; set; }
+        public int TrackTotal { get; set; }
+        public int DiscTotal { get; set; }
 
         public override string ToString()
         {

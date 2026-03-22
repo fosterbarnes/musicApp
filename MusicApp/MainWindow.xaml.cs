@@ -16,7 +16,6 @@ using System.Windows.Interop;
 using System.Windows.Threading;
 using NAudio.Wave;
 using ATL;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using MusicApp.Views;
@@ -34,37 +33,6 @@ namespace MusicApp
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
-
-
-        // ===========================================
-        // WINDOWS API IMPORTS FOR RECYCLE BIN
-        // ===========================================
-        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
-        private static extern int SHFileOperation(ref SHFILEOPSTRUCT lpFileOp);
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        private struct SHFILEOPSTRUCT
-        {
-            public IntPtr hwnd;
-            public uint wFunc;
-            [MarshalAs(UnmanagedType.LPWStr)]
-            public string pFrom;
-            [MarshalAs(UnmanagedType.LPWStr)]
-            public string pTo;
-            public ushort fFlags;
-            [MarshalAs(UnmanagedType.Bool)]
-            public bool fAnyOperationsAborted;
-            public IntPtr hNameMappings;
-            [MarshalAs(UnmanagedType.LPWStr)]
-            public string lpszProgressTitle;
-        }
-
-        private const uint FO_DELETE = 0x0003;
-        private const ushort FOF_ALLOWUNDO = 0x0040;
-        private const ushort FOF_NOCONFIRMATION = 0x0010;
-        private const ushort FOF_SILENT = 0x0004;
-
-
 
         // ===========================================
         // WINDOW MANAGEMENT
@@ -129,10 +97,8 @@ namespace MusicApp
         {
             InitializeComponent();
 
-            // Initialize window manager
             windowManager = new WindowManager(this, titleBarPlayer);
 
-            // Subscribe to window state changes for auto-saving
             windowManager.WindowStateChanged += WindowManager_WindowStateChanged;
 
             // Try to load settings synchronously to set the correct initial position
@@ -141,7 +107,6 @@ namespace MusicApp
                 var initialSettings = settingsManager.LoadSettingsSync();
                 if (initialSettings?.WindowState != null)
                 {
-                    // Use saved window position if available
                     windowManager.SetInitialPosition(
                         initialSettings.WindowState.Left,
                         initialSettings.WindowState.Top,
@@ -149,20 +114,17 @@ namespace MusicApp
                         initialSettings.WindowState.Height
                     );
 
-                    // Restore sidebar width if available
                     if (initialSettings.WindowState.SidebarWidth > 0)
                     {
                         sidebarColumn.Width = new GridLength(initialSettings.WindowState.SidebarWidth);
                     }
 
-                    // Store the settings for later use
                     appSettings = initialSettings;
                     
-                    // Columns will be built dynamically in SetupEventHandlers after InitializeColumnDefinitions
+                    // Columns are rebuilt after views are initialized.
                 }
                 else
                 {
-                    // Fall back to default position
                     windowManager.SetInitialPosition(
                         UILayoutConstants.DefaultWindowLeft,
                         UILayoutConstants.DefaultWindowTop,
@@ -172,7 +134,6 @@ namespace MusicApp
             }
             catch
             {
-                // Fall back to default position if loading fails
                 windowManager.SetInitialPosition(
                     UILayoutConstants.DefaultWindowLeft,
                     UILayoutConstants.DefaultWindowTop,
@@ -185,13 +146,10 @@ namespace MusicApp
             SetupEventHandlers();
             DataContext = this;
 
-            // Load saved data asynchronously
             _ = LoadSavedDataAsync();
 
-            // Initialize window state tracking
             windowManager.InitializeWindowState();
 
-            // Setup sidebar width tracking
             SetupSidebarWidthTracking();
         }
 
@@ -314,6 +272,7 @@ namespace MusicApp
             playlistsViewControl.RemoveFromPlaylistRequested += OnRemoveFromPlaylistRequested;
 
             contentHost.Content = songsView;
+            SetSidebarNavActive(btnLibrary);
         }
 
         /// <summary>
@@ -323,28 +282,14 @@ namespace MusicApp
         {
             try
             {
-                // Load general settings (window state only) - do this first if not already loaded
-                if (appSettings == null)
-                {
-                    appSettings = await settingsManager.LoadSettingsAsync();
-
-                    // Restore window state immediately after loading settings
-                    RestoreWindowState();
-                }
-
-                // Load library cache (tracks only)
                 var libraryCache = await libraryManager.LoadLibraryCacheAsync();
 
-                // Load recently played
                 var recentlyPlayedCache = await libraryManager.LoadRecentlyPlayedAsync();
 
-                // Load playlists
                 var playlistsCache = await libraryManager.LoadPlaylistsAsync();
 
-                // Load music from saved folders
                 await LoadMusicFromSavedFoldersAsync(libraryCache);
 
-                // Restore playlists
                 RestorePlaylists(playlistsCache);
 
                 // Sync pinned playlists for sidebar (so they appear in the menu on launch)
@@ -353,13 +298,10 @@ namespace MusicApp
                         PinnedPlaylists.Add(p);
                 OnPropertyChanged(nameof(HasPinnedPlaylists));
 
-                // Restore recently played
                 RestoreRecentlyPlayed(recentlyPlayedCache);
 
-                // Update UI
                 UpdateUI();
 
-                // Initialize shuffled tracks if shuffle is enabled
                 if (titleBarPlayer.IsShuffleEnabled)
                 {
                     RegenerateShuffledTracks();
@@ -386,19 +328,12 @@ namespace MusicApp
                     appSettings.WindowState.IsMaximized
                 );
 
-                // Restore sidebar width
                 if (appSettings.WindowState.SidebarWidth > 0)
                 {
                     sidebarColumn.Width = new GridLength(appSettings.WindowState.SidebarWidth);
                 }
 
-                // Rebuild columns with saved visibility/width in each view
-                songsView?.RebuildColumns();
-                queueViewControl?.RebuildColumns();
-                recentlyPlayedViewControl?.RebuildColumns();
-                artistsViewControl?.RebuildColumns();
-                genresViewControl?.RebuildColumns();
-                albumsViewControl?.RebuildColumns();
+                RebuildAllViewColumns();
             }
         }
 
@@ -417,17 +352,14 @@ namespace MusicApp
             {
                 if (Directory.Exists(folderPath))
                 {
-                    // Check if there are new files in the folder
                     bool hasNewFiles = await libraryManager.HasNewFilesInFolderAsync(folderPath);
 
                     if (hasNewFiles)
                     {
-                        // Load new files from this folder
                         await LoadMusicFromFolderAsync(folderPath, true);
                     }
                     else
                     {
-                        // Load from cache
                         await LoadMusicFromCacheAsync(folderPath, libraryCache);
                     }
                 }
@@ -446,10 +378,8 @@ namespace MusicApp
 
                 foreach (var track in cachedTracks)
                 {
-                    // Verify file still exists
                     if (File.Exists(track.FilePath))
                     {
-                        // Populate missing FileType if not set
                         if (string.IsNullOrEmpty(track.FileType))
                         {
                             var extension = Path.GetExtension(track.FilePath);
@@ -459,7 +389,6 @@ namespace MusicApp
                             }
                         }
                         
-                        // Populate missing Bitrate and SampleRate if not set
                         if (string.IsNullOrEmpty(track.Bitrate) || string.IsNullOrEmpty(track.SampleRate))
                         {
                             try
@@ -561,17 +490,11 @@ namespace MusicApp
                     });
                 }
 
-                // Update shuffled tracks if shuffle is enabled
                 Console.WriteLine($"After loading from cache - allTracks: {allTracks.Count}, filteredTracks: {filteredTracks.Count}");
                 UpdateShuffledTracks();
 
-                // Update queue view if it's currently visible
-                if (contentHost?.Content == queueViewControl)
-                {
-                    UpdateQueueView();
-                }
+                RefreshVisibleViews();
 
-                // Update status bar after loading from cache
                 await Dispatcher.InvokeAsync(() =>
                 {
                     UpdateStatusBar();
@@ -592,7 +515,6 @@ namespace MusicApp
             {
                 foreach (var playlist in playlistsCache.Playlists)
                 {
-                    // Reconstruct tracks for each playlist
                     playlist.ReconstructTracks(allTracks);
                     playlists.Add(playlist);
                 }
@@ -716,14 +638,8 @@ namespace MusicApp
         /// </summary>
         private void UpdateUI()
         {
-            if (songsView != null) songsView.ItemsSource = allTracks;
-            if (playlistsViewControl != null) playlistsViewControl.Playlists = playlists;
-            if (recentlyPlayedViewControl != null) recentlyPlayedViewControl.ItemsSource = recentlyPlayed;
-            if (artistsViewControl != null) artistsViewControl.ItemsSource = allTracks;
-            if (genresViewControl != null) genresViewControl.ItemsSource = allTracks;
-            if (albumsViewControl != null) albumsViewControl.ItemsSource = allTracks;
-            if (contentHost?.Content == queueViewControl)
-                UpdateQueueView();
+            RefreshAllViewDataSources();
+            RefreshVisibleViews();
         }
 
         /// <summary>
@@ -742,17 +658,14 @@ namespace MusicApp
                     return;
                 }
 
-                // Calculate total tracks
                 var totalTracks = allTracks.Count;
 
-                // Calculate unique albums
                 var uniqueAlbums = allTracks
                     .Where(t => !string.IsNullOrWhiteSpace(t.Album) && t.Album != "Unknown Album")
                     .Select(t => new { t.Album, t.Artist })
                     .Distinct()
                     .Count();
 
-                // Calculate total duration in days
                 var totalDuration = allTracks
                     .Where(t => t.DurationTimeSpan != TimeSpan.Zero)
                     .Sum(t => t.DurationTimeSpan.TotalSeconds);
@@ -775,18 +688,16 @@ namespace MusicApp
                             if (fileInfo.Exists)
                             {
                                 totalBytes += fileInfo.Length;
-                                track.FileSize = fileInfo.Length; // Cache it
+                                track.FileSize = fileInfo.Length;
                             }
                         }
                         catch
                         {
-                            // Skip files that can't be accessed
                         }
                     }
                 }
                 var totalGB = totalBytes / (1024.0 * 1024.0 * 1024.0);
 
-                // Update status bar text
                 statusBarText.Text = $"{totalTracks} songs, {uniqueAlbums} albums, {totalDays:F1} days, {totalGB:F2} GB";
             }
             catch (Exception ex)
@@ -804,14 +715,8 @@ namespace MusicApp
         /// </summary>
         private void SetupEventHandlers()
         {
-            if (songsView != null) songsView.ItemsSource = allTracks;
-            if (playlistsViewControl != null) playlistsViewControl.Playlists = playlists;
-            if (recentlyPlayedViewControl != null) recentlyPlayedViewControl.ItemsSource = recentlyPlayed;
-            if (artistsViewControl != null) artistsViewControl.ItemsSource = allTracks;
-            if (genresViewControl != null) genresViewControl.ItemsSource = allTracks;
-            if (albumsViewControl != null) albumsViewControl.ItemsSource = allTracks;
+            RefreshAllViewDataSources();
 
-            // Wire up title bar player control events
             titleBarPlayer.PlayPauseRequested += TitleBarPlayer_PlayPauseRequested;
             titleBarPlayer.PreviousTrackRequested += TitleBarPlayer_PreviousTrackRequested;
             titleBarPlayer.NextTrackRequested += TitleBarPlayer_NextTrackRequested;
@@ -819,14 +724,11 @@ namespace MusicApp
             titleBarPlayer.WindowMaximizeRequested += TitleBarPlayer_WindowMaximizeRequested;
             titleBarPlayer.WindowCloseRequested += TitleBarPlayer_WindowCloseRequested;
 
-            // Wire up shuffle state change event
             titleBarPlayer.ShuffleStateChanged += TitleBarPlayer_ShuffleStateChanged;
 
-            // Wire up song info navigation
             titleBarPlayer.ArtistNavigationRequested += TitleBarPlayer_ArtistNavigationRequested;
             titleBarPlayer.AlbumNavigationRequested += TitleBarPlayer_AlbumNavigationRequested;
 
-            // Wire up search
             titleBarPlayer.SearchTextChanged += TitleBarPlayer_SearchTextChanged;
             if (searchPopupView != null)
             {
@@ -847,8 +749,84 @@ namespace MusicApp
                 searchPopupView.DeleteRequested += OnDeleteRequested;
             }
 
-            // Wire up window size changed event
             this.SizeChanged += MainWindow_SizeChanged;
+        }
+
+        private static bool IsValidTrackWithPath(Song? track)
+        {
+            return track != null && !string.IsNullOrWhiteSpace(track.FilePath);
+        }
+
+        private void RebuildAllViewColumns()
+        {
+            songsView?.RebuildColumns();
+            queueViewControl?.RebuildColumns();
+            recentlyPlayedViewControl?.RebuildColumns();
+            artistsViewControl?.RebuildColumns();
+            genresViewControl?.RebuildColumns();
+            albumsViewControl?.RebuildColumns();
+        }
+
+        private void RefreshAllViewDataSources()
+        {
+            if (songsView != null) songsView.ItemsSource = allTracks;
+            if (playlistsViewControl != null) playlistsViewControl.Playlists = playlists;
+            if (recentlyPlayedViewControl != null) recentlyPlayedViewControl.ItemsSource = recentlyPlayed;
+            if (artistsViewControl != null) artistsViewControl.ItemsSource = allTracks;
+            if (genresViewControl != null) genresViewControl.ItemsSource = allTracks;
+            if (albumsViewControl != null) albumsViewControl.ItemsSource = allTracks;
+        }
+
+        private void RefreshVisibleViews()
+        {
+            var current = contentHost?.Content;
+            switch (current)
+            {
+                case object _ when ReferenceEquals(current, queueViewControl):
+                    UpdateQueueView();
+                    break;
+                case object _ when ReferenceEquals(current, playlistsViewControl):
+                    UpdatePlaylistsView();
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private void RefreshAfterMetadataEdit(Song updatedTrack)
+        {
+            songsView?.RefreshTrackListBindings();
+            queueViewControl?.RefreshTrackListBindings();
+            recentlyPlayedViewControl?.RefreshTrackListBindings();
+            artistsViewControl?.RefreshTrackListBindings();
+            genresViewControl?.RefreshTrackListBindings();
+            albumsViewControl?.RefreshAlbumGridFromLibrary();
+            playlistsViewControl?.RefreshTrackListBindings();
+
+            if (currentTrack != null && updatedTrack != null &&
+                string.Equals(currentTrack.FilePath, updatedTrack.FilePath, StringComparison.OrdinalIgnoreCase))
+            {
+                var albumArt = AlbumArtLoader.LoadAlbumArt(currentTrack);
+                titleBarPlayer.SetTrackInfo(currentTrack.Title, currentTrack.Artist, currentTrack.Album, albumArt);
+            }
+
+            UpdateStatusBar();
+        }
+
+        private void RemoveTrackFromCollections(Song track, bool includeShuffled)
+        {
+            allTracks.Remove(track);
+            filteredTracks.Remove(track);
+            if (includeShuffled)
+            {
+                shuffledTracks.Remove(track);
+            }
+            recentlyPlayed.Remove(track);
+        }
+
+        private static void LogDebug(string message)
+        {
+            Debug.WriteLine(message);
         }
 
         private void TitleBarPlayer_SearchTextChanged(object? sender, string query)
@@ -924,7 +902,6 @@ namespace MusicApp
             {
                 Console.WriteLine($"RegenerateShuffledTracks called - filteredTracks.Count: {filteredTracks.Count}");
 
-                // Safety check
                 if (filteredTracks == null || filteredTracks.Count == 0)
                 {
                     Console.WriteLine("No filtered tracks to shuffle");
@@ -933,10 +910,8 @@ namespace MusicApp
                     return;
                 }
 
-                // Clear existing shuffled tracks
                 shuffledTracks.Clear();
 
-                // Add all filtered tracks to shuffled collection
                 Console.WriteLine($"Processing {filteredTracks.Count} tracks from filteredTracks");
                 foreach (var track in filteredTracks)
                 {
@@ -953,10 +928,8 @@ namespace MusicApp
                 Console.WriteLine($"Added {shuffledTracks.Count} valid tracks to shuffled queue");
                 Console.WriteLine($"Shuffle queue now contains: {string.Join(", ", shuffledTracks.Take(5).Select(t => t.Title))}... (and {shuffledTracks.Count - 5} more)");
 
-                // Only shuffle if we have tracks
                 if (shuffledTracks.Count > 1)
                 {
-                    // Shuffle the tracks using Fisher-Yates algorithm
                     var random = new Random();
                     for (int i = shuffledTracks.Count - 1; i > 0; i--)
                     {
@@ -972,14 +945,11 @@ namespace MusicApp
                     Console.WriteLine("Not enough tracks to shuffle (need at least 2)");
                 }
 
-                // If we have a current track, ensure it's at the beginning of the shuffled queue
                 if (currentTrack != null)
                 {
-                    // Find the current track in the shuffled list
                     int trackIndex = shuffledTracks.IndexOf(currentTrack);
                     if (trackIndex > 0)
                     {
-                        // Move the current track to the beginning
                         var trackToMove = shuffledTracks[trackIndex];
                         shuffledTracks.RemoveAt(trackIndex);
                         shuffledTracks.Insert(0, trackToMove);
@@ -994,7 +964,6 @@ namespace MusicApp
                         Console.WriteLine($"Current track '{currentTrack.Title}' not found in shuffled list, this shouldn't happen");
                     }
 
-                    // Set the current shuffled index to 0 since the current track is now first
                     currentShuffledIndex = 0;
                 }
                 else
@@ -1005,7 +974,6 @@ namespace MusicApp
                 Console.WriteLine($"Shuffled tracks generated - shuffledTracks.Count: {shuffledTracks.Count}, currentShuffledIndex: {currentShuffledIndex}");
                 Console.WriteLine($"Shuffle queue order: {string.Join(" -> ", shuffledTracks.Take(5).Select(t => t.Title))}...");
 
-                // Update queue view if it's currently visible
                 if (contentHost?.Content == queueViewControl)
                 {
                     UpdateQueueView();
@@ -1016,7 +984,6 @@ namespace MusicApp
                 Console.WriteLine($"Error in RegenerateShuffledTracks: {ex.Message}");
                 Console.WriteLine($"Stack trace: {ex.StackTrace}");
 
-                // Fallback: clear shuffled tracks and reset index
                 try
                 {
                     shuffledTracks.Clear();
@@ -1039,12 +1006,11 @@ namespace MusicApp
             {
                 if (!titleBarPlayer.IsShuffleEnabled)
                 {
-                    return; // Shuffle not enabled, no need to initialize
+                    return;
                 }
 
                 Console.WriteLine($"EnsureShuffledTracksInitialized called - shuffledTracks.Count: {shuffledTracks.Count}, currentShuffledIndex: {currentShuffledIndex}");
 
-                // If we don't have shuffled tracks or they don't match the current filtered tracks, regenerate
                 if (shuffledTracks.Count == 0 || shuffledTracks.Count != filteredTracks.Count)
                 {
                     Console.WriteLine("Shuffled tracks count mismatch or empty, regenerating");
@@ -1052,7 +1018,6 @@ namespace MusicApp
                     return;
                 }
 
-                // If current track is not in shuffled tracks, regenerate
                 if (currentTrack != null && shuffledTracks.IndexOf(currentTrack) == -1)
                 {
                     Console.WriteLine("Current track not found in shuffled tracks, regenerating");
@@ -1060,7 +1025,6 @@ namespace MusicApp
                     return;
                 }
 
-                // If we have a valid current track but no valid shuffled index, find it
                 if (currentTrack != null && currentShuffledIndex == -1)
                 {
                     currentShuffledIndex = shuffledTracks.IndexOf(currentTrack);
@@ -1080,7 +1044,6 @@ namespace MusicApp
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in EnsureShuffledTracksInitialized: {ex.Message}");
-                // Fallback: regenerate shuffled tracks
                 RegenerateShuffledTracks();
             }
         }
@@ -1109,6 +1072,24 @@ namespace MusicApp
             }
         }
 
+        private void UpdateShuffleIndicesAfterTrackChange(Song track)
+        {
+            if (!titleBarPlayer.IsShuffleEnabled || HasContextualPlaybackQueue())
+                return;
+
+            if (!isManualNavigation)
+            {
+                Console.WriteLine("Shuffle enabled and not manual navigation - regenerating shuffled queue");
+                RegenerateShuffledTracks();
+            }
+            else
+            {
+                Console.WriteLine("Shuffle enabled but manual navigation - maintaining existing shuffled queue");
+            }
+
+            currentShuffledIndex = shuffledTracks.IndexOf(track);
+        }
+
         /// <summary>
         /// Gets the current play queue (either filtered or shuffled based on shuffle state)
         /// </summary>
@@ -1124,7 +1105,6 @@ namespace MusicApp
 
                 var queue = titleBarPlayer.IsShuffleEnabled ? shuffledTracks : filteredTracks;
 
-                // Safety check - ensure we have a valid queue
                 if (queue == null)
                 {
                     Console.WriteLine("GetCurrentPlayQueue: queue is null, falling back to filteredTracks");
@@ -1229,6 +1209,31 @@ namespace MusicApp
 
         #region Title Bar Player Control Event Handlers
 
+        private enum PreviousTrackSeekBehavior
+        {
+            RestartCurrent,
+            GoToPrevious,
+            RestartCurrentEdge,
+        }
+
+        private static PreviousTrackSeekBehavior GetPreviousTrackSeekBehavior(double elapsedSeconds, int currentIndex)
+        {
+            if (elapsedSeconds >= UILayoutConstants.PreviousTrackRestartThresholdSeconds)
+                return PreviousTrackSeekBehavior.RestartCurrent;
+            if (elapsedSeconds <= UILayoutConstants.PreviousTrackEdgeThresholdSeconds && currentIndex > 0)
+                return PreviousTrackSeekBehavior.GoToPrevious;
+            return PreviousTrackSeekBehavior.RestartCurrentEdge;
+        }
+
+        private void RestartCurrentTrackFromPreviousButton(bool resumeIfWasPlaying)
+        {
+            if (currentTrack == null)
+                return;
+            LoadTrackWithoutPlayback(currentTrack);
+            if (resumeIfWasPlaying)
+                ResumePlayback();
+        }
+
         private void TitleBarPlayer_PlayPauseRequested(object? sender, EventArgs e)
         {
             if (currentTrack == null)
@@ -1261,74 +1266,50 @@ namespace MusicApp
 
             Console.WriteLine($"Previous track requested - currentIndex: {currentIndex}, queue count: {currentQueue.Count}");
 
-            // Set manual navigation flag
             isManualNavigation = true;
 
-            // Get current playback position
             var currentPosition = titleBarPlayer.CurrentPosition;
             Console.WriteLine($"Current playback position: {currentPosition.TotalSeconds:F1} seconds");
 
-            // Store current playback state to preserve it
             bool wasPlaying = titleBarPlayer.IsPlaying;
+            var behavior = GetPreviousTrackSeekBehavior(currentPosition.TotalSeconds, currentIndex);
 
-            // If we're 3 or more seconds into the song, restart the current song
-            if (currentPosition.TotalSeconds >= UILayoutConstants.PreviousTrackRestartThresholdSeconds)
+            switch (behavior)
             {
-                Console.WriteLine("Restarting current track (3+ seconds elapsed)");
-                if (currentTrack != null)
-                {
-                    // Load the track without starting playback, then restore the previous state
-                    LoadTrackWithoutPlayback(currentTrack);
-                    // If it was playing before, start playback now
-                    if (wasPlaying)
+                case PreviousTrackSeekBehavior.RestartCurrent:
+                    Console.WriteLine("Restarting current track (3+ seconds elapsed)");
+                    RestartCurrentTrackFromPreviousButton(wasPlaying);
+                    break;
+
+                case PreviousTrackSeekBehavior.GoToPrevious:
+                    Console.WriteLine("Going to previous track (2 seconds or less elapsed)");
+                    var previousTrack = GetTrackFromCurrentQueue(currentIndex - 1);
+                    if (previousTrack != null)
                     {
-                        ResumePlayback();
+                        LoadTrackWithoutPlayback(previousTrack);
+                        if (wasPlaying)
+                            ResumePlayback();
                     }
-                }
-            }
-            // If we're 2 seconds or less into the song, go to previous track
-            else if (currentPosition.TotalSeconds <= UILayoutConstants.PreviousTrackEdgeThresholdSeconds && currentIndex > 0)
-            {
-                Console.WriteLine("Going to previous track (2 seconds or less elapsed)");
-                var previousTrack = GetTrackFromCurrentQueue(currentIndex - 1);
-                if (previousTrack != null)
-                {
-                    // Load the previous track without starting playback, then restore the previous state
-                    LoadTrackWithoutPlayback(previousTrack);
-                    // If it was playing before, start playback now
-                    if (wasPlaying)
+                    else
                     {
-                        ResumePlayback();
+                        Console.WriteLine("Previous track is null or invalid, cannot play");
+                        if (contentHost?.Content == queueViewControl)
+                            UpdateQueueView();
                     }
-                }
-                else
-                {
-                    Console.WriteLine("Previous track is null or invalid, cannot play");
-                    // Update queue view if it's visible
-                    if (contentHost?.Content == queueViewControl)
-                    {
-                        UpdateQueueView();
-                    }
-                }
-            }
-            // If we're between 2-3 seconds, restart the current song (edge case)
-            else
-            {
-                Console.WriteLine("Restarting current track (between 2-3 seconds elapsed)");
-                if (currentTrack != null)
-                {
-                    // Load the track without starting playback, then restore the previous state
-                    LoadTrackWithoutPlayback(currentTrack);
-                    // If it was playing before, start playback now
-                    if (wasPlaying)
-                    {
-                        ResumePlayback();
-                    }
-                }
+                    break;
+
+                case PreviousTrackSeekBehavior.RestartCurrentEdge:
+                    Console.WriteLine("Restarting current track (2–3s band, or ≤2s at start of queue)");
+                    RestartCurrentTrackFromPreviousButton(wasPlaying);
+                    break;
             }
 
-            // Reset manual navigation flag after a short delay
             Task.Delay(UILayoutConstants.ManualNavigationResetDelayMs).ContinueWith(_ => isManualNavigation = false);
+        }
+
+        private void ResetPlaybackToIdleAndRefreshQueue()
+        {
+            CleanupAudioObjects();
         }
 
         private void TitleBarPlayer_NextTrackRequested(object? sender, EventArgs e)
@@ -1338,7 +1319,6 @@ namespace MusicApp
 
             Console.WriteLine($"Next track requested - currentIndex: {currentIndex}, queue count: {currentQueue.Count}");
 
-            // Set manual navigation flag
             isManualNavigation = true;
 
             if (currentIndex < currentQueue.Count - 1)
@@ -1346,12 +1326,9 @@ namespace MusicApp
                 var nextTrack = GetTrackFromCurrentQueue(currentIndex + 1);
                 if (nextTrack != null)
                 {
-                    // Store current playback state to preserve it
                     bool wasPlaying = titleBarPlayer.IsPlaying;
 
-                    // Load the next track without starting playback, then restore the previous state
                     LoadTrackWithoutPlayback(nextTrack);
-                    // If it was playing before, start playback now
                     if (wasPlaying)
                     {
                         ResumePlayback();
@@ -1360,47 +1337,16 @@ namespace MusicApp
                 else
                 {
                     Console.WriteLine("Next track is null or has invalid file path, stopping playback");
-                    // Clean up and reset to idle state
-                    CleanupAudioObjects();
-                    currentTrack = null;
-                    currentTrackIndex = -1;
-                    currentShuffledIndex = -1;
-                    ClearContextualPlaybackQueue();
-                    titleBarPlayer.SetTrackInfo("No track selected", "", "");
-
-                    // Update queue view if it's visible
-                    if (contentHost?.Content == queueViewControl)
-                    {
-                        UpdateQueueView();
-                    }
+                    ResetPlaybackToIdleAndRefreshQueue();
                 }
             }
             else
             {
-                // If it's the last track, stop playback and reset to idle state
                 Console.WriteLine("Reached end of queue, stopping playback and resetting to idle state");
-
-                // Clean up audio objects and reset to idle state
-                CleanupAudioObjects();
-
-                // Reset current track info
-                currentTrack = null;
-                currentTrackIndex = -1;
-                currentShuffledIndex = -1;
-
-                // Update title bar player to show no track is playing
-                titleBarPlayer.SetTrackInfo("No track selected", "", "");
-
-                // Update queue view if it's visible
-                if (contentHost?.Content == queueViewControl)
-                {
-                    UpdateQueueView();
-                }
-
+                ResetPlaybackToIdleAndRefreshQueue();
                 Console.WriteLine("Playback stopped - app reset to idle state");
             }
 
-            // Reset manual navigation flag after a short delay
             Task.Delay(UILayoutConstants.ManualNavigationResetDelayMs).ContinueWith(_ => isManualNavigation = false);
         }
 
@@ -1434,7 +1380,6 @@ namespace MusicApp
         {
             base.OnActivated(e);
 
-            // Restore custom window style after minimize/restore operations
             if (WindowStyle != WindowStyle.None)
             {
                 Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, (DispatcherOperationCallback)delegate (object unused)
@@ -1474,7 +1419,6 @@ namespace MusicApp
         /// </summary>
         private void SetupSidebarWidthTracking()
         {
-            // Initialize the save timer for sidebar width
             sidebarWidthSaveTimer = new DispatcherTimer(
                 UILayoutConstants.SidebarWidthSaveDelay, 
                 DispatcherPriority.Background, 
@@ -1515,7 +1459,6 @@ namespace MusicApp
                 
                 try
                 {
-                    // Update the sidebar width in appSettings
                     if (appSettings.WindowState != null)
                     {
                         appSettings.WindowState.SidebarWidth = sidebarColumn.ActualWidth;
@@ -1537,17 +1480,14 @@ namespace MusicApp
         {
             try
             {
-                // Update the window state in appSettings
                 appSettings.WindowState = windowManager.GetCurrentWindowState();
 
-                // Also save current sidebar width
                 if (appSettings.WindowState != null)
                 {
                     appSettings.WindowState.SidebarWidth = sidebarColumn.ActualWidth;
 
                 }
 
-                // Save the settings asynchronously
                 await settingsManager.SaveSettingsAsync(appSettings);
 
                 System.Diagnostics.Debug.WriteLine("MainWindow: Window state saved successfully");
@@ -1569,7 +1509,6 @@ namespace MusicApp
 
             if (isShuffleEnabled)
             {
-                // Shuffle was enabled - regenerate shuffled tracks
                 Console.WriteLine("Shuffle enabled - regenerating shuffled tracks");
                 RegenerateShuffledTracks();
             }
@@ -1583,14 +1522,12 @@ namespace MusicApp
                     currentTrackIndex = filteredTracks.IndexOf(currentTrack);
                     if (currentTrackIndex == -1)
                     {
-                        // If current track not found in filtered list, reset to beginning
                         currentTrackIndex = 0;
                     }
                     Console.WriteLine($"Current track index updated to: {currentTrackIndex}");
                 }
             }
 
-            // Update queue view if it's currently visible
             if (contentHost?.Content == queueViewControl)
             {
                 UpdateQueueView();
@@ -1600,118 +1537,9 @@ namespace MusicApp
         #endregion
 
         #region Navigation Events
-
-        private void BtnLibrary_Click(object sender, RoutedEventArgs e)
-        {
-            ShowLibraryView();
-        }
-
-        private void BtnQueue_Click(object sender, RoutedEventArgs e)
-        {
-            ShowQueueView();
-        }
-
-        private void BtnPlaylists_Click(object sender, RoutedEventArgs e)
-        {
-            ShowPlaylistsView();
-        }
-
-        private void BtnRecentlyPlayed_Click(object sender, RoutedEventArgs e)
-        {
-            ShowRecentlyPlayedView();
-        }
-
-        private void BtnArtists_Click(object sender, RoutedEventArgs e)
-        {
-            ShowArtistsView();
-        }
-
-        private void BtnAlbums_Click(object sender, RoutedEventArgs e)
-        {
-            ShowAlbumsView();
-        }
-
-        private void BtnGenres_Click(object sender, RoutedEventArgs e)
-        {
-            ShowGenresView();
-        }
-
-        private async void BtnAddFolder_Click(object sender, RoutedEventArgs e)
-        {
-            await AddMusicFolderAsync();
-        }
-
-        private async void OnAddMusicFolderRequested(object? sender, EventArgs e)
-        {
-            await AddMusicFolderAsync();
-        }
-
-        private async void BtnRescanLibrary_Click(object sender, RoutedEventArgs e)
-        {
-            await RescanLibraryAsync();
-        }
-
-        private async void BtnRemoveFolder_Click(object sender, RoutedEventArgs e)
-        {
-            await RemoveMusicFolderAsync();
-        }
-
-        private void BtnClearSettings_Click(object sender, RoutedEventArgs e)
-        {
-            ClearSettings();
-        }
-
         #endregion
 
         #region View Management
-
-        private void ShowLibraryView()
-        {
-            contentHost.Content = songsView;
-        }
-
-        private void ShowQueueView()
-        {
-            contentHost.Content = queueViewControl;
-            UpdateQueueView();
-        }
-
-        private void ShowPlaylistsView(Playlist? selectPlaylist = null)
-        {
-            contentHost.Content = playlistsViewControl;
-            if (playlistsViewControl != null)
-            {
-                playlistsViewControl.Playlists = playlists;
-                playlistsViewControl.SelectPlaylist(selectPlaylist);
-            }
-        }
-
-        private void PinnedPlaylistSidebar_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.DataContext is Playlist playlist)
-                ShowPlaylistsView(playlist);
-        }
-
-        private void ShowRecentlyPlayedView()
-        {
-            contentHost.Content = recentlyPlayedViewControl;
-        }
-
-        private void ShowArtistsView()
-        {
-            contentHost.Content = artistsViewControl;
-        }
-
-        private void ShowAlbumsView()
-        {
-            contentHost.Content = albumsViewControl;
-        }
-
-        private void ShowGenresView()
-        {
-            contentHost.Content = genresViewControl;
-        }
-
         #endregion
 
         #region Queue Management
@@ -1721,20 +1549,18 @@ namespace MusicApp
         /// </summary>
         private void OnPlayNextRequested(object? sender, Song track)
         {
-            if (track == null || string.IsNullOrEmpty(track.FilePath))
+            if (!IsValidTrackWithPath(track))
                 return;
 
             int insertAt = GetCurrentTrackIndex() + 1;
             if (insertAt < 0)
                 insertAt = 0;
 
-            // Insert into filtered queue (normal order)
             if (insertAt <= filteredTracks.Count)
                 filteredTracks.Insert(insertAt, track);
             else
                 filteredTracks.Add(track);
 
-            // Insert into shuffled queue at same logical position
             int shuffleInsertAt = (titleBarPlayer.IsShuffleEnabled ? currentShuffledIndex : currentTrackIndex) + 1;
             if (shuffleInsertAt < 0)
                 shuffleInsertAt = 0;
@@ -1743,8 +1569,7 @@ namespace MusicApp
             else
                 shuffledTracks.Add(track);
 
-            if (contentHost?.Content == queueViewControl)
-                UpdateQueueView();
+            RefreshVisibleViews();
         }
 
         /// <summary>
@@ -1752,14 +1577,13 @@ namespace MusicApp
         /// </summary>
         private void OnAddToQueueRequested(object? sender, Song track)
         {
-            if (track == null || string.IsNullOrEmpty(track.FilePath))
+            if (!IsValidTrackWithPath(track))
                 return;
 
             filteredTracks.Add(track);
             shuffledTracks.Add(track);
 
-            if (contentHost?.Content == queueViewControl)
-                UpdateQueueView();
+            RefreshVisibleViews();
         }
 
         /// <summary>
@@ -1833,88 +1657,11 @@ namespace MusicApp
         }
 
         /// <summary>
-        /// Opens Windows Explorer with the track's file selected.
-        /// </summary>
-        private void OnShowInExplorerRequested(object? sender, Song track)
-        {
-            if (track == null || string.IsNullOrEmpty(track.FilePath))
-                return;
-            if (!File.Exists(track.FilePath))
-                return;
-
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "explorer.exe",
-                    Arguments = $"/select,\"{track.FilePath}\""
-                });
-            }
-            catch (Exception ex)
-            {
-                // Log or show a brief message if explorer fails (e.g. path no longer valid)
-                Debug.WriteLine($"Show in Explorer failed: {ex.Message}");
-            }
-        }
-
-        private void OnShowInArtistsRequested(object? sender, Song track)
-        {
-            if (track == null || string.IsNullOrWhiteSpace(track.Artist))
-                return;
-
-            ShowArtistsView();
-            artistsViewControl?.SelectTrack(track);
-        }
-
-        private void OnShowInAlbumsRequested(object? sender, Song track)
-        {
-            if (track == null || string.IsNullOrWhiteSpace(track.Album))
-                return;
-
-            ShowAlbumsView();
-            albumsViewControl?.SelectAlbum(track);
-        }
-
-        private void OnShowInSongsRequested(object? sender, Song track)
-        {
-            if (track == null)
-                return;
-
-            ShowLibraryView();
-            songsView?.SelectTrack(track);
-        }
-
-        private void OnShowInQueueRequested(object? sender, Song track)
-        {
-            if (track == null)
-                return;
-
-            ShowQueueView();
-            queueViewControl?.SelectTrack(track);
-        }
-
-        private void OnInfoRequested(object? sender, Song track)
-        {
-            if (track == null)
-                return;
-
-            var infoWindow = new InfoMetadataView
-            {
-                Owner = this
-            };
-            infoWindow.ShowInSongsRequested += OnShowInSongsRequested;
-            infoWindow.ShowInArtistsRequested += OnShowInArtistsRequested;
-            infoWindow.ShowInAlbumsRequested += OnShowInAlbumsRequested;
-            infoWindow.LoadTrack(track, allTracks);
-            infoWindow.ShowDialog();
-        }
-
-        /// <summary>
         /// Removes the track from the MusicApp library (in-memory and persisted). Does not delete the file.
         /// </summary>
         private async void OnRemoveFromLibraryRequested(object? sender, Song track)
         {
-            if (track == null || string.IsNullOrEmpty(track.FilePath))
+            if (!IsValidTrackWithPath(track))
                 return;
             var result = MessageDialog.Show(this, "Remove from Library", $"Remove \"{track.Title}\" from the library? The file will stay on your computer.", MessageDialog.Buttons.YesNo);
             if (result != true)
@@ -1927,7 +1674,7 @@ namespace MusicApp
         /// </summary>
         private async void OnDeleteRequested(object? sender, Song track)
         {
-            if (track == null || string.IsNullOrEmpty(track.FilePath))
+            if (!IsValidTrackWithPath(track))
                 return;
             var result = MessageDialog.Show(this, "Delete", $"Move \"{track.Title}\" to the recycle bin?", MessageDialog.Buttons.YesNo);
             if (result != true)
@@ -1938,7 +1685,7 @@ namespace MusicApp
                 await RemoveTrackFromLibraryAsync(track);
                 return;
             }
-            if (!MoveToRecycleBin(track.FilePath))
+            if (!RecycleBinHelper.MoveFileToRecycleBin(track.FilePath))
             {
                 MessageDialog.Show(this, "Error", $"Could not move file to recycle bin: {track.FilePath}", MessageDialog.Buttons.Ok);
                 return;
@@ -1956,7 +1703,6 @@ namespace MusicApp
 
             var path = track.FilePath;
 
-            // If this is the current track, stop playback and clear state
             if (currentTrack != null && string.Equals(currentTrack.FilePath, path, StringComparison.OrdinalIgnoreCase))
             {
                 CleanupAudioObjects();
@@ -1967,10 +1713,7 @@ namespace MusicApp
                 titleBarPlayer.SetTrackInfo("No track selected", "", "");
             }
 
-            allTracks.Remove(track);
-            filteredTracks.Remove(track);
-            shuffledTracks.Remove(track);
-            recentlyPlayed.Remove(track);
+            RemoveTrackFromCollections(track, includeShuffled: true);
 
             foreach (var playlist in playlists)
             {
@@ -1993,8 +1736,7 @@ namespace MusicApp
 
             UpdateUI();
             UpdateShuffledTracks();
-            if (contentHost?.Content == queueViewControl)
-                UpdateQueueView();
+            RefreshVisibleViews();
             UpdateStatusBar();
         }
 
@@ -2024,7 +1766,6 @@ namespace MusicApp
                     }
                 }
 
-                // Log the current state
                 var currentQueue = GetCurrentPlayQueue();
                 Console.WriteLine($"Current queue state - filteredTracks: {filteredTracks.Count}, shuffledTracks: {shuffledTracks.Count}, currentTrack: {currentTrack?.Title ?? "None"}, currentIndex: {GetCurrentTrackIndex()}");
             }
@@ -2046,7 +1787,6 @@ namespace MusicApp
                 Console.WriteLine("BuildQueueView called");
                 var queueView = new ObservableCollection<Song>();
 
-                // Get the current play queue
                 var currentQueue = GetCurrentPlayQueue();
                 var currentIndex = GetCurrentTrackIndex();
 
@@ -2054,7 +1794,6 @@ namespace MusicApp
 
                 if (currentQueue == null || currentQueue.Count == 0)
                 {
-                    // No queue available, show empty queue
                     Console.WriteLine("BuildQueueView - No queue available, returning empty queue");
                     return queueView;
                 }
@@ -2063,60 +1802,30 @@ namespace MusicApp
                 {
                     Console.WriteLine($"BuildQueueView - Building queue with current track: {currentTrack.Title} at index {currentIndex}");
 
-                    if (titleBarPlayer.IsShuffleEnabled)
-                    {
-                        // For shuffle mode, show current track at top, then remaining tracks in shuffled order
-                        // First add the current track
-                        queueView.Add(currentTrack);
-                        Console.WriteLine($"BuildQueueView - Added current shuffled track at top: {currentTrack.Title}");
+                    // Same structure for shuffle and ordered mode: current at top, then rest of active queue from currentIndex+1.
+                    bool shuffle = titleBarPlayer.IsShuffleEnabled;
+                    queueView.Add(currentTrack);
+                    Console.WriteLine($"BuildQueueView - Added current track at top: {currentTrack.Title} (shuffle={shuffle})");
 
-                        // Then add remaining tracks from current position onwards (skip previously played)
-                        if (currentIndex < currentQueue.Count - 1)
+                    if (currentIndex < currentQueue.Count - 1)
+                    {
+                        for (int i = currentIndex + 1; i < currentQueue.Count; i++)
                         {
-                            for (int i = currentIndex + 1; i < currentQueue.Count; i++)
+                            var track = currentQueue[i];
+                            if (track != null && !string.IsNullOrEmpty(track.FilePath))
                             {
-                                var track = currentQueue[i];
-                                if (track != null && !string.IsNullOrEmpty(track.FilePath))
-                                {
-                                    queueView.Add(track);
-                                    Console.WriteLine($"BuildQueueView - Added remaining shuffled track: {track.Title} at position {i}");
-                                }
+                                queueView.Add(track);
+                                Console.WriteLine($"BuildQueueView - Added remaining track: {track.Title} at index {i} (shuffle={shuffle})");
                             }
-                        }
-                        else
-                        {
-                            Console.WriteLine("BuildQueueView - No remaining tracks after current track in shuffle mode");
                         }
                     }
                     else
                     {
-                        // For normal mode, show current track at top followed by remaining tracks
-                        // Add the currently playing song at the top
-                        queueView.Add(currentTrack);
-
-                        // Add the remaining songs in order (from current position + 1 to end)
-                        // Only add if there are actually songs after the current one
-                        if (currentIndex < currentQueue.Count - 1)
-                        {
-                            for (int i = currentIndex + 1; i < currentQueue.Count; i++)
-                            {
-                                var track = currentQueue[i];
-                                if (track != null && !string.IsNullOrEmpty(track.FilePath))
-                                {
-                                    queueView.Add(track);
-                                    Console.WriteLine($"BuildQueueView - Added remaining track: {track.Title}");
-                                }
-                            }
-                        }
-                        else
-                        {
-                            Console.WriteLine("BuildQueueView - No remaining tracks after current track");
-                        }
+                        Console.WriteLine($"BuildQueueView - No remaining tracks after current track (shuffle={shuffle})");
                     }
                 }
                 else
                 {
-                    // No current track playing, show empty queue when app is in idle state
                     Console.WriteLine("BuildQueueView - No current track playing, returning empty queue (app is idle)");
                     return queueView;
                 }
@@ -2132,173 +1841,9 @@ namespace MusicApp
             }
         }
 
-        /// <summary>
-        /// Gets the actual playback queue (the songs that will actually be played)
-        /// This is different from the full library - it represents the current play session
-        /// </summary>
-        private ObservableCollection<Song> GetActualPlaybackQueue()
-        {
-            try
-            {
-                // If we have a current track, the playback queue should only include
-                // songs from the current track's position to the end of the current queue
-                var currentQueue = GetCurrentPlayQueue();
-                var currentIndex = GetCurrentTrackIndex();
-
-                if (currentQueue == null || currentQueue.Count == 0 || currentIndex < 0)
-                {
-                    return new ObservableCollection<Song>();
-                }
-
-                // Create a new collection with only the songs that will actually be played
-                var playbackQueue = new ObservableCollection<Song>();
-
-                // Add songs from current position to end (these are the songs that will actually play)
-                for (int i = currentIndex; i < currentQueue.Count; i++)
-                {
-                    var track = currentQueue[i];
-                    if (track != null && !string.IsNullOrEmpty(track.FilePath))
-                    {
-                        playbackQueue.Add(track);
-                    }
-                }
-
-                Console.WriteLine($"GetActualPlaybackQueue - current index: {currentIndex}, total queue: {currentQueue.Count}, playback queue: {playbackQueue.Count}");
-                return playbackQueue;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error getting actual playback queue: {ex.Message}");
-                return new ObservableCollection<Song>();
-            }
-        }
-
         #endregion
 
         #region Music Management
-
-        private async Task AddMusicFolderAsync()
-        {
-            var dialog = new System.Windows.Forms.FolderBrowserDialog
-            {
-                Description = "Select a folder containing music files"
-            };
-
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            {
-                await LoadMusicFromFolderAsync(dialog.SelectedPath, true);
-            }
-        }
-
-        private async Task RescanLibraryAsync()
-        {
-            try
-            {
-                var musicFolders = await libraryManager.GetMusicFoldersAsync();
-                if (musicFolders == null || musicFolders.Count == 0)
-                {
-                    MessageDialog.Show(this, "No Folders", "No music folders have been added yet.", MessageDialog.Buttons.Ok);
-                    return;
-                }
-
-                // Clear thumbnail cache so changed artwork is regenerated during scan
-                await Task.Run(() => AlbumArtCacheManager.InvalidateAll());
-
-                var totalNewTracks = 0;
-                foreach (var folderPath in musicFolders)
-                {
-                    if (Directory.Exists(folderPath))
-                    {
-                        // Always re-scan the folder
-                        await LoadMusicFromFolderAsync(folderPath, false);
-                        totalNewTracks += allTracks.Count(t => t.FilePath.StartsWith(folderPath));
-                    }
-                }
-
-                UpdateUI();
-                MessageDialog.Show(this, "Library Updated", $"Library re-scanned. Found {totalNewTracks} total tracks across all folders.", MessageDialog.Buttons.Ok);
-            }
-            catch (Exception ex)
-            {
-                MessageDialog.Show(this, "Error", $"Error re-scanning library: {ex.Message}", MessageDialog.Buttons.Ok);
-            }
-        }
-
-        private async Task RemoveMusicFolderAsync()
-        {
-            try
-            {
-                var musicFolders = await libraryManager.GetMusicFoldersAsync();
-                if (musicFolders == null || musicFolders.Count == 0)
-                {
-                    MessageDialog.Show(this, "No Folders", "No music folders have been added yet.", MessageDialog.Buttons.Ok);
-                    return;
-                }
-
-                var dialog = new System.Windows.Forms.FolderBrowserDialog
-                {
-                    Description = "Select a folder to remove from the library",
-                    ShowNewFolderButton = false
-                };
-
-                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                {
-                    var folderToRemove = dialog.SelectedPath;
-                    if (musicFolders.Contains(folderToRemove))
-                    {
-                        // Remove tracks from collections
-                        var tracksToRemove = allTracks.Where(t => t.FilePath.StartsWith(folderToRemove)).ToList();
-                        foreach (var track in tracksToRemove)
-                        {
-                            allTracks.Remove(track);
-                            filteredTracks.Remove(track);
-                            recentlyPlayed.Remove(track);
-                        }
-
-                        // Remove from playlists
-                        foreach (var playlist in playlists)
-                        {
-                            var playlistTracksToRemove = playlist.Tracks.Where(t => t.FilePath.StartsWith(folderToRemove)).ToList();
-                            foreach (var track in playlistTracksToRemove)
-                            {
-                                playlist.RemoveTrack(track);
-                            }
-                        }
-
-                        // Remove from library manager
-                        await libraryManager.RemoveMusicFolderAsync(folderToRemove);
-
-                        // Remove from cache
-                        await libraryManager.RemoveFolderFromCacheAsync(folderToRemove);
-
-                        // Update UI
-                        UpdateUI();
-
-                        // Update shuffled tracks if shuffle is enabled
-                        UpdateShuffledTracks();
-
-                        // Update queue view if it's currently visible
-                        if (contentHost?.Content == queueViewControl)
-                        {
-                            UpdateQueueView();
-                        }
-
-                        // Update status bar after removing tracks
-                        UpdateStatusBar();
-
-                        MessageDialog.Show(this, "Folder Removed", $"Folder '{folderToRemove}' and {tracksToRemove.Count} tracks removed from library.", MessageDialog.Buttons.Ok);
-                    }
-                    else
-                    {
-                        MessageDialog.Show(this, "Folder Not Found", $"Folder '{folderToRemove}' not found in library.", MessageDialog.Buttons.Ok);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageDialog.Show(this, "Error", $"Error removing folder: {ex.Message}", MessageDialog.Buttons.Ok);
-            }
-        }
 
         private async Task LoadMusicFromFolderAsync(string folderPath, bool saveToSettings = false)
         {
@@ -2312,7 +1857,6 @@ namespace MusicApp
                         .ToList();
                 });
 
-                // Show progress bar if there are files to process
                 if (musicFiles.Count > 0)
                 {
                     await Dispatcher.InvokeAsync(() =>
@@ -2331,22 +1875,18 @@ namespace MusicApp
                 var newTracks = new List<Song>();
                 int processedCount = 0;
 
-                // Process files on background thread
                 await Task.Run(async () =>
                 {
                     foreach (var file in musicFiles)
                     {
                         try
                         {
-                            // Check if track already exists
                             var existingTrack = existingTracks.FirstOrDefault(t => t.FilePath == file);
                             if (existingTrack == null)
                             {
-                                // Load song on background thread
-                                var track = LoadSong(file);
+                                var track = TrackMetadataLoader.LoadSong(file);
                                 if (track != null)
                                 {
-                                    // Add to collections on UI thread
                                     await Dispatcher.InvokeAsync(() =>
                                     {
                                         newTracks.Add(track);
@@ -2358,7 +1898,6 @@ namespace MusicApp
                         }
                         catch (Exception ex)
                         {
-                            // Log error but continue with other files
                             Console.WriteLine($"Error loading {file}: {ex.Message}");
                         }
                         finally
@@ -2366,13 +1905,11 @@ namespace MusicApp
                             processedCount++;
                             await Dispatcher.InvokeAsync(() =>
                             {
-                                // Update progress bar fill width
                                 if (musicFiles.Count > 0)
                                 {
                                     double progressPercent = (double)processedCount / musicFiles.Count;
                                     progressBarFill.Width = progressBarBackground.ActualWidth * progressPercent;
                                 }
-                                // Update status bar with exact song count during loading
                                 if (progressBarFill.Visibility == Visibility.Visible)
                                 {
                                     UpdateStatusBar();
@@ -2384,43 +1921,35 @@ namespace MusicApp
                     }
                 });
 
-                // Save to library manager if requested
                 if (saveToSettings)
                 {
                     await libraryManager.AddMusicFolderAsync(folderPath);
                 }
 
-                // Update library cache
                 await UpdateLibraryCacheAsync();
 
-                // Update folder scan time
                 await libraryManager.UpdateFolderScanTimeAsync(folderPath);
 
-                // Update shuffled tracks if shuffle is enabled
                 Console.WriteLine($"After loading from folder - allTracks: {allTracks.Count}, filteredTracks: {filteredTracks.Count}");
                 UpdateShuffledTracks();
 
-                // Update queue view if it's currently visible
                 if (contentHost?.Content == queueViewControl)
                 {
                     UpdateQueueView();
                 }
 
-                // Hide progress bar and final status bar update
                 if (musicFiles.Count > 0)
                 {
                     await Dispatcher.InvokeAsync(() =>
                     {
                         progressBarFill.Visibility = Visibility.Collapsed;
                         progressBarFill.Width = 0;
-                        // Final status bar update
                         UpdateStatusBar();
                     });
                 }
             }
             catch (Exception ex)
             {
-                // Hide progress bar on error
                 await Dispatcher.InvokeAsync(() =>
                 {
                     progressBarFill.Visibility = Visibility.Collapsed;
@@ -2444,229 +1973,6 @@ namespace MusicApp
             }
         }
 
-        private Song? LoadSong(string filePath)
-        {
-            try
-            {
-                // Get file system info first
-                FileInfo? fileInfo = null;
-                try
-                {
-                    fileInfo = new FileInfo(filePath);
-                    if (fileInfo.Exists)
-                    {
-                        // Set file size and date modified
-                        // FileSize will be set later if not already cached
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error getting file info for {filePath}: {ex.Message}");
-                }
-
-                var track = new Song
-                {
-                    Title = "Unknown Title",
-                    Artist = "Unknown Artist",
-                    Album = "Unknown Album",
-                    DurationTimeSpan = TimeSpan.Zero,
-                    Duration = "00:00",
-                    FilePath = filePath,
-                    TrackNumber = 0,
-                    Year = 0,
-                    Genre = "",
-                    DateAdded = DateTime.Now
-                };
-
-                // Set file system properties
-                if (fileInfo != null && fileInfo.Exists)
-                {
-                    track.DateModified = fileInfo.LastWriteTime;
-                    if (track.FileSize == 0)
-                    {
-                        track.FileSize = fileInfo.Length;
-                    }
-                }
-                
-                // Always set FileType from file path extension (even if fileInfo is null)
-                if (string.IsNullOrEmpty(track.FileType))
-                {
-                    var extension = Path.GetExtension(filePath);
-                    if (!string.IsNullOrEmpty(extension))
-                    {
-                        track.FileType = extension.TrimStart('.').ToUpper();
-                    }
-                }
-
-                // Use ATL.NET to read metadata
-                try
-                {
-                    var atlTrack = new ATL.Track(filePath);
-
-                    // Extract basic metadata from ATL
-                    if (!string.IsNullOrEmpty(atlTrack.Title))
-                        track.Title = atlTrack.Title;
-
-                    if (!string.IsNullOrEmpty(atlTrack.Artist))
-                        track.Artist = atlTrack.Artist;
-
-                    if (!string.IsNullOrEmpty(atlTrack.Album))
-                        track.Album = atlTrack.Album;
-
-                    if (atlTrack.TrackNumber.HasValue && atlTrack.TrackNumber.Value > 0)
-                        track.TrackNumber = atlTrack.TrackNumber.Value;
-
-                    if (atlTrack.Year.HasValue && atlTrack.Year.Value > 0)
-                        track.Year = atlTrack.Year.Value;
-
-                    if (!string.IsNullOrEmpty(atlTrack.Genre))
-                        track.Genre = atlTrack.Genre;
-
-                    // Extract additional metadata
-                    if (!string.IsNullOrEmpty(atlTrack.AlbumArtist))
-                        track.AlbumArtist = atlTrack.AlbumArtist;
-
-                    if (!string.IsNullOrEmpty(atlTrack.Composer))
-                        track.Composer = atlTrack.Composer;
-
-                    if (atlTrack.DiscNumber.HasValue && atlTrack.DiscNumber.Value > 0)
-                        track.DiscNumber = atlTrack.DiscNumber.Value.ToString();
-
-                    // Audio properties
-                    if (atlTrack.Bitrate > 0)
-                    {
-                        track.Bitrate = $"{atlTrack.Bitrate} kbps";
-                    }
-
-                    if (atlTrack.SampleRate > 0)
-                    {
-                        track.SampleRate = $"{atlTrack.SampleRate / 1000.0:F1} kHz";
-                    }
-
-                    // BPM (Beats Per Minute) - check AdditionalFields
-                    if (atlTrack.AdditionalFields != null)
-                    {
-                        // Try common BPM field names
-                        if (atlTrack.AdditionalFields.ContainsKey("BPM"))
-                        {
-                            if (int.TryParse(atlTrack.AdditionalFields["BPM"], out int bpm))
-                                track.BeatsPerMinute = bpm;
-                        }
-                        else if (atlTrack.AdditionalFields.ContainsKey("TBPM"))
-                        {
-                            if (int.TryParse(atlTrack.AdditionalFields["TBPM"], out int bpm))
-                                track.BeatsPerMinute = bpm;
-                        }
-
-                        // Category/Grouping
-                        if (atlTrack.AdditionalFields.ContainsKey("TCON") || atlTrack.AdditionalFields.ContainsKey("Category"))
-                        {
-                            var category = atlTrack.AdditionalFields.ContainsKey("Category") 
-                                ? atlTrack.AdditionalFields["Category"]
-                                : atlTrack.AdditionalFields["TCON"];
-                            if (!string.IsNullOrEmpty(category))
-                                track.Category = category;
-                        }
-                    }
-
-                    // Release Date - try to get from date fields
-                    if (atlTrack.Date.HasValue)
-                    {
-                        track.ReleaseDate = atlTrack.Date.Value;
-                    }
-                    else if (atlTrack.AdditionalFields != null && atlTrack.AdditionalFields.ContainsKey("TDRC"))
-                    {
-                        // Try to parse release date from ID3 tag
-                        if (DateTime.TryParse(atlTrack.AdditionalFields["TDRC"], out DateTime releaseDate))
-                        {
-                            track.ReleaseDate = releaseDate;
-                        }
-                    }
-
-                    // Get duration from ATL
-                    if (atlTrack.Duration > 0)
-                    {
-                        track.DurationTimeSpan = TimeSpan.FromSeconds(atlTrack.Duration);
-                        track.Duration = track.DurationTimeSpan.ToString(@"mm\:ss");
-                    }
-                    else
-                    {
-                        // Fallback to NAudio for duration
-                        using var audioFile = new AudioFileReader(filePath);
-                        track.DurationTimeSpan = audioFile.TotalTime;
-                        track.Duration = audioFile.TotalTime.ToString(@"mm\:ss");
-                    }
-
-                    // Check for embedded album art
-                    if (atlTrack.EmbeddedPictures != null && atlTrack.EmbeddedPictures.Count > 0)
-                    {
-                        track.AlbumArtPath = "embedded";
-                    }
-
-                    // Generate and cache album art thumbnail
-                    track.ThumbnailCachePath = AlbumArtCacheManager.GenerateAndCache(track);
-
-                    Console.WriteLine($"ATL metadata: Title='{track.Title}', Artist='{track.Artist}', Album='{track.Album}'");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"ATL failed for {filePath}: {ex.Message}");
-
-                    // Fallback to NAudio for duration, bitrate, and sample rate
-                    try
-                    {
-                        using var audioFile = new AudioFileReader(filePath);
-                        track.DurationTimeSpan = audioFile.TotalTime;
-                        track.Duration = audioFile.TotalTime.ToString(@"mm\:ss");
-                        
-                        // Get sample rate from NAudio if not already set
-                        if (string.IsNullOrEmpty(track.SampleRate))
-                        {
-                            var sampleRate = audioFile.WaveFormat.SampleRate;
-                            if (sampleRate > 0)
-                            {
-                                track.SampleRate = $"{sampleRate / 1000.0:F1} kHz";
-                            }
-                        }
-                        
-                        // Try to get bitrate from NAudio if not already set
-                        if (string.IsNullOrEmpty(track.Bitrate))
-                        {
-                            // Calculate bitrate from file size and duration
-                            if (track.FileSize > 0 && track.DurationTimeSpan.TotalSeconds > 0)
-                            {
-                                var bitrateKbps = (int)((track.FileSize * 8) / (track.DurationTimeSpan.TotalSeconds * 1000));
-                                if (bitrateKbps > 0)
-                                {
-                                    track.Bitrate = $"{bitrateKbps} kbps";
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception audioEx)
-                    {
-                        Console.WriteLine($"NAudio failed for {filePath}: {audioEx.Message}");
-                    }
-                }
-
-                // Ensure FileType is set even if fileInfo was null
-                if (string.IsNullOrEmpty(track.FileType))
-                {
-                    var extension = Path.GetExtension(filePath);
-                    if (!string.IsNullOrEmpty(extension))
-                    {
-                        track.FileType = extension.TrimStart('.').ToUpper();
-                    }
-                }
-
-                return track;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
         #endregion
 
         #region Playback Control
@@ -2675,7 +1981,6 @@ namespace MusicApp
         {
             try
             {
-                // Safety checks
                 if (track == null)
                 {
                     Console.WriteLine("PlayTrack called with null track");
@@ -2703,7 +2008,6 @@ namespace MusicApp
                 {
                     Console.WriteLine("Cleaning up audio objects...");
 
-                    // Set the playing state to false temporarily
                     titleBarPlayer.IsPlaying = false;
 
                     if (waveOut != null)
@@ -2736,54 +2040,25 @@ namespace MusicApp
 
                 // Set the current track index in the active queue context.
                 SyncCurrentTrackIndices(track);
+                UpdateShuffleIndicesAfterTrackChange(track);
 
-                // If shuffle is enabled and this is NOT manual navigation, regenerate shuffled queue
-                // Manual navigation (skip forward/backward) should maintain the existing shuffled order
-                if (titleBarPlayer.IsShuffleEnabled && !isManualNavigation && !HasContextualPlaybackQueue())
-                {
-                    Console.WriteLine("Shuffle enabled and not manual navigation - regenerating shuffled queue");
-                    RegenerateShuffledTracks();
-                    currentShuffledIndex = shuffledTracks.IndexOf(track);
-                }
-                else if (titleBarPlayer.IsShuffleEnabled && isManualNavigation && !HasContextualPlaybackQueue())
-                {
-                    Console.WriteLine("Shuffle enabled but manual navigation - maintaining existing shuffled queue");
-                    // Just update the index to the new track position
-                    currentShuffledIndex = shuffledTracks.IndexOf(track);
-                }
+                var albumArt = AlbumArtLoader.LoadAlbumArt(track);
 
-                // Load album art if available
-                var albumArt = LoadAlbumArt(track);
-
-                // Update title bar player control
                 titleBarPlayer.SetTrackInfo(track.Title, track.Artist, track.Album, albumArt);
                 titleBarPlayer.SetAudioObjects(waveOut, audioFileReader);
 
-                // Start playback
                 audioFileReader = new AudioFileReader(track.FilePath);
                 waveOut = new WaveOutEvent();
                 waveOut.PlaybackStopped += WaveOut_PlaybackStopped;
                 waveOut.Init(audioFileReader);
                 waveOut.Play();
 
-                // Update audio objects in control after creation
                 titleBarPlayer.SetAudioObjects(waveOut, audioFileReader);
                 titleBarPlayer.IsPlaying = true;
 
-                // Add to recently played
                 AddToRecentlyPlayed(track);
 
-                // Update playlists view if it's visible
-                if (contentHost?.Content == playlistsViewControl)
-                {
-                    UpdatePlaylistsView();
-                }
-
-                // Update queue view if it's visible
-                if (contentHost?.Content == queueViewControl)
-                {
-                    UpdateQueueView();
-                }
+                RefreshVisibleViews();
 
                 Console.WriteLine($"Successfully started playing: {track.Title}");
             }
@@ -2792,7 +2067,6 @@ namespace MusicApp
                 Console.WriteLine($"Error playing track '{track?.Title}': {ex.Message}");
                 Console.WriteLine($"Stack trace: {ex.StackTrace}");
 
-                // Try to show error to user
                 try
                 {
                     MessageDialog.Show(this, "Error", $"Error playing track: {ex.Message}", MessageDialog.Buttons.Ok);
@@ -2803,7 +2077,6 @@ namespace MusicApp
                     Console.WriteLine("Failed to show error message box");
                 }
 
-                // Try to stop playback safely
                 try
                 {
                     StopPlayback();
@@ -2822,7 +2095,6 @@ namespace MusicApp
         {
             try
             {
-                // Safety checks
                 if (track == null)
                 {
                     Console.WriteLine("LoadTrackWithoutPlayback called with null track");
@@ -2843,64 +2115,32 @@ namespace MusicApp
 
                 Console.WriteLine($"Loading track without playback: {track.Title} - {track.Artist}");
 
-                // Store current playback state
                 bool wasPlaying = titleBarPlayer.IsPlaying;
 
-                // Clean up existing audio objects without triggering PlaybackStopped
                 CleanupAudioObjects();
 
                 currentTrack = track;
 
                 // Set the current track index in the active queue context.
                 SyncCurrentTrackIndices(track);
+                UpdateShuffleIndicesAfterTrackChange(track);
 
-                // If shuffle is enabled and this is NOT manual navigation, regenerate shuffled queue
-                // Manual navigation (skip forward/backward) should maintain the existing shuffled order
-                if (titleBarPlayer.IsShuffleEnabled && !isManualNavigation && !HasContextualPlaybackQueue())
-                {
-                    Console.WriteLine("Shuffle enabled and not manual navigation - regenerating shuffled queue");
-                    RegenerateShuffledTracks();
-                    currentShuffledIndex = shuffledTracks.IndexOf(track);
-                }
-                else if (titleBarPlayer.IsShuffleEnabled && isManualNavigation && !HasContextualPlaybackQueue())
-                {
-                    Console.WriteLine("Shuffle enabled but manual navigation - maintaining existing shuffled queue");
-                    // Just update the index to the new track position
-                    currentShuffledIndex = shuffledTracks.IndexOf(track);
-                }
+                var albumArt = AlbumArtLoader.LoadAlbumArt(track);
 
-                // Load album art if available
-                var albumArt = LoadAlbumArt(track);
-
-                // Update title bar player control
                 titleBarPlayer.SetTrackInfo(track.Title, track.Artist, track.Album, albumArt);
 
-                // Create audio objects but don't start playback
                 audioFileReader = new AudioFileReader(track.FilePath);
                 waveOut = new WaveOutEvent();
                 waveOut.PlaybackStopped += WaveOut_PlaybackStopped;
                 waveOut.Init(audioFileReader);
 
-                // Update audio objects in control
                 titleBarPlayer.SetAudioObjects(waveOut, audioFileReader);
 
-                // Restore the previous playback state
                 titleBarPlayer.IsPlaying = wasPlaying;
 
-                // Add to recently played
                 AddToRecentlyPlayed(track);
 
-                // Update playlists view if it's visible
-                if (contentHost?.Content == playlistsViewControl)
-                {
-                    UpdatePlaylistsView();
-                }
-
-                // Update queue view if it's visible
-                if (contentHost?.Content == queueViewControl)
-                {
-                    UpdateQueueView();
-                }
+                RefreshVisibleViews();
 
                 Console.WriteLine($"Successfully loaded track without playback: {track.Title}, playback state: {titleBarPlayer.IsPlaying}");
             }
@@ -2909,7 +2149,6 @@ namespace MusicApp
                 Console.WriteLine($"Error loading track '{track?.Title}' without playback: {ex.Message}");
                 Console.WriteLine($"Stack trace: {ex.StackTrace}");
 
-                // Try to show error to user
                 try
                 {
                     MessageDialog.Show(this, "Error", $"Error loading track: {ex.Message}", MessageDialog.Buttons.Ok);
@@ -2920,7 +2159,6 @@ namespace MusicApp
                     Console.WriteLine("Failed to show error message box");
                 }
 
-                // Try to stop playback safely
                 try
                 {
                     StopPlayback();
@@ -2932,202 +2170,18 @@ namespace MusicApp
             }
         }
 
-        private BitmapImage? LoadAlbumArt(Song track)
-        {
-            try
-            {
-                // Fast path: use cached thumbnail (JPEG from disk, no ATL/GDI+ overhead)
-                if (!string.IsNullOrEmpty(track.ThumbnailCachePath))
-                {
-                    var cached = AlbumArtCacheManager.LoadFromCachePath(track.ThumbnailCachePath);
-                    if (cached != null)
-                        return cached;
-                }
-
-                // First try to load embedded album art using ATL.NET
-                try
-                {
-                    var atlTrack = new ATL.Track(track.FilePath);
-                    var embeddedPictures = atlTrack.EmbeddedPictures;
-
-                    if (embeddedPictures != null && embeddedPictures.Count > 0)
-                    {
-                        var picture = embeddedPictures[0];
-                        var scaledBitmap = CreateHighQualityScaledImage(picture.PictureData);
-                        return scaledBitmap;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error loading embedded album art for {track.Title}: {ex.Message}");
-                }
-
-                // Fallback: Try to find album art in the same directory as the music file
-                var directory = Path.GetDirectoryName(track.FilePath);
-                if (directory != null)
-                {
-                    var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
-                    var imageFiles = Directory.GetFiles(directory, "*.*")
-                        .Where(file => imageExtensions.Contains(Path.GetExtension(file).ToLower()))
-                        .ToList();
-
-                    var albumArtFile = imageFiles.FirstOrDefault(file =>
-                    {
-                        var fileName = Path.GetFileNameWithoutExtension(file).ToLower();
-                        return fileName.Contains("album") ||
-                               fileName.Contains("cover") ||
-                               fileName.Contains("art") ||
-                               fileName.Contains("folder");
-                    });
-
-                    if (albumArtFile == null && imageFiles.Count > 0)
-                    {
-                        albumArtFile = imageFiles[0];
-                    }
-
-                    if (albumArtFile != null)
-                    {
-                        var scaledBitmap = CreateHighQualityScaledImageFromFile(albumArtFile);
-                        return scaledBitmap;
-                    }
-                    else
-                    {
-                        return null;
-                    }
-                }
-                else
-                {
-                    return null;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error loading album art for {track.Title}: {ex.Message}");
-                return null;
-            }
-        }
-
-        private BitmapImage? CreateHighQualityScaledImage(byte[] imageData)
-        {
-            try
-            {
-                using var originalStream = new MemoryStream(imageData);
-                using var originalBitmap = new System.Drawing.Bitmap(originalStream);
-
-                // Get the target size (assuming the Image control is around 60x60 pixels)
-                int targetSize = UILayoutConstants.TitleBarAlbumArtRenderSize;
-
-                // Calculate new dimensions maintaining aspect ratio
-                int originalWidth = originalBitmap.Width;
-                int originalHeight = originalBitmap.Height;
-
-                double ratio = Math.Min((double)targetSize / originalWidth, (double)targetSize / originalHeight);
-                int newWidth = (int)(originalWidth * ratio);
-                int newHeight = (int)(originalHeight * ratio);
-
-                // Create high-quality scaled bitmap (WPF will handle the rounded corners via clipping)
-                using var scaledBitmap = new System.Drawing.Bitmap(newWidth, newHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                using var graphics = System.Drawing.Graphics.FromImage(scaledBitmap);
-
-                // Set high-quality rendering options
-                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-                graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
-                graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
-
-                // Draw the scaled image
-                graphics.DrawImage(originalBitmap, 0, 0, newWidth, newHeight);
-
-                // Convert to WPF BitmapImage
-                var wpfBitmap = new BitmapImage();
-                using var stream = new MemoryStream();
-                scaledBitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
-                stream.Position = 0;
-
-                wpfBitmap.BeginInit();
-                wpfBitmap.CacheOption = BitmapCacheOption.OnLoad;
-                wpfBitmap.StreamSource = stream;
-                wpfBitmap.EndInit();
-                wpfBitmap.Freeze(); // Freeze for better performance
-
-                return wpfBitmap;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error creating high-quality scaled image: {ex.Message}");
-                return null;
-            }
-        }
-
-        private BitmapImage? CreateHighQualityScaledImageFromFile(string filePath)
-        {
-            try
-            {
-                using var originalBitmap = new System.Drawing.Bitmap(filePath);
-
-                // Get the target size (assuming the Image control is around 60x60 pixels)
-                int targetSize = UILayoutConstants.TitleBarAlbumArtRenderSize;
-
-                // Calculate new dimensions maintaining aspect ratio
-                int originalWidth = originalBitmap.Width;
-                int originalHeight = originalBitmap.Height;
-
-                double ratio = Math.Min((double)targetSize / originalWidth, (double)targetSize / originalHeight);
-                int newWidth = (int)(originalWidth * ratio);
-                int newHeight = (int)(originalHeight * ratio);
-
-                // Create high-quality scaled bitmap (WPF will handle the rounded corners via clipping)
-                using var scaledBitmap = new System.Drawing.Bitmap(newWidth, newHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                using var graphics = System.Drawing.Graphics.FromImage(scaledBitmap);
-
-                // Set high-quality rendering options
-                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-                graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
-                graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
-
-                // Draw the scaled image
-                graphics.DrawImage(originalBitmap, 0, 0, newWidth, newHeight);
-
-                // Convert to WPF BitmapImage
-                var wpfBitmap = new BitmapImage();
-                using var stream = new MemoryStream();
-                scaledBitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
-                stream.Position = 0;
-
-                wpfBitmap.BeginInit();
-                wpfBitmap.CacheOption = BitmapCacheOption.OnLoad;
-                wpfBitmap.StreamSource = stream;
-                wpfBitmap.EndInit();
-                wpfBitmap.Freeze(); // Freeze for better performance
-
-                return wpfBitmap;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error creating high-quality scaled image from file: {ex.Message}");
-                return null;
-            }
-        }
-
-
-
         private void AddToRecentlyPlayed(Song track)
         {
-            // Mark track as played
             track.MarkAsPlayed();
 
-            // Remove if already exists
             var existing = recentlyPlayed.FirstOrDefault(t => t.FilePath == track.FilePath);
             if (existing != null)
             {
                 recentlyPlayed.Remove(existing);
             }
 
-            // Add to beginning
             recentlyPlayed.Insert(0, track);
 
-            // Keep only last 20 tracks
             while (recentlyPlayed.Count > 20)
             {
                 recentlyPlayed.RemoveAt(recentlyPlayed.Count - 1);
@@ -3163,20 +2217,13 @@ namespace MusicApp
             {
                 Console.WriteLine("Resetting app to idle state...");
 
-                // Reset current track info
                 currentTrack = null;
                 currentTrackIndex = -1;
                 currentShuffledIndex = -1;
                 ClearContextualPlaybackQueue();
 
-                // Update title bar player to show no track is playing
                 titleBarPlayer.SetTrackInfo("No track selected", "", "");
-
-                // Update queue view if it's visible
-                if (contentHost?.Content == queueViewControl)
-                {
-                    UpdateQueueView();
-                }
+                RefreshVisibleViews();
 
                 Console.WriteLine("App reset to idle state successfully");
             }
@@ -3257,320 +2304,13 @@ namespace MusicApp
             currentShuffledIndex = shuffledTracks.IndexOf(track);
         }
 
-        /// <summary>
-        /// Safely cleans up audio objects without triggering PlaybackStopped event
-        /// </summary>
-        private void CleanupAudioObjects()
-        {
-            try
-            {
-                Console.WriteLine("Cleaning up audio objects...");
-
-                // Set the playing state to false
-                titleBarPlayer.IsPlaying = false;
-
-                if (waveOut != null)
-                {
-                    Console.WriteLine("Removing PlaybackStopped event handler and stopping waveOut");
-                    // Remove the event handler before stopping to prevent triggering PlaybackStopped
-                    waveOut.PlaybackStopped -= WaveOut_PlaybackStopped;
-                    waveOut.Stop();
-                    waveOut.Dispose();
-                    waveOut = null;
-                    Console.WriteLine("waveOut disposed");
-                }
-
-                if (audioFileReader != null)
-                {
-                    Console.WriteLine("Disposing audioFileReader");
-                    audioFileReader.Dispose();
-                    audioFileReader = null;
-                    Console.WriteLine("audioFileReader disposed");
-                }
-
-                Console.WriteLine("Audio objects cleanup completed");
-
-                // Reset app state to idle
-                ResetToIdleState();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error during audio cleanup: {ex.Message}");
-            }
-        }
-
-        private void StopPlayback()
-        {
-            // Set flag to indicate we're manually stopping playback
-            isManuallyStopping = true;
-
-            try
-            {
-                // Use the safe cleanup method
-                CleanupAudioObjects();
-                ClearContextualPlaybackQueue();
-            }
-            finally
-            {
-                // Reset flag after a short delay to allow for cleanup
-                Task.Delay(UILayoutConstants.ManualNavigationResetDelayMs).ContinueWith(_ => isManuallyStopping = false);
-            }
-        }
-
-        private void WaveOut_PlaybackStopped(object? sender, StoppedEventArgs e)
-        {
-            try
-            {
-                // Check if we're manually stopping playback
-                if (isManuallyStopping)
-                {
-                    Console.WriteLine("Playback stopped manually, not advancing to next track");
-                    return;
-                }
-
-                // Additional safety check: ensure we have valid audio objects
-                if (waveOut == null || audioFileReader == null)
-                {
-                    Console.WriteLine("Audio objects are null, not advancing to next track");
-                    return;
-                }
-
-                // Additional safety check: ensure the audio objects are still valid (not disposed)
-                try
-                {
-                    var _ = audioFileReader.TotalTime;
-                }
-                catch (ObjectDisposedException)
-                {
-                    Console.WriteLine("AudioFileReader was disposed, not advancing to next track");
-                    return;
-                }
-                catch (NullReferenceException)
-                {
-                    Console.WriteLine("AudioFileReader is null, not advancing to next track");
-                    return;
-                }
-
-                // This event is raised when the audio playback finishes naturally.
-                // Handle the track finished logic directly here
-                var currentQueue = GetCurrentPlayQueue();
-                var currentIndex = GetCurrentTrackIndex();
-
-                Console.WriteLine($"Track finished naturally - currentIndex: {currentIndex}, queue count: {currentQueue.Count}");
-
-                // Safety checks
-                if (currentQueue == null || currentQueue.Count == 0)
-                {
-                    Console.WriteLine("No tracks in queue, stopping playback");
-                    CleanupAudioObjects();
-                    ClearContextualPlaybackQueue();
-                    return;
-                }
-
-                if (currentIndex < 0 || currentIndex >= currentQueue.Count)
-                {
-                    Console.WriteLine($"Invalid current index: {currentIndex}, resetting to 0");
-                    currentIndex = 0;
-                }
-
-                if (currentIndex < currentQueue.Count - 1)
-                {
-                    var nextTrack = GetTrackFromCurrentQueue(currentIndex + 1);
-                    if (nextTrack != null)
-                    {
-                        Console.WriteLine($"Advancing to next track: {nextTrack.Title}");
-                        PlayTrack(nextTrack);
-
-                        // Update queue view if it's visible
-                        if (contentHost?.Content == queueViewControl)
-                        {
-                            UpdateQueueView();
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("Next track is null or has invalid file path, stopping playback");
-                        // Clean up and reset to idle state
-                        CleanupAudioObjects();
-                        ClearContextualPlaybackQueue();
-                    }
-                }
-                else
-                {
-                    // If it's the last track, stop playback and reset to idle state
-                    Console.WriteLine("Reached end of queue, stopping playback and resetting to idle state");
-
-                    // Clean up audio objects and reset to idle state
-                    CleanupAudioObjects();
-                    ClearContextualPlaybackQueue();
-
-                    Console.WriteLine("Playback stopped - app reset to idle state");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error in WaveOut_PlaybackStopped: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-
-                // Fallback: try to stop playback safely
-                try
-                {
-                    CleanupAudioObjects();
-                    ClearContextualPlaybackQueue();
-                }
-                catch (Exception stopEx)
-                {
-                    Console.WriteLine($"Error stopping playback: {stopEx.Message}");
-                }
-            }
-        }
-
         #endregion
 
         #region Playlist Management
 
-        private void UpdatePlaylistsView()
-        {
-            // This method can be expanded to show which playlists contain the current track
-        }
-
         #endregion
 
         #region Settings Management
-
-        private void ClearSettings()
-        {
-            try
-            {
-                // Show confirmation dialog
-                var result = MessageDialog.Show(this, "Clear Settings",
-                    "This will clear all settings and return the app to a clean state. This action cannot be undone.\n\n" +
-                    "The following will be cleared:\n" +
-                    "• Music library cache\n" +
-                    "• Recently played history\n" +
-                    "• Playlists\n" +
-                    "• Music folders\n" +
-                    "• Window settings\n\n" +
-                    "Are you sure you want to continue?",
-                    MessageDialog.Buttons.YesNo);
-
-                if (result != true)
-                {
-                    return;
-                }
-
-                // Get the AppData\Roaming\musicApp directory
-                var appDataPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "musicApp");
-
-                if (!Directory.Exists(appDataPath))
-                {
-                    MessageDialog.Show(this, "No Settings", "No settings found to clear.", MessageDialog.Buttons.Ok);
-                    return;
-                }
-
-                // Find all JSON files in the directory
-                var jsonFiles = Directory.GetFiles(appDataPath, "*.json", SearchOption.TopDirectoryOnly);
-
-                if (jsonFiles.Length == 0)
-                {
-                    MessageDialog.Show(this, "No Settings", "No settings files found to clear.", MessageDialog.Buttons.Ok);
-                    return;
-                }
-
-                // Move files to recycle bin
-                int movedFiles = 0;
-                foreach (var file in jsonFiles)
-                {
-                    try
-                    {
-                        // Use Windows API to move to recycle bin
-                        if (MoveToRecycleBin(file))
-                        {
-                            movedFiles++;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error moving file {file} to recycle bin: {ex.Message}");
-                    }
-                }
-
-                // Clear in-memory collections
-                allTracks.Clear();
-                filteredTracks.Clear();
-                shuffledTracks.Clear();
-                playlists.Clear();
-                recentlyPlayed.Clear();
-
-                // Reset current track
-                currentTrack = null;
-                currentTrackIndex = -1;
-                currentShuffledIndex = -1;
-                ClearContextualPlaybackQueue();
-
-                // Stop any current playback
-                StopPlayback();
-
-                // Clear title bar player track info
-                titleBarPlayer.SetTrackInfo("No track selected", "", "");
-
-                // Reset window state to default
-                appSettings = new SettingsManager.AppSettings();
-                windowManager.ResetWindowState();
-
-                // Update queue view if it's visible
-                if (contentHost?.Content == queueViewControl)
-                {
-                    UpdateQueueView();
-                }
-
-                // Update UI
-                UpdateUI();
-
-                // Show success message
-                MessageDialog.Show(this, "Settings Cleared",
-                    $"Successfully cleared {movedFiles} settings files.\n\n" +
-                    "The app has been reset to a clean state.",
-                    MessageDialog.Buttons.Ok);
-            }
-            catch (Exception ex)
-            {
-                MessageDialog.Show(this, "Error", $"Error clearing settings: {ex.Message}", MessageDialog.Buttons.Ok);
-            }
-        }
-
-        private bool MoveToRecycleBin(string filePath)
-        {
-            try
-            {
-                // Use Windows API to move file to recycle bin
-                var shf = new SHFILEOPSTRUCT
-                {
-                    wFunc = FO_DELETE,
-                    pFrom = filePath + '\0' + '\0', // Double null-terminated string
-                    fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT,
-                    fAnyOperationsAborted = false
-                };
-
-                int result = SHFileOperation(ref shf);
-                return result == 0;
-            }
-            catch
-            {
-                // Fallback: try to delete the file directly
-                try
-                {
-                    File.Delete(filePath);
-                    return true;
-                }
-                catch
-                {
-                    return false;
-                }
-            }
-        }
 
         #endregion
 
@@ -3582,7 +2322,6 @@ namespace MusicApp
         {
             try
             {
-                // Get current player settings from the title bar player control
                 appSettings.Player = new SettingsManager.PlayerSettings
                 {
                     IsShuffleEnabled = titleBarPlayer.IsShuffleEnabled,
@@ -3592,13 +2331,11 @@ namespace MusicApp
                 // Save current window state - always save the normal window bounds, not the current maximized dimensions
                 appSettings.WindowState = windowManager.GetCurrentWindowState();
 
-                // Also save current sidebar width
                 if (appSettings.WindowState != null)
                 {
                     appSettings.WindowState.SidebarWidth = sidebarColumn.ActualWidth;
                 }
 
-                // Save settings
                 await settingsManager.SaveSettingsAsync(appSettings);
             }
             catch (Exception ex)

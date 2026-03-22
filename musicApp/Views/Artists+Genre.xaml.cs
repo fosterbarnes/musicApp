@@ -78,6 +78,8 @@ namespace MusicApp.Views
 
         public void RebuildColumns() => trackList.RebuildColumns();
 
+        public void RefreshTrackListBindings() => trackList.RefreshItemBindings();
+
         /// <summary>
         /// Selects the track's artist in the sidebar and highlights that track in the right-side track list.
         /// </summary>

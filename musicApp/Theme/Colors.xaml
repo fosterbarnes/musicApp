@@ -1,5 +1,10 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- Current theme brand (raw Color + brush for StaticResource / bindings) -->
+    <Color x:Key="ThemeColor">#523e6e</Color>
+    <SolidColorBrush x:Key="ThemeBrand-brush" Color="{StaticResource ThemeColor}"/>
 
     <!-- Core app surfaces (*-brush suffix) -->
     <SolidColorBrush x:Key="AppBackground-brush" Color="#1E1E1E"/>
@@ -17,6 +22,8 @@
     <SolidColorBrush x:Key="BorderStrong-brush" Color="#505050"/>
     <SolidColorBrush x:Key="BorderMuted-brush" Color="#464646"/>
     <SolidColorBrush x:Key="Divider-brush" Color="#525252"/>
+    <SolidColorBrush x:Key="FieldFocusBorder-brush" Color="#5f5585"/>
+    <SolidColorBrush x:Key="FieldHoverBorder-brush" Color="#666380"/>
 
     <!-- Interaction -->
     <SolidColorBrush x:Key="Hover-brush" Color="#404040"/>
@@ -26,7 +33,13 @@
     <SolidColorBrush x:Key="SelectedHover-brush" Color="#585858"/>
     <SolidColorBrush x:Key="AccentPrimary-brush" Color="#705399"/>
     <SolidColorBrush x:Key="AccentHover-brush" Color="#856CAA"/>
+    <SolidColorBrush x:Key="SidebarNavActiveBackground-brush" Color="{StaticResource ThemeColor}"/>
+    <SolidColorBrush x:Key="SidebarNavActivePressed-brush" Color="#5A4370"/>
+    <SolidColorBrush x:Key="TextSelection-brush" Color="#c0c0c0"/>
     <SolidColorBrush x:Key="Danger-brush" Color="#E81123"/>
+
+    <!-- Opacity (sys:Double 0–1; *-opacity suffix — same pattern as Spacing.xaml scalars) -->
+    <sys:Double x:Key="TextSelection-opacity">0.25</sys:Double>
 
     <!-- Text -->
     <SolidColorBrush x:Key="TextPrimary-brush" Color="#FFFFFF"/>

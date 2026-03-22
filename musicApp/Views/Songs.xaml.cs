@@ -77,6 +77,8 @@ namespace MusicApp.Views
 
         public void RebuildColumns() => trackList.RebuildColumns();
 
+        public void RefreshTrackListBindings() => trackList.RefreshItemBindings();
+
         public void ScrollToSong(Song song) => trackList.ScrollToSong(song);
 
         /// <summary>

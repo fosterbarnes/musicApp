@@ -22,6 +22,8 @@ public static class UILayoutConstants
     // Shared image sizing
     public const int TitleBarAlbumArtRenderSize = 120;
     public const int InfoMetadataAlbumArtSize = 144;
+    /// <summary>Logical width/height of the Artwork tab inner square; Viewbox scales it to fit the window.</summary>
+    public const double InfoMetadataArtworkViewboxLogicalExtent = 512;
 
     // Search popup layout
     public const double SearchPopupHorizontalContentPadding = 24;

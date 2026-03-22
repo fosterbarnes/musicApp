@@ -46,6 +46,8 @@ namespace MusicApp.Views
 
         public void RebuildColumns() => trackList.RebuildColumns();
 
+        public void RefreshTrackListBindings() => trackList.RefreshItemBindings();
+
         private void TrackList_PlayTrackRequested(object? sender, Song e)
         {
             PlayTrackRequested?.Invoke(this, e);

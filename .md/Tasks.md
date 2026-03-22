@@ -3,15 +3,18 @@
 ### Title Bar
 - ~~Play/pause/skip buttons~~
 - ~~Volume control~~
-##### Song info view:
+
+#### Song info view:
   - ~~Currently playing song info (album art, artist, album)~~
   - ~~Ability to get to song album/artist from info view~~
   - ~~Clickable, selectable seek bar~~
   - ~~Shuffle button~~
   - ~~Repeat button~~
-##### Queue button:
+
+#### Queue button:
   - Popout menu with re-orderable currently playing queue
-##### Search bar:
+
+#### Search bar:
   - ~~Editable text area to input search~~
   - ~~Menu with search results~~
   - ~~Ability to get to search result items in main window~~
@@ -21,6 +24,10 @@
 
 
 ### Main Window Buttons
+
+#### Recently Added
+- Inherit albums view, but sort by most recently added songs
+- Option to view 'recently added' as albums, songs, or artists view
 
 #### Artists
 - ~~Scrollable, selectable artist list~~
@@ -86,11 +93,12 @@
 
 
 ## Settings Menu
-##### EQ
+
+### EQ
   - Pre-made EQ options
   - Custom EQ selector
   - Save/load custom EQs
-##### Themes/colors
+### Themes/colors
   - Pre-made color options
   - Custom color picker
   - Multiple custom save slots
@@ -109,24 +117,25 @@
 
 
 ## General
-#### UI Stuff
+
+### UI Stuff
 - ~~Unnecessary space between the scroll bar and track menu in artist/genre view~~
 
-#### General Concerns
-- Split `MainWindow.xaml.cs` into multiple components
+### General Concerns
+- ~~Split `MainWindow.xaml.cs` into multiple components~~
 - Cut down on if statements. Use more switch/loops
 - ~~Use hard-coded custom "pop-ups" and info menus rather than built in windows pop-ups~~
 - Improve startup load times
 - Improve album art load time
 
-#### Bugs
+### Bugs
 - General sluggishness/startup time
 - Window sized is not always properly remembered and restored
 - Queue does not work as intended and needs fixing
 
-#### Right-Click Context Menu
+### Right-Click Context Menu
 
-##### General Items
+#### General Items
 - ~~Play Next~~
 - ~~Add to Queue~~
 - ~~Add to Playlist:~~
@@ -136,15 +145,15 @@
 - ~~Show in Albums~~
 - ~~Show in Songs~~
 - ~~Show in Queue~~
-- ~~Info/metadata menu:~~
+#### Info/Metadata
   
-  ###### Top Info Bar
+  ##### Top Info Bar
   - ~~Song name~~
   - ~~Artist name~~
   - ~~Album name~~
   - ~~Album art~~
   
-  ###### Details
+  ##### Details
   - ~~Song title (text field)~~
   - ~~Artist (text field)~~
   - ~~Album (text field)~~
@@ -158,21 +167,29 @@
   - ~~Favorite (tick box)~~
   - ~~Bpm (text box)~~
   - ~~Play Count (text field)~~
+  - ~~Ability to edit metadata~~
 
-  ###### Artwork
-  - To:do
+  ##### Artwork
+  - ~~Display full size, resizable artwork~~
+  - ~~Ability to change album art~~
 
-  ###### Lyrics
-  - To:do
+  ##### Lyrics
+  - ~~Display lyrics if available~~
+  - ~~Ability to add lyrics~~
 
-  ###### Options
-  - To:do
+  ##### Options
+  - ~~Open in MP3Tag~~
+  - Start/Stop Position
+  - Remember playback position
+  - Skip when shuffling
+  - Volume slider for individual tracks
+  - EQ
 
-  ###### Sorting
-  - To:do
+  ##### Sorting
+  - Change sorting options for specific items
 
-  ###### File
-  - To:do
+  ##### File
+  - ~~Show file-type, length, size, bit rate, and other info~~
 
 - ~~Show in Explorer~~
 - ~~Remove from Library~~
@@ -200,9 +217,7 @@
 - ~~Hide "Show in Queue"~~
 
 #### Planned Features
-- Ability to edit metadata
 - Visualizer
-- Playlist import support
 - _POSSIBLE_ iTunes library import support
 - Audio file converting/compressing
 - Album art scraper

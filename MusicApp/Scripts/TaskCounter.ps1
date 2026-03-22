@@ -2,13 +2,15 @@
 
 param(
     [string] $Path = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) '.md\Tasks.md'),
-    [string] $ReadmePath = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'README.md')
+    [string] $ReadmePath = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'README.md'),
+    [string] $ToDoPath = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) '.md\ToDo.md')
 )
-
-if (-not (Test-Path -LiteralPath $Path)) {
-    Write-Error "Tasks file not found: $Path"
-    exit 1
+function Test-IsTaskLine([string] $line) {
+    $t = $line.TrimStart()
+    return $t.Length -gt 0 -and -not $t.StartsWith('#') -and $t -match '\S'
 }
+
+Write-Host "`nCounting tasks..." -ForegroundColor Yellow
 
 $lines = Get-Content -LiteralPath $Path -Encoding UTF8
 $taskLines = $lines | Where-Object {
@@ -22,17 +24,40 @@ $total = $taskLines.Count
 $completed = ($taskLines | Where-Object { $_.Contains('~') }).Count
 
 $pct = if ($total -eq 0) { 0 } else { [math]::Round(100 * $completed / $total, 1) }
-if ($total -eq 0) {
-    Write-Host '0/0 tasks (no task lines found)'
-} else {
-    Write-Host "$completed/$total tasks completed ($pct%)"
+Write-Host "$completed/$total tasks completed ($pct%)"
+Write-Host "`nUpdating ToDo.md..." -ForegroundColor Yellow
+
+$todoOut = [System.Collections.ArrayList]::new()
+[void]$todoOut.Add('# ToDo')
+[void]$todoOut.Add('')
+
+$notDone = 0
+foreach ($line in $lines) {
+    $trimStart = $line.TrimStart()
+    if ($trimStart.StartsWith('#')) {
+        [void]$todoOut.Add($line)
+        continue
+    }
+    if ($line.Trim().Length -eq 0) {
+        if ($todoOut.Count -lt 2) { continue }
+        $last = [string]$todoOut[$todoOut.Count - 1]
+        if ($last -eq '') { continue }
+        if ($last.TrimStart().StartsWith('#')) { [void]$todoOut.Add('') }
+        elseif ($last -match '\S') { [void]$todoOut.Add('') }
+        continue
+    }
+    if (-not (Test-IsTaskLine $line)) { continue }
+    if ($line.Contains('~')) { continue }
+    [void]$todoOut.Add($line)
+    $notDone++
 }
 
-# Sync README.md: replace content between <summary>Tasks</summary> and </details> with full .md\Tasks.md
-if (-not (Test-Path -LiteralPath $ReadmePath)) {
-    Write-Error "README file not found: $ReadmePath"
-    exit 1
+if ($notDone -eq 0) {
+    $todoOut = @('# ToDo', '', '_No undone tasks._')
 }
+$todoOut | Set-Content -LiteralPath $ToDoPath -Encoding UTF8
+Write-Host "Done."
+Write-Host "`nUpdating README.md..." -ForegroundColor Yellow
 
 $readmeLines = Get-Content -LiteralPath $ReadmePath -Encoding UTF8
 $summaryIndex = -1
@@ -40,20 +65,12 @@ for ($i = 0; $i -lt $readmeLines.Count; $i++) {
     if ($readmeLines[$i] -match '<summary>Tasks</summary>') { $summaryIndex = $i; break }
 }
 
-if ($summaryIndex -lt 0) {
-    Write-Error "README.md: could not find <summary>Tasks</summary>"
-    exit 1
-}
 
 $detailsIndex = -1
 for ($i = $summaryIndex + 1; $i -lt $readmeLines.Count; $i++) {
     if ($readmeLines[$i] -eq '</details>') { $detailsIndex = $i; break }
 }
 
-if ($detailsIndex -lt 0) {
-    Write-Error "README.md: could not find closing </details> after <summary>Tasks</summary>"
-    exit 1
-}
 
 $tasksContent = Get-Content -LiteralPath $Path -Encoding UTF8
 $newReadme = $readmeLines[0..$summaryIndex] + $tasksContent + $readmeLines[$detailsIndex..($readmeLines.Count - 1)]
@@ -70,3 +87,4 @@ for ($i = 0; $i -lt $newReadme.Count; $i++) {
 }
 
 $newReadme | Set-Content -LiteralPath $ReadmePath -Encoding UTF8
+Write-Host "`Done."

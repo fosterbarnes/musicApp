@@ -47,6 +47,8 @@ namespace MusicApp.Views
 
         public void RebuildColumns() => trackList.RebuildColumns();
 
+        public void RefreshTrackListBindings() => trackList.RefreshItemBindings();
+
         public void SelectTrack(Song track)
         {
             if (track == null || trackList.ItemsSource == null)
