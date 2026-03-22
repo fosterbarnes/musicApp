@@ -36,7 +36,7 @@
 
 musicApp is in early development, bugs are expected.
 
-If you want to use it, [download the latest release](https://github.com/fosterbarnes/musicApp/releases/download/v0.1.0/musicApp_v0.1.0_dollyShakeswerve-portable.zip), unzip, then run MusicApp.exe
+If you want to use it, [download the latest release](https://github.com/fosterbarnes/musicApp/releases/download/v0.1.0/musicApp-v0.1.0-dollyShakeswerve-portable.zip), unzip, then run MusicApp.exe
 
 ## Progress
 
