@@ -326,7 +326,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Chrome"
-                                Background="{StaticResource Selected-brush}"
+                                Background="#523E6E"
                                 BorderBrush="{StaticResource BorderStrong-brush}"
                                 BorderThickness="0,0,1,0"
                                 SnapsToDevicePixels="True">
@@ -336,10 +336,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource SelectedHover-brush}" />
+                                <Setter TargetName="Chrome" Property="Background" Value="#523E6E" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource PressedAlt-brush}" />
+                                <Setter TargetName="Chrome" Property="Background" Value="#523E6E" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
@@ -354,7 +354,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Chrome"
-                                Background="{StaticResource Selected-brush}"
+                                Background="#523E6E"
                                 BorderBrush="{StaticResource BorderStrong-brush}"
                                 BorderThickness="0"
                                 SnapsToDevicePixels="True">
@@ -364,10 +364,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource SelectedHover-brush}" />
+                                <Setter TargetName="Chrome" Property="Background" Value="#523E6E" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource PressedAlt-brush}" />
+                                <Setter TargetName="Chrome" Property="Background" Value="#523E6E" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />

@@ -36,12 +36,12 @@
 
 musicApp is in early development, bugs are expected.
 
-If you want to use it, [download the latest release](https://github.com/fosterbarnes/musicApp/releases/download/v0.1.0/musicApp-v0.1.0-dollyShakeswerve-portable.zip), unzip, then run MusicApp.exe
+If you want to use it, [download the latest release](https://github.com/fosterbarnes/musicApp/releases/download/v0.1.1/musicApp-v0.1.1-dudeBonerwheels-portable.zip), unzip, then run MusicApp.exe
 
 ## Progress
 
 ![Progress Bar](https://progress-bars.entcheneric.com/bar.svg?progress=62&backgroundColor=%23212121&height=40&width=800&borderRadius=10&striped=false&animated=false&gradientAnimated=false&animationSpeed=1&stripeAnimationSpeed=1&gradientAnimationSpeed=1&initialAnimationSpeed=1&color=%23705399)  
-**89 / 144 tasks complete (61.8%)**
+**93 / 150 tasks complete (62%)**
 
 
 <details>
@@ -69,6 +69,7 @@ If you want to use it, [download the latest release](https://github.com/fosterba
   - ~~Context menu item: show in songs/artists/genre/album~~
   - ~~Dynamically re-sizable window based on amount of results~~
   - ~~Ability to resize window~~
+
 
 ### Main Window Buttons
 
@@ -130,33 +131,53 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 - ~~Simple button to clear all app settings and libraries~~
 - Will most likely be moved to a library management window/menu
 
+
 ### Bottom Row
 - ~~Song count~~
 - ~~Album count~~
 - ~~Time and size calculation~~
 - ~~Progress bar for song scanning and other actions~~
 
+
+
 ## Settings Menu
 
-### EQ
-  - Pre-made EQ options
-  - Custom EQ selector
-  - Save/load custom EQs
-### Themes/colors
-  - Pre-made color options
-  - Custom color picker
-  - Multiple custom save slots
-- Multiple audio backends
-- Cross-fading between songs
-- Volume normalization
-- Sample rate
-- Library import/export
-- Language
-- Change settings storage location
-- Change media storage location
-- Check for updates
-- Keyboard shortcuts
-- Toggle donation links
+### General
+- Check for updates (tickbox)
+- Automatically install updates (tickbox)
+- Import/Export Settings (two buttons)
+- Language (dropdown)
+
+### Playback
+- EQ options, with options to create, import or export profiles (dropdown)
+- Cross-fade songs (slider)
+- Volume normalization (tickbox for now, slider later)
+- Multiple audio backends (dropdown)
+- Sample rate (dropdown)
+- Bits per sample (dropdown)
+
+### Library
+- Library import/export (two buttons)
+- Change media storage location (button)
+- Change settings storage location (button)
+
+### Shortcuts
+- Scrollable grid view with each shortcut as an item in the list
+
+### Theme/UI
+- Color, with options to create, import or export profiles (dropdown)
+- Spacing, with options to create, import or export profiles (dropdown)
+- Size, with options to create, import or export profiles (dropdown)
+- List size, with options to create, import or export profiles (dropdown)
+- Toggle donation links (tickbox)
+
+### About
+- ~~Version and other app info (e.g. musicApp v0.1.0 dollyShakeswerve)~~
+- ~~Project link (https://github.com/fosterbarnes/musicApp)~~
+- ~~Issues link (https://github.com/fosterbarnes/musicApp/issues/new)~~
+- ~~Donation link (https://buymeacoffee.com/fosterbarnes)~~
+
+
 
 ## General
 
@@ -282,6 +303,7 @@ If you want to use it, [download the latest release](https://github.com/fosterba
 
 # General Usage Info
 
+
 ## Main Window
 
 ### Title Bar
@@ -369,4 +391,6 @@ If you'd like to support me, follow me on twitch:
 
 or if you're feeling generous drop a donation:
 [https://coff.ee/fosterbarnes](https://coff.ee/fosterbarnes)
+
+
 

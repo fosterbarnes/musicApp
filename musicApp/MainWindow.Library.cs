@@ -41,7 +41,7 @@ namespace MusicApp
                     if (Directory.Exists(folderPath))
                     {
                         await LoadMusicFromFolderAsync(folderPath, false);
-                        totalNewTracks += allTracks.Count(t => t.FilePath.StartsWith(folderPath));
+                        totalNewTracks += allTracks.Count(t => LibraryPathHelper.IsFileUnderMusicFolder(t.FilePath, folderPath));
                     }
                 }
 
@@ -74,9 +74,9 @@ namespace MusicApp
                 if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
                     var folderToRemove = dialog.SelectedPath;
-                    if (musicFolders.Contains(folderToRemove))
+                    if (musicFolders.Any(f => LibraryPathHelper.PathsEqual(f, folderToRemove)))
                     {
-                        var tracksToRemove = allTracks.Where(t => t.FilePath.StartsWith(folderToRemove)).ToList();
+                        var tracksToRemove = allTracks.Where(t => LibraryPathHelper.IsFileUnderMusicFolder(t.FilePath, folderToRemove)).ToList();
                         foreach (var track in tracksToRemove)
                         {
                             RemoveTrackFromCollections(track, includeShuffled: false);
@@ -84,7 +84,7 @@ namespace MusicApp
 
                         foreach (var playlist in playlists)
                         {
-                            var playlistTracksToRemove = playlist.Tracks.Where(t => t.FilePath.StartsWith(folderToRemove)).ToList();
+                            var playlistTracksToRemove = playlist.Tracks.Where(t => LibraryPathHelper.IsFileUnderMusicFolder(t.FilePath, folderToRemove)).ToList();
                             foreach (var track in playlistTracksToRemove)
                             {
                                 playlist.RemoveTrack(track);

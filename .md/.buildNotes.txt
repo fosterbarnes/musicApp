@@ -1,44 +1,44 @@
+Settings:
+	- Create scaffold for settings menu. (These items are placeholders, code-behind is not wired up yet):
+		General
+		- Check for updates (tickbox)
+		- Automatically install updates (tickbox)
+		- Import/Export Settings (two buttons)
+		- Language (dropdown)
+
+		Playback
+		- EQ options, with options to create, import or export profiles (dropdown)
+		- Cross-fade songs (slider)
+		- Volume normalization (tickbox for now, slider later)
+		- Multiple audio backends (dropdown)
+		- Sample rate (dropdown)
+		- Bits per sample (dropdown)
+
+		Library
+		- Library import/export (two buttons)
+		- Change media storage location (button)
+		- Change settings storage location (button)
+
+		Shortcuts
+		- Scrollable grid view with each shortcut as an item in the list
+
+		Theme/UI
+		- Color, with options to create, import or export profiles (dropdown)
+		- Spacing, with options to create, import or export profiles (dropdown)
+		- Size, with options to create, import or export profiles (dropdown)
+		- List size, with options to create, import or export profiles (dropdown)
+		- Toggle donation links (tickbox)
+
+		About
+		- Version and other app info (e.g. musicApp v0.1.0 dollyShakeswerve)
+		- Project link (https://github.com/fosterbarnes/musicApp)
+		- Issues link (https://github.com/fosterbarnes/musicApp/issues/new)
+		- Donation link (https://buymeacoffee.com/fosterbarnes)
+
+Info View:
+	- Change selected tab color to #523e6e
+	
 Main Window:
-- Change look and feel of view selection rows
-
-Info/Metadata View: 
-- Add ability to edit metadata
-- Fine tune colors
-- Artwork
-	- Display full size, resizable artwork
-	- Ability to change album art
-
-- Lyrics
-	- Display lyrics if available
-	- Ability to add lyrics
-
-- Options
-	- Open in MP3Tag
-	- Start/Stop Position (placeholder)
-	- Remember playback position (placeholder)
-	- Skip when shuffling (placeholder)
-	- Volume slider for individual tracks (placeholder)
-	- EQ (placeholder)
-
-   Sorting
-  - Change sorting options for specific items (placeholder)
-
-   File
-  - Show file-type, length, size, bit rate, and other info
-
-Theming:
-- Consolidate opacity values for future theme usage
-
-General/Backend:
-- Refactor MainWindow.xaml.cs:
-	- Dead code cleanup
-	- Remove unnecessary, obvious comments
-	- Refactor duplicate usage to helpers
-	- Split into partial files: `MainWindow.Navigation.cs`, `MainWindow.Library.cs`, `MainWindow.Settings.cs`, `MainWindow.Playback.cs`, 
-	- Move some stuff to helper files: `RecycleBinHelper.cs`, `TrackMetadataLoader.cs`, `AlbumArtLoader.cs`
-	- Replace messy if statements with loops/switches
-- Add ToDo.md to keep track of un-done tasks. Update taskCounter script to update ToDo
-
-Scripts:
-- Rename some shit
-- Clean shit up
+	- Fix issues with re-scanning the library for new tracks. 
+	- Fix "Clear Settings" not clearing song count and storage info
+	- Change loading bar color to #523e6e

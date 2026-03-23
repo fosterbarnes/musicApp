@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using MusicApp.Helpers;
 
 namespace MusicApp
 {
@@ -12,6 +13,8 @@ namespace MusicApp
         private static readonly string AppDataPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
             "musicApp");
+
+        public static string SettingsDirectoryPath => AppDataPath;
         
         private static readonly string LibraryCacheFilePath = Path.Combine(AppDataPath, "library.json");
         private static readonly string RecentlyPlayedFilePath = Path.Combine(AppDataPath, "recentlyPlayed.json");
@@ -178,7 +181,9 @@ namespace MusicApp
                         PropertyNameCaseInsensitive = true
                     };
                     var folders = JsonSerializer.Deserialize<LibraryFolders>(json, options);
-                    return folders ?? new LibraryFolders();
+                    var result = folders ?? new LibraryFolders();
+                    ApplyMusicFolderNormalization(result);
+                    return result;
                 }
             }
             catch (Exception ex)
@@ -188,10 +193,27 @@ namespace MusicApp
             return new LibraryFolders();
         }
 
+        private static void ApplyMusicFolderNormalization(LibraryFolders folders)
+        {
+            var raw = folders.MusicFolders ?? new List<string>();
+            var collapsed = LibraryPathHelper.CollapseOverlappingMusicRoots(raw);
+            var mergedScan = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in folders.FolderLastScanned)
+            {
+                var root = LibraryPathHelper.FindCanonicalMusicRoot(kv.Key, collapsed);
+                if (root == null) continue;
+                if (!mergedScan.TryGetValue(root, out var existing) || kv.Value > existing)
+                    mergedScan[root] = kv.Value;
+            }
+            folders.MusicFolders = collapsed;
+            folders.FolderLastScanned = mergedScan;
+        }
+
         public async Task SaveLibraryFoldersAsync(LibraryFolders folders)
         {
             try
             {
+                ApplyMusicFolderNormalization(folders);
                 var options = new JsonSerializerOptions 
                 { 
                     WriteIndented = true,
@@ -402,22 +424,21 @@ namespace MusicApp
 
         public async Task AddMusicFolderAsync(string folderPath)
         {
+            var normalized = LibraryPathHelper.TryNormalizePath(folderPath);
+            if (normalized == null) return;
             var folders = await LoadLibraryFoldersAsync();
-            if (!folders.MusicFolders.Contains(folderPath))
-            {
-                folders.MusicFolders.Add(folderPath);
-                await SaveLibraryFoldersAsync(folders);
-            }
+            if (folders.MusicFolders.Any(f => LibraryPathHelper.PathsEqual(f, normalized))) return;
+            folders.MusicFolders.Add(normalized);
+            await SaveLibraryFoldersAsync(folders);
         }
 
         public async Task RemoveMusicFolderAsync(string folderPath)
         {
             var folders = await LoadLibraryFoldersAsync();
-            if (folders.MusicFolders.Contains(folderPath))
-            {
-                folders.MusicFolders.Remove(folderPath);
-                await SaveLibraryFoldersAsync(folders);
-            }
+            var match = folders.MusicFolders.FirstOrDefault(f => LibraryPathHelper.PathsEqual(f, folderPath));
+            if (match == null) return;
+            folders.MusicFolders.Remove(match);
+            await SaveLibraryFoldersAsync(folders);
         }
 
         #endregion
@@ -428,19 +449,29 @@ namespace MusicApp
         {
             try
             {
+                var normalized = LibraryPathHelper.TryNormalizePath(folderPath);
+                if (normalized == null) return true;
+
                 var folders = await LoadLibraryFoldersAsync();
-                if (!folders.FolderLastScanned.ContainsKey(folderPath))
-                    return true;
+                DateTime? lastScanned = null;
+                foreach (var kv in folders.FolderLastScanned)
+                {
+                    if (LibraryPathHelper.PathsEqual(kv.Key, normalized))
+                    {
+                        lastScanned = kv.Value;
+                        break;
+                    }
+                }
+                if (lastScanned == null) return true;
 
-                var lastScanned = folders.FolderLastScanned[folderPath];
-                var directoryInfo = new DirectoryInfo(folderPath);
-                
-                // Check if any files have been modified since last scan
+                var directoryInfo = new DirectoryInfo(normalized);
                 var supportedExtensions = new[] { ".mp3", ".wav", ".flac", ".m4a", ".aac" };
-                var musicFiles = directoryInfo.GetFiles("*.*", SearchOption.AllDirectories)
-                    .Where(file => supportedExtensions.Contains(file.Extension.ToLower()));
-
-                return musicFiles.Any(file => file.LastWriteTime > lastScanned);
+                foreach (var file in directoryInfo.EnumerateFiles("*.*", SearchOption.AllDirectories))
+                {
+                    if (!supportedExtensions.Contains(file.Extension.ToLower())) continue;
+                    if (file.LastWriteTime > lastScanned.Value) return true;
+                }
+                return false;
             }
             catch (Exception ex)
             {
@@ -453,8 +484,10 @@ namespace MusicApp
         {
             try
             {
+                var normalized = LibraryPathHelper.TryNormalizePath(folderPath);
+                if (normalized == null) return;
                 var folders = await LoadLibraryFoldersAsync();
-                folders.FolderLastScanned[folderPath] = DateTime.Now;
+                folders.FolderLastScanned[normalized] = DateTime.Now;
                 await SaveLibraryFoldersAsync(folders);
             }
             catch (Exception ex)
@@ -468,13 +501,9 @@ namespace MusicApp
             try
             {
                 var folders = await LoadLibraryFoldersAsync();
-                
-                // Remove folder from scan times
-                if (folders.FolderLastScanned.ContainsKey(folderPath))
-                {
-                    folders.FolderLastScanned.Remove(folderPath);
-                }
-                
+                var key = folders.FolderLastScanned.Keys.FirstOrDefault(k => LibraryPathHelper.PathsEqual(k, folderPath));
+                if (key != null)
+                    folders.FolderLastScanned.Remove(key);
                 await SaveLibraryFoldersAsync(folders);
             }
             catch (Exception ex)

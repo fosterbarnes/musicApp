@@ -50,6 +50,9 @@ namespace MusicApp
         private ObservableCollection<Playlist> playlists = new ObservableCollection<Playlist>();
         private ObservableCollection<Song> recentlyPlayed = new ObservableCollection<Song>();
 
+        private readonly object _libraryPathRegistryLock = new();
+        private readonly HashSet<string> _registeredLibraryNormalizedPaths = new(StringComparer.OrdinalIgnoreCase);
+
         /// <summary>Playlists pinned to the sidebar; used for the dynamic pinned section.</summary>
         public ObservableCollection<Playlist> PinnedPlaylists { get; } = new ObservableCollection<Playlist>();
 
@@ -346,6 +349,8 @@ namespace MusicApp
             if (musicFolders == null || musicFolders.Count == 0)
                 return;
 
+            ResetLibraryPathRegistry();
+
             libraryCache ??= await libraryManager.LoadLibraryCacheAsync();
 
             foreach (var folderPath in musicFolders)
@@ -374,12 +379,17 @@ namespace MusicApp
             try
             {
                 libraryCache ??= await libraryManager.LoadLibraryCacheAsync();
-                var cachedTracks = libraryCache.Tracks.Where(t => t.FilePath.StartsWith(folderPath)).ToList();
+                var cachedTracks = libraryCache.Tracks
+                    .Where(t => !string.IsNullOrWhiteSpace(t.FilePath) && LibraryPathHelper.IsFileUnderMusicFolder(t.FilePath, folderPath))
+                    .ToList();
 
                 foreach (var track in cachedTracks)
                 {
                     if (File.Exists(track.FilePath))
                     {
+                        if (!TryRegisterLibraryPath(track.FilePath))
+                            continue;
+
                         if (string.IsNullOrEmpty(track.FileType))
                         {
                             var extension = Path.GetExtension(track.FilePath);
@@ -813,8 +823,54 @@ namespace MusicApp
             UpdateStatusBar();
         }
 
+        private void ResetLibraryPathRegistry()
+        {
+            lock (_libraryPathRegistryLock)
+            {
+                _registeredLibraryNormalizedPaths.Clear();
+            }
+        }
+
+        private bool TryRegisterLibraryPath(string? path)
+        {
+            var n = LibraryPathHelper.TryNormalizePath(path);
+            if (n == null) return false;
+            lock (_libraryPathRegistryLock)
+            {
+                if (_registeredLibraryNormalizedPaths.Contains(n)) return false;
+                _registeredLibraryNormalizedPaths.Add(n);
+                return true;
+            }
+        }
+
+        private void ReleaseRegisteredLibraryPath(string? path)
+        {
+            var n = LibraryPathHelper.TryNormalizePath(path);
+            if (n == null) return;
+            lock (_libraryPathRegistryLock)
+            {
+                _registeredLibraryNormalizedPaths.Remove(n);
+            }
+        }
+
+        private void UnregisterLibraryPathIfLastCopy(Song track)
+        {
+            var n = LibraryPathHelper.TryNormalizePath(track.FilePath);
+            if (n == null) return;
+            lock (_libraryPathRegistryLock)
+            {
+                foreach (var t in allTracks)
+                {
+                    if (ReferenceEquals(t, track)) continue;
+                    if (LibraryPathHelper.PathsEqual(t.FilePath, track.FilePath)) return;
+                }
+                _registeredLibraryNormalizedPaths.Remove(n);
+            }
+        }
+
         private void RemoveTrackFromCollections(Song track, bool includeShuffled)
         {
+            UnregisterLibraryPathIfLastCopy(track);
             allTracks.Remove(track);
             filteredTracks.Remove(track);
             if (includeShuffled)
@@ -1866,13 +1922,6 @@ namespace MusicApp
                     });
                 }
 
-                // Get existing tracks on UI thread before processing (ObservableCollection must be accessed on UI thread)
-                var existingTracks = await Dispatcher.InvokeAsync(() =>
-                {
-                    return allTracks.Where(t => t.FilePath.StartsWith(folderPath)).ToList();
-                });
-
-                var newTracks = new List<Song>();
                 int processedCount = 0;
 
                 await Task.Run(async () =>
@@ -1881,24 +1930,27 @@ namespace MusicApp
                     {
                         try
                         {
-                            var existingTrack = existingTracks.FirstOrDefault(t => t.FilePath == file);
-                            if (existingTrack == null)
+                            if (!TryRegisterLibraryPath(file))
+                                continue;
+
+                            var track = TrackMetadataLoader.LoadSong(file);
+                            if (track != null)
                             {
-                                var track = TrackMetadataLoader.LoadSong(file);
-                                if (track != null)
+                                await Dispatcher.InvokeAsync(() =>
                                 {
-                                    await Dispatcher.InvokeAsync(() =>
-                                    {
-                                        newTracks.Add(track);
-                                        allTracks.Add(track);
-                                        filteredTracks.Add(track);
-                                    });
-                                }
+                                    allTracks.Add(track);
+                                    filteredTracks.Add(track);
+                                });
+                            }
+                            else
+                            {
+                                ReleaseRegisteredLibraryPath(file);
                             }
                         }
                         catch (Exception ex)
                         {
                             Console.WriteLine($"Error loading {file}: {ex.Message}");
+                            ReleaseRegisteredLibraryPath(file);
                         }
                         finally
                         {

@@ -220,6 +220,15 @@
                                 <TextBlock Text="Clear Settings" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
+
+                        <Button x:Name="btnSettings"
+                                Style="{StaticResource SidebarNavigationButton}"
+                                Click="BtnSettings_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Cog" VerticalAlignment="Center" Margin="{StaticResource Right10-thk}"/>
+                                <TextBlock Text="Settings" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Border>
 
@@ -277,11 +286,10 @@
 
                     <!-- Progress Bar Fill -->
                     <Border x:Name="progressBarFill"
-                            Background="{StaticResource AccentPrimary-brush}"
+                            Background="{StaticResource ThemeBrand-brush}"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
-                            Width="0"
-                            Opacity="0.3"/>
+                            Width="0"/>
 
                     <!-- Status Text (on top of progress bar) -->
                     <TextBlock x:Name="statusBarText" 

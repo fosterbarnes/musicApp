@@ -56,6 +56,7 @@
     <Thickness x:Key="Right8-thk">0,0,8,0</Thickness>
     <Thickness x:Key="Right10-thk">0,0,10,0</Thickness>
     <Thickness x:Key="Right15-thk">0,0,15,0</Thickness>
+    <Thickness x:Key="Left8-thk">8,0,0,0</Thickness>
     <Thickness x:Key="Left10-thk">10,0,0,0</Thickness>
     <Thickness x:Key="Left20-thk">20,0,0,0</Thickness>
     <Thickness x:Key="Left180-thk">180,0,0,0</Thickness>
@@ -63,6 +64,8 @@
     <Thickness x:Key="InfoSortAsPlaceholderInset-thk">7,3,3,3</Thickness>
     <Thickness x:Key="FieldLabelMargin-thk">0,0,10,8</Thickness>
     <Thickness x:Key="ComboBoxContentMargin-thk">6,2,28,2</Thickness>
+    <Thickness x:Key="SettingsGeneralContentMargin-thk">0,16,6,0</Thickness>
+    <Thickness x:Key="SettingsGeneralDividerMargin-thk">0,16,0,18</Thickness>
     <Thickness x:Key="HeaderPanelPadding-thk">15,10</Thickness>
     <Thickness x:Key="SearchBarPadding-thk">8,4</Thickness>
     <Thickness x:Key="IconButtonPadding-thk">8</Thickness>
@@ -87,4 +90,10 @@
     <sys:Double x:Key="FieldHeight-size">26</sys:Double>
     <sys:Double x:Key="ToolButton32-size">32</sys:Double>
     <sys:Double x:Key="ToolButton24-size">24</sys:Double>
+    <sys:Double x:Key="SettingsPlaybackCrossfadeSliderWidth-size">180</sys:Double>
+    <sys:Double x:Key="SettingsPlaybackSliderHeight-size">28</sys:Double>
+    <sys:Double x:Key="AboutMainLineFontSize-size">18</sys:Double>
+    <sys:Double x:Key="AboutIconSize-size">128</sys:Double>
+    <sys:Double x:Key="AboutTitleFontSize-size">24</sys:Double>
+    <sys:Double x:Key="AboutVersionSubtitleFontSize-size">14</sys:Double>
 </ResourceDictionary>

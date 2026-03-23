@@ -1,0 +1,845 @@
+<Window x:Class="MusicApp.Views.SettingsView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Settings"
+        Width="650"
+        Height="730"
+        MinWidth="420"
+        MinHeight="580"
+        MaxWidth="1920"
+        MaxHeight="1080"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource AppBackground-brush}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Theme/SettingsDialogFormResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        <Style x:Key="SectionSegmentInactiveStyle" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Foreground" Value="{StaticResource TextTertiary-brush}" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{StaticResource ControlBackgroundAlt-brush}"
+                                BorderBrush="{StaticResource BorderMuted-brush}"
+                                BorderThickness="0,0,1,0"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Hover-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Pressed-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SectionSegmentInactiveLastStyle" TargetType="Button" BasedOn="{StaticResource SectionSegmentInactiveStyle}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{StaticResource ControlBackgroundAlt-brush}"
+                                BorderBrush="{StaticResource BorderMuted-brush}"
+                                BorderThickness="0"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Hover-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Pressed-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SectionSegmentActiveStyle" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary-brush}" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{StaticResource ThemeBrand-brush}"
+                                BorderBrush="{StaticResource BorderStrong-brush}"
+                                BorderThickness="0,0,1,0"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ThemeBrand-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ThemeBrand-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SectionSegmentActiveLastStyle" TargetType="Button" BasedOn="{StaticResource SectionSegmentActiveStyle}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{StaticResource ThemeBrand-brush}"
+                                BorderBrush="{StaticResource BorderStrong-brush}"
+                                BorderThickness="0"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ThemeBrand-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ThemeBrand-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="MetadataDialogFooterButtonStyle" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary-brush}" />
+            <Setter Property="Width" Value="92" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{StaticResource ControlBackgroundAlt-brush}"
+                                BorderBrush="{StaticResource BorderMuted-brush}"
+                                BorderThickness="1"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Hover-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Pressed-brush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SettingsGeneralActionButtonStyle" TargetType="Button" BasedOn="{StaticResource MetadataDialogFooterButtonStyle}">
+            <Setter Property="Width" Value="Auto" />
+            <Setter Property="MinWidth" Value="120" />
+        </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="{StaticResource Uniform12-thk}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Margin="{StaticResource Bottom10-thk}"
+                Background="{StaticResource ControlBackgroundAlt-brush}"
+                BorderBrush="{StaticResource BorderMuted-brush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource Sm-cr}"
+                ClipToBounds="True">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="GeneralSectionButton"
+                        Grid.Column="0"
+                        Content="General"
+                        Style="{StaticResource SectionSegmentActiveStyle}"
+                        Tag="General"
+                        Click="SectionButton_Click" />
+                <Button x:Name="PlaybackSectionButton"
+                        Grid.Column="1"
+                        Content="Playback"
+                        Style="{StaticResource SectionSegmentInactiveStyle}"
+                        Tag="Playback"
+                        Click="SectionButton_Click" />
+                <Button x:Name="LibrarySectionButton"
+                        Grid.Column="2"
+                        Content="Library"
+                        Style="{StaticResource SectionSegmentInactiveStyle}"
+                        Tag="Library"
+                        Click="SectionButton_Click" />
+                <Button x:Name="KeyboardShortcutsSectionButton"
+                        Grid.Column="3"
+                        Content="Shortcuts"
+                        Style="{StaticResource SectionSegmentInactiveStyle}"
+                        Tag="KeyboardShortcuts"
+                        Click="SectionButton_Click" />
+                <Button x:Name="ThemeSectionButton"
+                        Grid.Column="4"
+                        Content="Theme/UI"
+                        Style="{StaticResource SectionSegmentInactiveStyle}"
+                        Tag="Theme"
+                        Click="SectionButton_Click" />
+                <Button x:Name="AboutSectionButton"
+                        Grid.Column="5"
+                        Content="About"
+                        Style="{StaticResource SectionSegmentInactiveLastStyle}"
+                        Tag="About"
+                        Click="SectionButton_Click" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1"
+                Background="{StaticResource SurfaceLowered-brush}"
+                BorderBrush="{StaticResource BorderSubtle-brush}"
+                BorderThickness="{StaticResource Border1-thk}"
+                CornerRadius="{StaticResource Md-cr}"
+                Padding="{StaticResource Uniform10-thk}">
+            <Grid>
+                <Grid x:Name="GeneralSectionPanel" Visibility="Visible">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Grid Margin="{StaticResource SettingsGeneralContentMargin-thk}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{StaticResource InfoMetadataLabelColumnWidth}" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Grid.Column="0"
+                                       Grid.RowSpan="2"
+                                       Text="Updates"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       VerticalAlignment="Top" />
+
+                            <CheckBox Grid.Row="0"
+                                      Grid.Column="1"
+                                      Content="Check for updates"
+                                      Foreground="{StaticResource TextPrimary-brush}"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      VerticalAlignment="Center" />
+
+                            <CheckBox Grid.Row="1"
+                                      Grid.Column="1"
+                                      Content="Automatically install updates"
+                                      Foreground="{StaticResource TextPrimary-brush}"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      VerticalAlignment="Center" />
+
+                            <Separator Grid.Row="2"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="3"
+                                       Grid.Column="0"
+                                       Text="Import/Export Settings"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <StackPanel Grid.Row="3"
+                                        Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        Margin="{StaticResource FieldRowGap-thk}"
+                                        VerticalAlignment="Center">
+                                <Button Content="Import"
+                                        Style="{StaticResource SettingsGeneralActionButtonStyle}"
+                                        Margin="{StaticResource Right8-thk}" />
+                                <Button Content="Export"
+                                        Style="{StaticResource SettingsGeneralActionButtonStyle}" />
+                            </StackPanel>
+
+                            <Separator Grid.Row="4"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="5"
+                                       Grid.Column="0"
+                                       Text="Language"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       VerticalAlignment="Center" />
+                            <ComboBox Grid.Row="5"
+                                      Grid.Column="1"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      Style="{StaticResource DarkFieldComboBoxStyle}"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="English (System)" IsSelected="True" />
+                                <ComboBoxItem Content="English (United States)" />
+                            </ComboBox>
+                        </Grid>
+                    </ScrollViewer>
+                </Grid>
+                <Grid x:Name="PlaybackSectionPanel" Visibility="Collapsed">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Grid Margin="{StaticResource SettingsGeneralContentMargin-thk}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{StaticResource InfoMetadataLabelColumnWidth}" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Grid.Column="0"
+                                       Text="EQ"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <ComboBox Grid.Row="0"
+                                      Grid.Column="1"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      Style="{StaticResource DarkFieldComboBoxStyle}"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="New..." />
+                                <ComboBoxItem Content="Import..." />
+                                <ComboBoxItem Content="Export..." />
+                            </ComboBox>
+
+                            <Separator Grid.Row="1"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="2"
+                                       Grid.Column="0"
+                                       Text="Cross-fade songs"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <StackPanel Grid.Row="2"
+                                        Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        Margin="{StaticResource FieldRowGap-thk}"
+                                        VerticalAlignment="Center">
+                                <Slider Minimum="0"
+                                        Maximum="15"
+                                        Value="0"
+                                        Width="{StaticResource SettingsPlaybackCrossfadeSliderWidth-size}"
+                                        Height="{StaticResource SettingsPlaybackSliderHeight-size}"
+                                        VerticalAlignment="Center"
+                                        IsMoveToPointEnabled="True"
+                                        Style="{StaticResource SettingsPlaybackSliderStyle}" />
+                                <TextBlock Text="0s"
+                                           Foreground="{StaticResource TextTertiary-brush}"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           Margin="{StaticResource Left10-thk}" />
+                            </StackPanel>
+
+                            <Separator Grid.Row="3"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="4"
+                                       Grid.Column="0"
+                                       Text="Volume normalization"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <CheckBox Grid.Row="4"
+                                      Grid.Column="1"
+                                      Content=""
+                                      Foreground="{StaticResource TextPrimary-brush}"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      VerticalAlignment="Center" />
+
+                            <Separator Grid.Row="5"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="6"
+                                       Grid.Column="0"
+                                       Text="Multiple audio backends"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <ComboBox Grid.Row="6"
+                                      Grid.Column="1"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      Style="{StaticResource DarkFieldComboBoxStyle}"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="WASAPI (exclusive)" />
+                                <ComboBoxItem Content="WASAPI (shared)" IsSelected="True" />
+                                <ComboBoxItem Content="DirectSound" />
+                                <ComboBoxItem Content="WaveOut" />
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="7"
+                                       Grid.Column="0"
+                                       Text="Sample rate"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       VerticalAlignment="Center" />
+                            <ComboBox Grid.Row="7"
+                                      Grid.Column="1"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      Style="{StaticResource DarkFieldComboBoxStyle}"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="44100 Hz" />
+                                <ComboBoxItem Content="48000 Hz" IsSelected="True" />
+                                <ComboBoxItem Content="88200 Hz" />
+                                <ComboBoxItem Content="96000 Hz" />
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="8"
+                                       Grid.Column="0"
+                                       Text="Bits per sample"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       VerticalAlignment="Center" />
+                            <ComboBox Grid.Row="8"
+                                      Grid.Column="1"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      Style="{StaticResource DarkFieldComboBoxStyle}"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="16-bit" IsSelected="True" />
+                                <ComboBoxItem Content="24-bit" />
+                                <ComboBoxItem Content="32-bit float" />
+                            </ComboBox>
+                        </Grid>
+                    </ScrollViewer>
+                </Grid>
+                <Grid x:Name="LibrarySectionPanel" Visibility="Collapsed">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Grid Margin="{StaticResource SettingsGeneralContentMargin-thk}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{StaticResource InfoMetadataLabelColumnWidth}" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Grid.Column="0"
+                                       Text="Library import/export"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <StackPanel Grid.Row="0"
+                                        Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        Margin="{StaticResource FieldRowGap-thk}"
+                                        VerticalAlignment="Center">
+                                <Button Content="Import"
+                                        Style="{StaticResource SettingsGeneralActionButtonStyle}"
+                                        Margin="{StaticResource Right8-thk}" />
+                                <Button Content="Export"
+                                        Style="{StaticResource SettingsGeneralActionButtonStyle}" />
+                            </StackPanel>
+
+                            <Separator Grid.Row="1"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="2"
+                                       Grid.Column="0"
+                                       Text="Media storage"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <Button Grid.Row="2"
+                                    Grid.Column="1"
+                                    Content="Change media storage location"
+                                    HorizontalAlignment="Left"
+                                    Margin="{StaticResource FieldRowGap-thk}"
+                                    Style="{StaticResource SettingsGeneralActionButtonStyle}" />
+
+                            <Separator Grid.Row="3"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="4"
+                                       Grid.Column="0"
+                                       Text="Settings storage"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <Button Grid.Row="4"
+                                    Grid.Column="1"
+                                    Content="Change settings storage location"
+                                    HorizontalAlignment="Left"
+                                    Margin="{StaticResource FieldRowGap-thk}"
+                                    Style="{StaticResource SettingsGeneralActionButtonStyle}" />
+                        </Grid>
+                    </ScrollViewer>
+                </Grid>
+                <Grid x:Name="ThemeSectionPanel" Visibility="Collapsed">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Grid Margin="{StaticResource SettingsGeneralContentMargin-thk}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{StaticResource InfoMetadataLabelColumnWidth}" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Grid.Column="0"
+                                       Text="Color scheme"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <ComboBox Grid.Row="0"
+                                      Grid.Column="1"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      Style="{StaticResource DarkFieldComboBoxStyle}"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="New..." />
+                                <ComboBoxItem Content="Import..." />
+                                <ComboBoxItem Content="Export..." />
+                            </ComboBox>
+
+                            <Separator Grid.Row="1"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="2"
+                                       Grid.Column="0"
+                                       Text="Spacing"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <ComboBox Grid.Row="2"
+                                      Grid.Column="1"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      Style="{StaticResource DarkFieldComboBoxStyle}"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="New..." />
+                                <ComboBoxItem Content="Import..." />
+                                <ComboBoxItem Content="Export..." />
+                            </ComboBox>
+
+                            <Separator Grid.Row="3"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="4"
+                                       Grid.Column="0"
+                                       Text="Size"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <ComboBox Grid.Row="4"
+                                      Grid.Column="1"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      Style="{StaticResource DarkFieldComboBoxStyle}"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="New..." />
+                                <ComboBoxItem Content="Import..." />
+                                <ComboBoxItem Content="Export..." />
+                            </ComboBox>
+
+                            <Separator Grid.Row="5"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="6"
+                                       Grid.Column="0"
+                                       Text="List size"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <ComboBox Grid.Row="6"
+                                      Grid.Column="1"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      Style="{StaticResource DarkFieldComboBoxStyle}"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="New..." />
+                                <ComboBoxItem Content="Import..." />
+                                <ComboBoxItem Content="Export..." />
+                            </ComboBox>
+
+                            <Separator Grid.Row="7"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="8"
+                                       Grid.Column="0"
+                                       Text="Donation links"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <CheckBox Grid.Row="8"
+                                      Grid.Column="1"
+                                      Content="Hide donation links"
+                                      Foreground="{StaticResource TextPrimary-brush}"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      VerticalAlignment="Center" />
+                        </Grid>
+                    </ScrollViewer>
+                </Grid>
+                <Grid x:Name="KeyboardShortcutsSectionPanel" Visibility="Collapsed"
+                      Margin="{StaticResource SettingsGeneralContentMargin-thk}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" MinHeight="120" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" MinHeight="120" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Text="In-app shortcuts"
+                               Style="{StaticResource FieldLabelStyle}"
+                               VerticalAlignment="Bottom"
+                               Margin="{StaticResource Bottom8-thk}" />
+
+                    <ListView x:Name="KeyboardShortcutsInAppListView"
+                              Grid.Row="1"
+                              VerticalAlignment="Stretch"
+                              HorizontalAlignment="Stretch"
+                              ItemContainerStyle="{StaticResource CompactListViewItemStyle}"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto"
+                              Background="Transparent"
+                              BorderThickness="0"
+                              Foreground="{StaticResource TextPrimary-brush}">
+                        <ListView.View>
+                            <GridView ColumnHeaderContainerStyle="{StaticResource CompactGridViewHeaderStyle}">
+                                <GridViewColumn Header="Keyboard Shortcut (Placeholder)"
+                                                DisplayMemberBinding="{Binding Shortcut}"
+                                                Width="200" />
+                                <GridViewColumn Header="Action (Placeholder)"
+                                                DisplayMemberBinding="{Binding Action}"
+                                                Width="200" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+
+                    <TextBlock Grid.Row="2"
+                               Text="Global shortcuts"
+                               Style="{StaticResource FieldLabelStyle}"
+                               VerticalAlignment="Bottom"
+                               Margin="{StaticResource FileInfoSectionBreakValueMargin-thk}" />
+
+                    <ListView x:Name="KeyboardShortcutsGlobalListView"
+                              Grid.Row="3"
+                              VerticalAlignment="Stretch"
+                              HorizontalAlignment="Stretch"
+                              ItemContainerStyle="{StaticResource CompactListViewItemStyle}"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto"
+                              Foreground="{StaticResource TextPrimary-brush}"
+                              Background="Transparent"
+                              BorderThickness="0">
+                        <ListView.View>
+                            <GridView ColumnHeaderContainerStyle="{StaticResource CompactGridViewHeaderStyle}">
+                                <GridViewColumn Header="Keyboard Shortcut (Placeholder)"
+                                                DisplayMemberBinding="{Binding Shortcut}"
+                                                Width="200" />
+                                <GridViewColumn Header="Action (Placeholder)"
+                                                DisplayMemberBinding="{Binding Action}"
+                                                Width="200" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </Grid>
+                <Grid x:Name="AboutSectionPanel" Visibility="Collapsed">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Grid Margin="{StaticResource Right6-thk}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Image Grid.Column="0"
+                                   Source="/Resources/icon/MusicApp Icon.png"
+                                   Width="{StaticResource AboutIconSize-size}"
+                                   Height="{StaticResource AboutIconSize-size}"
+                                   Margin="{StaticResource Right15-thk}"
+                                   VerticalAlignment="Center"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   SnapsToDevicePixels="True" />
+
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Left">
+                                <TextBlock Text="musicApp"
+                                           Style="{StaticResource AboutTitleStyle}" />
+                                <TextBlock x:Name="AboutVersionSubtitleText"
+                                           Margin="{StaticResource Bottom10-thk}"
+                                           Style="{StaticResource AboutVersionSubtitleStyle}" />
+                                <TextBlock Style="{StaticResource AboutLinkLineStyle}">
+                                    <Hyperlink NavigateUri="https://github.com/fosterbarnes/musicApp"
+                                               RequestNavigate="AboutHyperlink_RequestNavigate"
+                                               Foreground="{StaticResource TextLinkStrong-brush}">
+                                        github.com/fosterbarnes/musicApp
+                                    </Hyperlink>
+                                </TextBlock>
+                                <TextBlock Style="{StaticResource AboutLinkLineStyle}">
+                                    <Hyperlink NavigateUri="https://github.com/fosterbarnes/musicApp/issues/new"
+                                               RequestNavigate="AboutHyperlink_RequestNavigate"
+                                               Foreground="{StaticResource TextLinkStrong-brush}">
+                                        github.com/fosterbarnes/musicApp/issues/new
+                                    </Hyperlink>
+                                </TextBlock>
+                                <TextBlock Margin="{StaticResource Bottom8-thk}"
+                                           Style="{StaticResource AboutLinkLineStyle}">
+                                    <Hyperlink NavigateUri="https://buymeacoffee.com/fosterbarnes"
+                                               RequestNavigate="AboutHyperlink_RequestNavigate"
+                                               Foreground="{StaticResource TextLinkStrong-brush}">
+                                        buymeacoffee.com/fosterbarnes
+                                    </Hyperlink>
+                                </TextBlock>
+
+                                <Grid Margin="{StaticResource Top10-thk}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="{StaticResource InfoMetadataLabelColumnWidth}" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0"
+                                               Grid.Column="0"
+                                               Text="Install Location"
+                                               Style="{StaticResource FieldLabelStyle}" />
+                                    <TextBlock x:Name="AboutInstallLocationText"
+                                               Grid.Row="0"
+                                               Grid.Column="1"
+                                               Style="{StaticResource FileInfoValueStyle}" />
+
+                                    <TextBlock Grid.Row="1"
+                                               Grid.Column="0"
+                                               Text="Settings Location"
+                                               Style="{StaticResource FieldLabelStyle}" />
+                                    <TextBlock x:Name="AboutSettingsLocationText"
+                                               Grid.Row="1"
+                                               Grid.Column="1"
+                                               Style="{StaticResource FileInfoValueStyle}" />
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="{StaticResource Top10-thk}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <Button x:Name="OkButton"
+                        Content="OK"
+                        Margin="{StaticResource Right8-thk}"
+                        Style="{StaticResource MetadataDialogFooterButtonStyle}"
+                        IsDefault="True"
+                        Click="OkButton_Click" />
+                <Button x:Name="CancelButton"
+                        Content="Cancel"
+                        Style="{StaticResource MetadataDialogFooterButtonStyle}"
+                        IsCancel="True"
+                        Click="CancelButton_Click" />
+                <Button x:Name="ApplyButton"
+                        Content="Apply"
+                        Margin="{StaticResource Left8-thk}"
+                        Style="{StaticResource MetadataDialogFooterButtonStyle}"
+                        Click="ApplyButton_Click" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

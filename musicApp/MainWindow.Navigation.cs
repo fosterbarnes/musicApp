@@ -71,6 +71,15 @@ namespace MusicApp
             ClearSettings();
         }
 
+        private void BtnSettings_Click(object sender, RoutedEventArgs e)
+        {
+            var settingsWindow = new SettingsView
+            {
+                Owner = this
+            };
+            settingsWindow.ShowDialog();
+        }
+
         private void ShowLibraryView()
         {
             contentHost.Content = songsView;

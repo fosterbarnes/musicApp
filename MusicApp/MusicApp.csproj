@@ -28,4 +28,13 @@
     <Page Include="Resources\icon\MusicApp Icon.ico" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Resource Include="Resources\icon\MusicApp Icon.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Version" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="VersionTag" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

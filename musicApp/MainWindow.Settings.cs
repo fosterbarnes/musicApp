@@ -1,6 +1,7 @@
-using System;
-using System.IO;
-using MusicApp.Dialogs;
+        using System;
+        using System.IO;
+        using System.Windows;
+        using MusicApp.Dialogs;
 
 namespace MusicApp
 {
@@ -66,6 +67,7 @@ namespace MusicApp
                 }
 
                 allTracks.Clear();
+                ResetLibraryPathRegistry();
                 filteredTracks.Clear();
                 shuffledTracks.Clear();
                 playlists.Clear();
@@ -85,6 +87,10 @@ namespace MusicApp
 
                 RefreshVisibleViews();
                 UpdateUI();
+
+                progressBarFill.Visibility = Visibility.Collapsed;
+                progressBarFill.Width = 0;
+                UpdateStatusBar();
 
                 MessageDialog.Show(this, "Settings Cleared",
                     $"Successfully cleared {movedFiles} settings files.\n\n" +
