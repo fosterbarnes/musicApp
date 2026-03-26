@@ -31,7 +31,7 @@ $updated = [regex]::Replace(
     $readme,
     $oldLinkRegex,
     "[download the latest release]($releaseUrl)"
-)
+).TrimEnd()
 Write-Host "`nUpdating release link in README..." -ForegroundColor Yellow
 Write-Host "$releaseUrl"
 Set-Content -LiteralPath $ReadmePath -Encoding UTF8 -Value $updated

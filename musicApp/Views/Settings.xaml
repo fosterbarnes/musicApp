@@ -1,8 +1,10 @@
-<Window x:Class="MusicApp.Views.SettingsView"
+<Window x:Class="musicApp.Views.SettingsView"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:converters="clr-namespace:musicApp.Converters"
         mc:Ignorable="d"
         Title="Settings"
         Width="650"
@@ -19,131 +21,13 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Theme/SettingsDialogFormResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
-        <Style x:Key="SectionSegmentInactiveStyle" TargetType="Button">
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Foreground" Value="{StaticResource TextTertiary-brush}" />
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="Cursor" Value="Hand" />
+            <converters:CrossfadeStartSecondsLabelConverter x:Key="CrossfadeStartSecondsLabelConverter" />
+        <Style x:Key="SettingsLibraryActionButtonStyle" TargetType="Button" BasedOn="{StaticResource SidebarNavigationButton}">
+            <Setter Property="Height" Value="{StaticResource SettingsLibraryActionButtonHeight-size}" />
+            <Setter Property="MinHeight" Value="{StaticResource SettingsLibraryActionButtonHeight-size}" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="VerticalAlignment" Value="Stretch" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome"
-                                Background="{StaticResource ControlBackgroundAlt-brush}"
-                                BorderBrush="{StaticResource BorderMuted-brush}"
-                                BorderThickness="0,0,1,0"
-                                SnapsToDevicePixels="True">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Hover-brush}" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Pressed-brush}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style x:Key="SectionSegmentInactiveLastStyle" TargetType="Button" BasedOn="{StaticResource SectionSegmentInactiveStyle}">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome"
-                                Background="{StaticResource ControlBackgroundAlt-brush}"
-                                BorderBrush="{StaticResource BorderMuted-brush}"
-                                BorderThickness="0"
-                                SnapsToDevicePixels="True">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Hover-brush}" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Pressed-brush}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style x:Key="SectionSegmentActiveStyle" TargetType="Button">
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary-brush}" />
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="VerticalAlignment" Value="Stretch" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome"
-                                Background="{StaticResource ThemeBrand-brush}"
-                                BorderBrush="{StaticResource BorderStrong-brush}"
-                                BorderThickness="0,0,1,0"
-                                SnapsToDevicePixels="True">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ThemeBrand-brush}" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ThemeBrand-brush}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style x:Key="SectionSegmentActiveLastStyle" TargetType="Button" BasedOn="{StaticResource SectionSegmentActiveStyle}">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome"
-                                Background="{StaticResource ThemeBrand-brush}"
-                                BorderBrush="{StaticResource BorderStrong-brush}"
-                                BorderThickness="0"
-                                SnapsToDevicePixels="True">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ThemeBrand-brush}" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ThemeBrand-brush}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="10,0,10,0" />
         </Style>
         <Style x:Key="MetadataDialogFooterButtonStyle" TargetType="Button">
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -194,11 +78,11 @@
         <Border Grid.Row="0"
                 Margin="{StaticResource Bottom10-thk}"
                 Background="{StaticResource ControlBackgroundAlt-brush}"
-                BorderBrush="{StaticResource BorderMuted-brush}"
-                BorderThickness="1"
+                BorderThickness="0"
                 CornerRadius="{StaticResource Sm-cr}"
                 ClipToBounds="True">
-            <Grid>
+            <Grid UseLayoutRounding="True"
+                  Background="{StaticResource ControlBackgroundAlt-brush}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
@@ -215,32 +99,37 @@
                         Click="SectionButton_Click" />
                 <Button x:Name="PlaybackSectionButton"
                         Grid.Column="1"
+                        Margin="-1,0,0,0"
                         Content="Playback"
                         Style="{StaticResource SectionSegmentInactiveStyle}"
                         Tag="Playback"
                         Click="SectionButton_Click" />
                 <Button x:Name="LibrarySectionButton"
                         Grid.Column="2"
+                        Margin="-1,0,0,0"
                         Content="Library"
                         Style="{StaticResource SectionSegmentInactiveStyle}"
                         Tag="Library"
                         Click="SectionButton_Click" />
                 <Button x:Name="KeyboardShortcutsSectionButton"
                         Grid.Column="3"
+                        Margin="-1,0,0,0"
                         Content="Shortcuts"
                         Style="{StaticResource SectionSegmentInactiveStyle}"
                         Tag="KeyboardShortcuts"
                         Click="SectionButton_Click" />
                 <Button x:Name="ThemeSectionButton"
                         Grid.Column="4"
+                        Margin="-1,0,0,0"
                         Content="Theme/UI"
                         Style="{StaticResource SectionSegmentInactiveStyle}"
                         Tag="Theme"
                         Click="SectionButton_Click" />
                 <Button x:Name="AboutSectionButton"
                         Grid.Column="5"
+                        Margin="-1,0,0,0"
                         Content="About"
-                        Style="{StaticResource SectionSegmentInactiveLastStyle}"
+                        Style="{StaticResource SectionSegmentInactiveStyle}"
                         Tag="About"
                         Click="SectionButton_Click" />
             </Grid>
@@ -268,41 +157,69 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0"
                                        Grid.Column="0"
-                                       Grid.RowSpan="2"
+                                       Grid.RowSpan="3"
                                        Text="Updates"
                                        Style="{StaticResource FieldLabelStyle}"
                                        VerticalAlignment="Top" />
 
-                            <CheckBox Grid.Row="0"
+                            <CheckBox x:Name="GeneralCheckForUpdatesCheckBox"
+                                      Grid.Row="0"
                                       Grid.Column="1"
                                       Content="Check for updates"
                                       Foreground="{StaticResource TextPrimary-brush}"
                                       Margin="{StaticResource FieldRowGap-thk}"
                                       VerticalAlignment="Center" />
 
-                            <CheckBox Grid.Row="1"
+                            <CheckBox x:Name="GeneralAutoInstallUpdatesCheckBox"
+                                      Grid.Row="1"
                                       Grid.Column="1"
                                       Content="Automatically install updates"
                                       Foreground="{StaticResource TextPrimary-brush}"
                                       Margin="{StaticResource FieldRowGap-thk}"
                                       VerticalAlignment="Center" />
 
-                            <Separator Grid.Row="2"
+                            <CheckBox x:Name="GeneralLaunchAfterUpdateCheckBox"
+                                      Grid.Row="2"
+                                      Grid.Column="1"
+                                      Content="Launch musicApp after updating"
+                                      Foreground="{StaticResource TextPrimary-brush}"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      VerticalAlignment="Center" />
+
+                            <Separator Grid.Row="3"
                                        Grid.ColumnSpan="2"
                                        Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
                                        Background="{StaticResource BorderDefault-brush}" />
 
-                            <TextBlock Grid.Row="3"
+                            <TextBlock Grid.Row="4"
+                                       Grid.Column="0"
+                                       Text="Language"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       VerticalAlignment="Center" />
+                            <ComboBox x:Name="GeneralLanguageComboBox"
+                                      Grid.Row="4"
+                                      Grid.Column="1"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      Style="{StaticResource DarkFieldComboBoxStyle}"
+                                      HorizontalAlignment="Stretch" />
+
+                            <Separator Grid.Row="5"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="6"
                                        Grid.Column="0"
                                        Text="Import/Export Settings"
                                        Style="{StaticResource FieldLabelStyle}"
                                        TextWrapping="Wrap"
                                        VerticalAlignment="Center" />
-                            <StackPanel Grid.Row="3"
+                            <StackPanel Grid.Row="6"
                                         Grid.Column="1"
                                         Orientation="Horizontal"
                                         Margin="{StaticResource FieldRowGap-thk}"
@@ -313,25 +230,6 @@
                                 <Button Content="Export"
                                         Style="{StaticResource SettingsGeneralActionButtonStyle}" />
                             </StackPanel>
-
-                            <Separator Grid.Row="4"
-                                       Grid.ColumnSpan="2"
-                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
-                                       Background="{StaticResource BorderDefault-brush}" />
-
-                            <TextBlock Grid.Row="5"
-                                       Grid.Column="0"
-                                       Text="Language"
-                                       Style="{StaticResource FieldLabelStyle}"
-                                       VerticalAlignment="Center" />
-                            <ComboBox Grid.Row="5"
-                                      Grid.Column="1"
-                                      Margin="{StaticResource FieldRowGap-thk}"
-                                      Style="{StaticResource DarkFieldComboBoxStyle}"
-                                      HorizontalAlignment="Stretch">
-                                <ComboBoxItem Content="English (System)" IsSelected="True" />
-                                <ComboBoxItem Content="English (United States)" />
-                            </ComboBox>
                         </Grid>
                     </ScrollViewer>
                 </Grid>
@@ -378,28 +276,62 @@
 
                             <TextBlock Grid.Row="2"
                                        Grid.Column="0"
-                                       Text="Cross-fade songs"
+                                       Text="Volume normalization"
                                        Style="{StaticResource FieldLabelStyle}"
                                        TextWrapping="Wrap"
-                                       VerticalAlignment="Center" />
+                                       VerticalAlignment="Top"
+                                       Margin="{StaticResource Top2-thk}" />
                             <StackPanel Grid.Row="2"
                                         Grid.Column="1"
-                                        Orientation="Horizontal"
                                         Margin="{StaticResource FieldRowGap-thk}"
-                                        VerticalAlignment="Center">
-                                <Slider Minimum="0"
-                                        Maximum="15"
-                                        Value="0"
-                                        Width="{StaticResource SettingsPlaybackCrossfadeSliderWidth-size}"
-                                        Height="{StaticResource SettingsPlaybackSliderHeight-size}"
-                                        VerticalAlignment="Center"
-                                        IsMoveToPointEnabled="True"
-                                        Style="{StaticResource SettingsPlaybackSliderStyle}" />
-                                <TextBlock Text="0s"
-                                           Foreground="{StaticResource TextTertiary-brush}"
-                                           FontSize="12"
-                                           VerticalAlignment="Center"
-                                           Margin="{StaticResource Left10-thk}" />
+                                        VerticalAlignment="Top">
+                                <Grid VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox x:Name="PlaybackVolumeNormalizationCheckBox"
+                                              Grid.Column="0"
+                                              Content=""
+                                              Foreground="{StaticResource TextPrimary-brush}"
+                                              VerticalAlignment="Center"
+                                              Checked="PlaybackVolumeNormalizationCheckBox_Changed"
+                                              Unchecked="PlaybackVolumeNormalizationCheckBox_Changed" />
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center">
+                                        <Button x:Name="PlaybackScanAllLoudnormButton"
+                                                Content="Scan all"
+                                                Style="{StaticResource SettingsGeneralActionButtonStyle}"
+                                                Click="PlaybackScanAllLoudnorm_Click" />
+                                        <Button x:Name="PlaybackClearLoudnormCacheButton"
+                                                Margin="{StaticResource Left8-thk}"
+                                                Content="Clear Cache"
+                                                Style="{StaticResource SettingsGeneralActionButtonStyle}"
+                                                Click="PlaybackClearLoudnormCache_Click" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock x:Name="PlaybackLoudnormCacheStatsText"
+                                           Margin="{StaticResource Top8-thk}"
+                                           Style="{StaticResource SettingsPlaybackAuxTextStyle}"
+                                           ToolTip="Placeholder: cached count / audio files in library (normalization not active yet)"
+                                           Text="0/0" />
+                                <ProgressBar x:Name="PlaybackLoudnormScanProgressBar"
+                                             Height="{StaticResource ProgressBarThin5-size}"
+                                             Margin="{StaticResource Top10-thk}"
+                                             Minimum="0"
+                                             Maximum="100"
+                                             Value="0"
+                                             Visibility="Collapsed"
+                                             Foreground="{StaticResource ThemeBrand-brush}"
+                                             Background="{StaticResource SurfaceLowered-brush}"
+                                             BorderThickness="0" />
+                                <TextBlock x:Name="PlaybackLoudnormScanStatusText"
+                                           Margin="{StaticResource Top6-thk}"
+                                           Visibility="Collapsed"
+                                           Style="{StaticResource SettingsPlaybackAuxTextStyle}"
+                                           TextWrapping="Wrap" />
                             </StackPanel>
 
                             <Separator Grid.Row="3"
@@ -409,16 +341,46 @@
 
                             <TextBlock Grid.Row="4"
                                        Grid.Column="0"
-                                       Text="Volume normalization"
+                                       Text="Cross-fade songs"
                                        Style="{StaticResource FieldLabelStyle}"
                                        TextWrapping="Wrap"
                                        VerticalAlignment="Center" />
-                            <CheckBox Grid.Row="4"
-                                      Grid.Column="1"
-                                      Content=""
-                                      Foreground="{StaticResource TextPrimary-brush}"
-                                      Margin="{StaticResource FieldRowGap-thk}"
-                                      VerticalAlignment="Center" />
+                            <StackPanel Grid.Row="4"
+                                        Grid.Column="1"
+                                        Margin="{StaticResource FieldRowGap-thk}"
+                                        VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Start"
+                                               Style="{StaticResource SettingsPlaybackCrossfadeLabelStyle}" />
+                                    <Slider x:Name="PlaybackCrossfadeSlider"
+                                            Minimum="0"
+                                            Maximum="15"
+                                            TickFrequency="1"
+                                            IsSnapToTickEnabled="True"
+                                            Value="0"
+                                            Width="{StaticResource SettingsPlaybackCrossfadeSliderWidth-size}"
+                                            VerticalAlignment="Center"
+                                            IsMoveToPointEnabled="True"
+                                            Style="{StaticResource CustomVolumeSlider}"
+                                            Foreground="{StaticResource AccentPrimary-brush}"
+                                            Background="Transparent" />
+                                    <TextBlock Style="{StaticResource SettingsPlaybackAuxTextStyle}"
+                                               VerticalAlignment="Center"
+                                               Margin="{StaticResource Left10-thk}"
+                                               Text="{Binding ElementName=PlaybackCrossfadeSlider, Path=Value, Converter={StaticResource CrossfadeStartSecondsLabelConverter}}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="{StaticResource Top8-thk}">
+                                    <TextBlock Text="Length"
+                                               Style="{StaticResource SettingsPlaybackCrossfadeLabelStyle}" />
+                                    <TextBox x:Name="PlaybackCrossfadeRampTextBox"
+                                             Style="{StaticResource DarkFieldTextBoxStyle}"
+                                             LostFocus="PlaybackCrossfadeRampTextBox_LostFocus" />
+                                    <TextBlock Text="s"
+                                               Style="{StaticResource SettingsPlaybackAuxTextStyle}"
+                                               VerticalAlignment="Center"
+                                               Margin="{StaticResource Left8-thk}" />
+                                </StackPanel>
+                            </StackPanel>
 
                             <Separator Grid.Row="5"
                                        Grid.ColumnSpan="2"
@@ -427,35 +389,48 @@
 
                             <TextBlock Grid.Row="6"
                                        Grid.Column="0"
-                                       Text="Multiple audio backends"
+                                       Text="Audio backend"
                                        Style="{StaticResource FieldLabelStyle}"
                                        TextWrapping="Wrap"
-                                       VerticalAlignment="Center" />
-                            <ComboBox Grid.Row="6"
-                                      Grid.Column="1"
-                                      Margin="{StaticResource FieldRowGap-thk}"
-                                      Style="{StaticResource DarkFieldComboBoxStyle}"
-                                      HorizontalAlignment="Stretch">
-                                <ComboBoxItem Content="WASAPI (exclusive)" />
-                                <ComboBoxItem Content="WASAPI (shared)" IsSelected="True" />
-                                <ComboBoxItem Content="DirectSound" />
-                                <ComboBoxItem Content="WaveOut" />
-                            </ComboBox>
+                                       VerticalAlignment="Top"
+                                       Margin="{StaticResource Top4-thk}" />
+                            <StackPanel Grid.Row="6"
+                                        Grid.Column="1"
+                                        Margin="{StaticResource FieldRowGap-thk}">
+                                <ComboBox x:Name="PlaybackAudioBackendComboBox"
+                                          Style="{StaticResource DarkFieldComboBoxStyle}"
+                                          HorizontalAlignment="Stretch"
+                                          SelectionChanged="PlaybackAudioInfrastructure_Changed">
+                                    <ComboBoxItem Content="WASAPI (exclusive)" Tag="WasapiExclusive" />
+                                    <ComboBoxItem Content="WASAPI (shared) - Default" Tag="WasapiShared" />
+                                    <ComboBoxItem Content="DirectSound" Tag="DirectSound" />
+                                    <ComboBoxItem Content="WaveOut" Tag="WaveOut" />
+                                </ComboBox>
+                                <CheckBox x:Name="PlaybackSoftwareVolumeCheckBox"
+                                          Margin="{StaticResource Top8-thk}"
+                                          Content="Control system volume"
+                                          Foreground="{StaticResource TextPrimary-brush}"
+                                          ToolTip="Makes the in-app volume slider control volume system-wide"
+                                          Checked="PlaybackAudioInfrastructure_Changed"
+                                          Unchecked="PlaybackAudioInfrastructure_Changed" />
+                            </StackPanel>
 
                             <TextBlock Grid.Row="7"
                                        Grid.Column="0"
                                        Text="Sample rate"
                                        Style="{StaticResource FieldLabelStyle}"
                                        VerticalAlignment="Center" />
-                            <ComboBox Grid.Row="7"
+                            <ComboBox x:Name="PlaybackOutputSampleRateComboBox"
+                                      Grid.Row="7"
                                       Grid.Column="1"
                                       Margin="{StaticResource FieldRowGap-thk}"
                                       Style="{StaticResource DarkFieldComboBoxStyle}"
-                                      HorizontalAlignment="Stretch">
-                                <ComboBoxItem Content="44100 Hz" />
-                                <ComboBoxItem Content="48000 Hz" IsSelected="True" />
-                                <ComboBoxItem Content="88200 Hz" />
-                                <ComboBoxItem Content="96000 Hz" />
+                                      HorizontalAlignment="Stretch"
+                                      SelectionChanged="PlaybackOutputSampleRateComboBox_SelectionChanged">
+                                <ComboBoxItem Content="44100 Hz" Tag="44100" />
+                                <ComboBoxItem Content="48000 Hz" Tag="48000" />
+                                <ComboBoxItem Content="88200 Hz" Tag="88200" />
+                                <ComboBoxItem Content="96000 Hz" Tag="96000" />
                             </ComboBox>
 
                             <TextBlock Grid.Row="8"
@@ -463,14 +438,16 @@
                                        Text="Bits per sample"
                                        Style="{StaticResource FieldLabelStyle}"
                                        VerticalAlignment="Center" />
-                            <ComboBox Grid.Row="8"
+                            <ComboBox x:Name="PlaybackOutputBitsComboBox"
+                                      Grid.Row="8"
                                       Grid.Column="1"
                                       Margin="{StaticResource FieldRowGap-thk}"
                                       Style="{StaticResource DarkFieldComboBoxStyle}"
-                                      HorizontalAlignment="Stretch">
-                                <ComboBoxItem Content="16-bit" IsSelected="True" />
-                                <ComboBoxItem Content="24-bit" />
-                                <ComboBoxItem Content="32-bit float" />
+                                      HorizontalAlignment="Stretch"
+                                      SelectionChanged="PlaybackOutputBitsComboBox_SelectionChanged">
+                                <ComboBoxItem Content="16-bit" Tag="Pcm16" />
+                                <ComboBoxItem Content="24-bit" Tag="Pcm24" />
+                                <ComboBoxItem Content="32-bit float" Tag="IeeeFloat" />
                             </ComboBox>
                         </Grid>
                     </ScrollViewer>
@@ -491,13 +468,223 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0"
+                            <Grid Grid.Row="0"
+                                  Grid.Column="0"
+                                  Grid.ColumnSpan="2"
+                                  Margin="{StaticResource FieldRowGap-thk}"
+                                  VerticalAlignment="Top">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="3*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="0"
+                                           Text="Library actions"
+                                           Style="{StaticResource FieldLabelStyle}"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Top"
+                                           HorizontalAlignment="Left"
+                                           Margin="{StaticResource Top2-thk}" />
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="1"
+                                           Text="Show in sidebar"
+                                           Style="{StaticResource FieldLabelStyle}"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Top"
+                                           HorizontalAlignment="Left"
+                                           Margin="{StaticResource Top2-thk}" />
+
+                                <Button x:Name="LibraryAddMusicButton"
+                                        Grid.Row="1"
+                                        Grid.Column="0"
+                                        Style="{StaticResource SettingsLibraryActionButtonStyle}"
+                                        Margin="{StaticResource SettingsLibraryActionButtonRowMargin-thk}"
+                                        Click="LibraryAddMusicButton_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="FolderPlus" VerticalAlignment="Center" Margin="{StaticResource Right10-thk}" />
+                                        <TextBlock Text="Add Music" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <CheckBox x:Name="SidebarAddMusicCheckBox"
+                                          Grid.Row="1"
+                                          Grid.Column="1"
+                                          Foreground="{StaticResource TextPrimary-brush}"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Left"
+                                          Margin="{StaticResource Bottom4-thk}"
+                                          IsChecked="False" />
+
+                                <Button x:Name="LibraryRescanLibraryButton"
+                                        Grid.Row="2"
+                                        Grid.Column="0"
+                                        Style="{StaticResource SettingsLibraryActionButtonStyle}"
+                                        Margin="{StaticResource SettingsLibraryActionButtonRowMargin-thk}"
+                                        Click="LibraryRescanLibraryButton_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="Refresh" VerticalAlignment="Center" Margin="{StaticResource Right10-thk}" />
+                                        <TextBlock Text="Re-Scan Library" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <CheckBox x:Name="SidebarRescanLibraryCheckBox"
+                                          Grid.Row="2"
+                                          Grid.Column="1"
+                                          Foreground="{StaticResource TextPrimary-brush}"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Left"
+                                          Margin="{StaticResource Bottom4-thk}"
+                                          IsChecked="False" />
+
+                                <Button x:Name="LibraryRemoveMusicButton"
+                                        Grid.Row="3"
+                                        Grid.Column="0"
+                                        Style="{StaticResource SettingsLibraryActionButtonStyle}"
+                                        Margin="{StaticResource SettingsLibraryActionButtonRowMargin-thk}"
+                                        Click="LibraryRemoveMusicButton_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="FolderRemove" VerticalAlignment="Center" Margin="{StaticResource Right10-thk}" />
+                                        <TextBlock Text="Remove Music" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <CheckBox x:Name="SidebarRemoveMusicCheckBox"
+                                          Grid.Row="3"
+                                          Grid.Column="1"
+                                          Foreground="{StaticResource TextPrimary-brush}"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Left"
+                                          Margin="{StaticResource Bottom4-thk}"
+                                          IsChecked="False" />
+
+                                <Button x:Name="LibraryClearSettingsButton"
+                                        Grid.Row="4"
+                                        Grid.Column="0"
+                                        Style="{StaticResource SettingsLibraryActionButtonStyle}"
+                                        Margin="{StaticResource SettingsLibraryActionButtonLastRowMargin-thk}"
+                                        Click="LibraryClearSettingsButton_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="DeleteSweep" VerticalAlignment="Center" Margin="{StaticResource Right10-thk}" />
+                                        <TextBlock Text="Clear Settings" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <CheckBox x:Name="SidebarClearSettingsCheckBox"
+                                          Grid.Row="4"
+                                          Grid.Column="1"
+                                          Foreground="{StaticResource TextPrimary-brush}"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Left"
+                                          IsChecked="False" />
+                            </Grid>
+
+                            <Separator Grid.Row="1"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <Grid Grid.Row="2"
+                                  Grid.Column="0"
+                                  Grid.ColumnSpan="2"
+                                  Margin="{StaticResource FieldRowGap-thk}"
+                                  VerticalAlignment="Top">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0"
+                                           Text="File storage"
+                                           Style="{StaticResource FieldLabelStyle}"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Top"
+                                           HorizontalAlignment="Left"
+                                           Margin="{StaticResource Top2-thk}" />
+
+                                <Grid Grid.Row="1"
+                                      Margin="{StaticResource Top10-thk}"
+                                      HorizontalAlignment="Left">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0"
+                                               Grid.Column="0"
+                                               VerticalAlignment="Top"
+                                               Text="Music Library: "
+                                               Style="{StaticResource FieldLabelStyle}" />
+                                    <StackPanel Grid.Row="0"
+                                                Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Top"
+                                                Margin="{StaticResource FieldRowGap-thk}">
+                                        <TextBox x:Name="FileStorageMusicLibraryPathText"
+                                                 HorizontalAlignment="Left"
+                                                 MaxWidth="{Binding ViewportWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer, Mode=FindAncestor}}"
+                                                 Style="{StaticResource FileStoragePathReadOnlyTextBoxStyle}" />
+                                        <Button x:Name="FileStorageOpenMusicLibraryButton"
+                                                VerticalAlignment="Top"
+                                                Margin="{StaticResource Left8NudgeUp4-thk}"
+                                                Style="{StaticResource AboutOpenFolderIconButtonStyle}"
+                                                ToolTip="Open in File Explorer"
+                                                Click="FileStorageOpenMusicLibrary_Click">
+                                            <materialDesign:PackIcon Kind="FolderArrowRight"
+                                                                     Width="18"
+                                                                     Height="18"
+                                                                     Foreground="{StaticResource TextSecondary-brush}" />
+                                        </Button>
+                                    </StackPanel>
+
+                                    <TextBlock Grid.Row="1"
+                                               Grid.Column="0"
+                                               VerticalAlignment="Top"
+                                               Text="Settings: "
+                                               Style="{StaticResource FieldLabelStyle}" />
+                                    <StackPanel Grid.Row="1"
+                                                Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Top"
+                                                Margin="{StaticResource FieldRowGap-thk}">
+                                        <TextBox x:Name="FileStorageSettingsPathText"
+                                                 HorizontalAlignment="Left"
+                                                 MaxWidth="{Binding ViewportWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer, Mode=FindAncestor}}"
+                                                 Style="{StaticResource FileStoragePathReadOnlyTextBoxStyle}" />
+                                        <Button x:Name="FileStorageOpenSettingsPathButton"
+                                                VerticalAlignment="Top"
+                                                Margin="{StaticResource Left8NudgeUp4-thk}"
+                                                Style="{StaticResource AboutOpenFolderIconButtonStyle}"
+                                                ToolTip="Open in File Explorer"
+                                                Click="FileStorageOpenSettingsPath_Click">
+                                            <materialDesign:PackIcon Kind="FolderArrowRight"
+                                                                     Width="18"
+                                                                     Height="18"
+                                                                     Foreground="{StaticResource TextSecondary-brush}" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+
+                            <Separator Grid.Row="3"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="4"
                                        Grid.Column="0"
                                        Text="Library import/export"
                                        Style="{StaticResource FieldLabelStyle}"
                                        TextWrapping="Wrap"
                                        VerticalAlignment="Center" />
-                            <StackPanel Grid.Row="0"
+                            <StackPanel Grid.Row="4"
                                         Grid.Column="1"
                                         Orientation="Horizontal"
                                         Margin="{StaticResource FieldRowGap-thk}"
@@ -508,42 +695,6 @@
                                 <Button Content="Export"
                                         Style="{StaticResource SettingsGeneralActionButtonStyle}" />
                             </StackPanel>
-
-                            <Separator Grid.Row="1"
-                                       Grid.ColumnSpan="2"
-                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
-                                       Background="{StaticResource BorderDefault-brush}" />
-
-                            <TextBlock Grid.Row="2"
-                                       Grid.Column="0"
-                                       Text="Media storage"
-                                       Style="{StaticResource FieldLabelStyle}"
-                                       TextWrapping="Wrap"
-                                       VerticalAlignment="Center" />
-                            <Button Grid.Row="2"
-                                    Grid.Column="1"
-                                    Content="Change media storage location"
-                                    HorizontalAlignment="Left"
-                                    Margin="{StaticResource FieldRowGap-thk}"
-                                    Style="{StaticResource SettingsGeneralActionButtonStyle}" />
-
-                            <Separator Grid.Row="3"
-                                       Grid.ColumnSpan="2"
-                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
-                                       Background="{StaticResource BorderDefault-brush}" />
-
-                            <TextBlock Grid.Row="4"
-                                       Grid.Column="0"
-                                       Text="Settings storage"
-                                       Style="{StaticResource FieldLabelStyle}"
-                                       TextWrapping="Wrap"
-                                       VerticalAlignment="Center" />
-                            <Button Grid.Row="4"
-                                    Grid.Column="1"
-                                    Content="Change settings storage location"
-                                    HorizontalAlignment="Left"
-                                    Margin="{StaticResource FieldRowGap-thk}"
-                                    Style="{StaticResource SettingsGeneralActionButtonStyle}" />
                         </Grid>
                     </ScrollViewer>
                 </Grid>
@@ -556,8 +707,6 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -645,24 +794,6 @@
                                 <ComboBoxItem Content="Import..." />
                                 <ComboBoxItem Content="Export..." />
                             </ComboBox>
-
-                            <Separator Grid.Row="7"
-                                       Grid.ColumnSpan="2"
-                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
-                                       Background="{StaticResource BorderDefault-brush}" />
-
-                            <TextBlock Grid.Row="8"
-                                       Grid.Column="0"
-                                       Text="Donation links"
-                                       Style="{StaticResource FieldLabelStyle}"
-                                       TextWrapping="Wrap"
-                                       VerticalAlignment="Center" />
-                            <CheckBox Grid.Row="8"
-                                      Grid.Column="1"
-                                      Content="Hide donation links"
-                                      Foreground="{StaticResource TextPrimary-brush}"
-                                      Margin="{StaticResource FieldRowGap-thk}"
-                                      VerticalAlignment="Center" />
                         </Grid>
                     </ScrollViewer>
                 </Grid>
@@ -741,7 +872,7 @@
                             </Grid.ColumnDefinitions>
 
                             <Image Grid.Column="0"
-                                   Source="/Resources/icon/MusicApp Icon.png"
+                                   Source="/Resources/icon/musicApp Icon.png"
                                    Width="{StaticResource AboutIconSize-size}"
                                    Height="{StaticResource AboutIconSize-size}"
                                    Margin="{StaticResource Right15-thk}"
@@ -752,61 +883,116 @@
                             <StackPanel Grid.Column="1"
                                         VerticalAlignment="Center"
                                         HorizontalAlignment="Left">
-                                <TextBlock Text="musicApp"
-                                           Style="{StaticResource AboutTitleStyle}" />
-                                <TextBlock x:Name="AboutVersionSubtitleText"
-                                           Margin="{StaticResource Bottom10-thk}"
-                                           Style="{StaticResource AboutVersionSubtitleStyle}" />
-                                <TextBlock Style="{StaticResource AboutLinkLineStyle}">
-                                    <Hyperlink NavigateUri="https://github.com/fosterbarnes/musicApp"
-                                               RequestNavigate="AboutHyperlink_RequestNavigate"
-                                               Foreground="{StaticResource TextLinkStrong-brush}">
-                                        github.com/fosterbarnes/musicApp
-                                    </Hyperlink>
-                                </TextBlock>
-                                <TextBlock Style="{StaticResource AboutLinkLineStyle}">
-                                    <Hyperlink NavigateUri="https://github.com/fosterbarnes/musicApp/issues/new"
-                                               RequestNavigate="AboutHyperlink_RequestNavigate"
-                                               Foreground="{StaticResource TextLinkStrong-brush}">
-                                        github.com/fosterbarnes/musicApp/issues/new
-                                    </Hyperlink>
-                                </TextBlock>
-                                <TextBlock Margin="{StaticResource Bottom8-thk}"
-                                           Style="{StaticResource AboutLinkLineStyle}">
-                                    <Hyperlink NavigateUri="https://buymeacoffee.com/fosterbarnes"
-                                               RequestNavigate="AboutHyperlink_RequestNavigate"
-                                               Foreground="{StaticResource TextLinkStrong-brush}">
-                                        buymeacoffee.com/fosterbarnes
-                                    </Hyperlink>
-                                </TextBlock>
+                                <RichTextBox x:Name="AboutTitleRichTextBox"
+                                             Style="{StaticResource AboutTitleLinkRichTextBoxStyle}">
+                                    <FlowDocument PagePadding="0" TextAlignment="Left">
+                                        <Paragraph Margin="0" />
+                                    </FlowDocument>
+                                </RichTextBox>
+                                <RichTextBox x:Name="AboutVersionSubtitleText"
+                                             Style="{StaticResource AboutVersionSubtitleLinkRichTextBoxStyle}" />
+                                <RichTextBox Style="{StaticResource AboutLinkReadOnlyRichTextBoxStyle}">
+                                    <FlowDocument PagePadding="0" TextAlignment="Left">
+                                        <Paragraph Margin="0">
+                                            <Hyperlink Style="{StaticResource AboutHyperlinkStyle}"
+                                                       NavigateUri="https://github.com/fosterbarnes/musicApp"
+                                                       RequestNavigate="AboutHyperlink_RequestNavigate"
+                                                       Foreground="{StaticResource TextLinkStrong-brush}">
+                                                github.com/fosterbarnes/musicApp
+                                            </Hyperlink>
+                                        </Paragraph>
+                                    </FlowDocument>
+                                </RichTextBox>
+                                <RichTextBox Style="{StaticResource AboutLinkReadOnlyRichTextBoxStyle}">
+                                    <FlowDocument PagePadding="0" TextAlignment="Left">
+                                        <Paragraph Margin="0">
+                                            <Hyperlink Style="{StaticResource AboutHyperlinkStyle}"
+                                                       NavigateUri="https://github.com/fosterbarnes/musicApp/issues/new"
+                                                       RequestNavigate="AboutHyperlink_RequestNavigate"
+                                                       Foreground="{StaticResource TextLinkStrong-brush}">
+                                                github.com/fosterbarnes/musicApp/issues/new
+                                            </Hyperlink>
+                                        </Paragraph>
+                                    </FlowDocument>
+                                </RichTextBox>
 
                                 <Grid Margin="{StaticResource Top10-thk}">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="{StaticResource InfoMetadataLabelColumnWidth}" />
+                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
                                     <TextBlock Grid.Row="0"
                                                Grid.Column="0"
-                                               Text="Install Location"
+                                               VerticalAlignment="Top"
+                                               Text="Install: "
                                                Style="{StaticResource FieldLabelStyle}" />
-                                    <TextBlock x:Name="AboutInstallLocationText"
-                                               Grid.Row="0"
-                                               Grid.Column="1"
-                                               Style="{StaticResource FileInfoValueStyle}" />
+                                    <RichTextBox x:Name="AboutInstallLocationText"
+                                                 Grid.Row="0"
+                                                 Grid.Column="1"
+                                                 Margin="{StaticResource FieldRowGap-thk}"
+                                                 Style="{StaticResource AboutPathReadOnlyRichTextBoxStyle}" />
+                                    <Button x:Name="AboutOpenInstallLocationButton"
+                                            Grid.Row="0"
+                                            Grid.Column="2"
+                                            Margin="{StaticResource Left8NudgeUp4-thk}"
+                                            Style="{StaticResource AboutOpenFolderIconButtonStyle}"
+                                            ToolTip="Open in File Explorer"
+                                            Click="AboutOpenInstallLocation_Click">
+                                        <materialDesign:PackIcon Kind="FolderArrowRight"
+                                                                 Width="18"
+                                                                 Height="18"
+                                                                 Foreground="{StaticResource TextSecondary-brush}" />
+                                    </Button>
 
                                     <TextBlock Grid.Row="1"
                                                Grid.Column="0"
-                                               Text="Settings Location"
+                                               VerticalAlignment="Top"
+                                               Text="Settings: "
                                                Style="{StaticResource FieldLabelStyle}" />
-                                    <TextBlock x:Name="AboutSettingsLocationText"
-                                               Grid.Row="1"
-                                               Grid.Column="1"
-                                               Style="{StaticResource FileInfoValueStyle}" />
+                                    <RichTextBox x:Name="AboutSettingsLocationText"
+                                                 Grid.Row="1"
+                                                 Grid.Column="1"
+                                                 Margin="{StaticResource FieldRowGap-thk}"
+                                                 Style="{StaticResource AboutPathReadOnlyRichTextBoxStyle}" />
+                                    <Button x:Name="AboutOpenSettingsLocationButton"
+                                            Grid.Row="1"
+                                            Grid.Column="2"
+                                            Margin="{StaticResource Left8NudgeUp4-thk}"
+                                            Style="{StaticResource AboutOpenFolderIconButtonStyle}"
+                                            ToolTip="Open in File Explorer"
+                                            Click="AboutOpenSettingsLocation_Click">
+                                        <materialDesign:PackIcon Kind="FolderArrowRight"
+                                                                 Width="18"
+                                                                 Height="18"
+                                                                 Foreground="{StaticResource TextSecondary-brush}" />
+                                    </Button>
+
+                                    <StackPanel Grid.Row="2"
+                                                Grid.Column="0"
+                                                Grid.ColumnSpan="3"
+                                                Style="{StaticResource AboutCreditLineStackPanelStyle}">
+                                        <TextBlock Style="{StaticResource AboutCreditLinePartTextBlockStyle}">
+                                            <Run Text="made by "
+                                                 Foreground="{StaticResource TextSecondary-brush}" />
+                                        </TextBlock>
+                                        <TextBlock Style="{StaticResource AboutCreditLinePartTextBlockStyle}"
+                                                   Margin="0,0,0,0"
+                                                   Panel.ZIndex="1">
+                                            <Hyperlink Style="{StaticResource AboutHyperlinkStyle}"
+                                                       NavigateUri="https://github.com/fosterbarnes/musicApp"
+                                                       Click="AboutCreditLineHyperlink_Click"
+                                                       Foreground="{StaticResource TextLinkStrong-brush}">
+                                                fosterbarnes
+                                            </Hyperlink>
+                                        </TextBlock>
+                                    </StackPanel>
                                 </Grid>
                             </StackPanel>
                         </Grid>

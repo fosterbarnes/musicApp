@@ -20,6 +20,7 @@
     <SolidColorBrush x:Key="BorderSubtle-brush" Color="#3F3F3F"/>
     <SolidColorBrush x:Key="BorderDefault-brush" Color="#404040"/>
     <SolidColorBrush x:Key="BorderStrong-brush" Color="#505050"/>
+    <SolidColorBrush x:Key="SectionSegmentSelectedBorder-brush" Color="#8363b0"/>
     <SolidColorBrush x:Key="BorderMuted-brush" Color="#464646"/>
     <SolidColorBrush x:Key="Divider-brush" Color="#525252"/>
     <SolidColorBrush x:Key="FieldFocusBorder-brush" Color="#5f5585"/>
@@ -38,7 +39,7 @@
     <SolidColorBrush x:Key="TextSelection-brush" Color="#c0c0c0"/>
     <SolidColorBrush x:Key="Danger-brush" Color="#E81123"/>
 
-    <!-- Opacity (sys:Double 0–1; *-opacity suffix — same pattern as Spacing.xaml scalars) -->
+    <!-- Opacity (sys:Double 0-1; *-opacity suffix - same pattern as Spacing.xaml scalars) -->
     <sys:Double x:Key="TextSelection-opacity">0.25</sys:Double>
 
     <!-- Text -->

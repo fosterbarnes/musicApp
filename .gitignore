@@ -5,6 +5,8 @@ musicApp Nightly Release.exe
 musicApp/.vs
 musicApp/bin
 musicApp/obj
+musicApp/.updater/bin
+musicApp/.updater/obj
 musicApp/.installer/Output/
 .vs/
 obj/

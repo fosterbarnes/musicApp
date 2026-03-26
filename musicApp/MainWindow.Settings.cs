@@ -1,15 +1,83 @@
-        using System;
-        using System.IO;
-        using System.Windows;
-        using MusicApp.Dialogs;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Windows;
+using musicApp.Dialogs;
+using musicApp.Helpers;
 
-namespace MusicApp
+namespace musicApp
 {
     public partial class MainWindow
     {
+        public void ApplyPlaybackPreferences()
+        {
+            try
+            {
+                var prefs = PreferencesManager.Instance.LoadPreferencesSync();
+                PreferencesManager.EnsureInitialized(prefs);
+                ApplyCrossfadePreferenceSeconds(prefs.Playback.CrossfadeSeconds);
+                ApplyCrossfadeRampSeconds(prefs.Playback.CrossfadeRampSeconds);
+
+                _cachedAudioBackend = prefs.Playback.AudioBackend;
+                _useSoftwareSessionVolume = prefs.Playback.UseSoftwareSessionVolume;
+                _cachedOutputSampleRateHz = prefs.Playback.OutputSampleRateHz;
+                _cachedOutputBits = prefs.Playback.OutputBits;
+
+                bool backendChanged = _playbackOutputPrefsSyncedOnce && _lastAppliedAudioBackend != _cachedAudioBackend;
+                bool volModeChanged = _playbackOutputPrefsSyncedOnce && _lastAppliedUseSoftwareSessionVolume != _useSoftwareSessionVolume;
+                bool sampleRateChanged = _playbackOutputPrefsSyncedOnce &&
+                    _lastAppliedOutputSampleRateHz != _cachedOutputSampleRateHz;
+                bool outputBitsChanged = _playbackOutputPrefsSyncedOnce && _lastAppliedOutputBits != _cachedOutputBits;
+
+                if ((backendChanged || volModeChanged || sampleRateChanged || outputBitsChanged) &&
+                    audioFileReader != null && currentTrack != null)
+                    RecreateAudioOutputForPreferencesChange();
+
+                _lastAppliedAudioBackend = _cachedAudioBackend;
+                _lastAppliedUseSoftwareSessionVolume = _useSoftwareSessionVolume;
+                _lastAppliedOutputSampleRateHz = _cachedOutputSampleRateHz;
+                _lastAppliedOutputBits = _cachedOutputBits;
+                _playbackOutputPrefsSyncedOnce = true;
+            }
+            catch
+            {
+                ApplyCrossfadePreferenceSeconds(0);
+                ApplyCrossfadeRampSeconds(0);
+            }
+        }
+
+        public List<string> CopyLibraryFilePathsForLoudnormStats()
+        {
+            return allTracks
+                .Where(t => !string.IsNullOrWhiteSpace(t.FilePath))
+                .Select(t => t.FilePath!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(p =>
+                {
+                    try { return File.Exists(p); }
+                    catch { return false; }
+                })
+                .ToList();
+        }
+
+        public void ApplySidebarPreferences()
+        {
+            var prefs = PreferencesManager.Instance.LoadPreferencesSync();
+            PreferencesManager.EnsureInitialized(prefs);
+            var s = prefs.Sidebar;
+            btnAddFolder.Visibility = s.ShowAddMusic ? Visibility.Visible : Visibility.Collapsed;
+            btnRescanLibrary.Visibility = s.ShowRescanLibrary ? Visibility.Visible : Visibility.Collapsed;
+            btnRemoveFolder.Visibility = s.ShowRemoveMusic ? Visibility.Visible : Visibility.Collapsed;
+            btnClearSettings.Visibility = s.ShowClearSettings ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public void RunClearSettingsFromSettings() => ClearSettings();
+
         private void UpdatePlaylistsView()
         {
-            // Intentionally left as placeholder for future playlist-specific refresh behavior.
+            if (playlistsViewControl != null)
+                playlistsViewControl.Playlists = playlists;
         }
 
         private void ClearSettings()
@@ -91,6 +159,9 @@ namespace MusicApp
                 progressBarFill.Visibility = Visibility.Collapsed;
                 progressBarFill.Width = 0;
                 UpdateStatusBar();
+
+                ApplySidebarPreferences();
+                ApplyPlaybackPreferences();
 
                 MessageDialog.Show(this, "Settings Cleared",
                     $"Successfully cleared {movedFiles} settings files.\n\n" +

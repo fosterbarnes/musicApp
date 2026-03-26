@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace MusicApp.Helpers
+namespace musicApp.Helpers
 {
     public static class LibraryPathHelper
     {

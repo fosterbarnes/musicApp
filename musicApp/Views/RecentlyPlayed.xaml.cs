@@ -1,6 +1,6 @@
 using System.Windows.Controls;
 
-namespace MusicApp.Views
+namespace musicApp.Views
 {
     public partial class RecentlyPlayedView : UserControl
     {

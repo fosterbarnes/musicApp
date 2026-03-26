@@ -38,7 +38,7 @@
 - ~~Popout album view with large album artwork and list of songs~~
 - ~~Sort by Artist/Album~~
 - ~~Album art size slider~~
-- ~~Album song selection flyout menu:~~
+- ~~Album song selection fly-out menu:~~
   - ~~Dynamically resizing columns~~
   - ~~Album length and song count info~~
   - ~~High quality album art~~
@@ -67,21 +67,21 @@
 - ~~List of queued songs in a scrollable, selectable list~~
 - Ability to re-order songs
 
-#### Add Music Folder
+#### Add Music
 - ~~Simple button to recursively scan a given folder, then add it to the library~~
-- Will most likely be moved to a library management window/menu
+- ~~Hidden by default, can be shown in main window (Settings > Playback)~~
 
 #### Re-Scan Library
 - ~~Simple button to re-scan the current library folder(s)~~
-- Will most likely be moved to a library management window/menu
+- ~~Hidden by default, can be shown in main window (Settings > Playback)~~
 
-#### Remove Music Folder
+#### Remove Music
 - ~~Simple button to remove a given folder from the library~~
-- Will most likely be moved to a library management window/menu
+- ~~Hidden by default, can be shown in main window (Settings > Playback)~~
 
 #### Clear Settings
 - ~~Simple button to clear all app settings and libraries~~
-- Will most likely be moved to a library management window/menu
+- ~~Hidden by default, can be shown in main window (Settings > Playback)~~
 
 
 ### Bottom Row
@@ -95,23 +95,52 @@
 ## Settings Menu
 
 ### General
-- Check for updates (tickbox)
-- Automatically install updates (tickbox)
-- Import/Export Settings (two buttons)
-- Language (dropdown)
+#### Updates
+- ~~Check for updates (tick-box)~~
+- ~~Automatically install updates (tick-box)~~
+- ~~Launch musicApp after updating (tick-box)~~
+
+#### Language
+- ~~Dropdown~~
+- Write translations and localization files
+
+#### Import/Export
+- ~~Import/Export Settings (two buttons)~~
+- Write settings file format and import/export logic
 
 ### Playback
-- EQ options, with options to create, import or export profiles (dropdown)
-- Cross-fade songs (slider)
-- Volume normalization (tickbox for now, slider later)
-- Multiple audio backends (dropdown)
-- Sample rate (dropdown)
-- Bits per sample (dropdown)
+#### EQ
+- Pre-made EQ options, with options to create, import or export profiles (dropdown)
+#### Volume normalization
+- ~~Tickbox (on/off)~~
+- Write code-behind
+- Scan all button to build normalization cache
+- Clear cache button
+
+#### Cross-fade songs
+- Start time (slider)
+- Length (text box)
+
+#### Audio
+- ~~Multiple audio backends (dropdown)~~
+- ~~Sample rate (dropdown)~~
+- ~~Bits per sample (dropdown)~~
 
 ### Library
+#### Actions
+- ~~Add Music~~
+- ~~Re-Scan Library~~
+- ~~Remove Music~~
+- ~~Clear Settings~~
+- ~~Tick-boxes for each to show in sidebar~~
+
+#### File Storage
+- ~~Music library location~~
+- ~~Settings location~~
+- Change media storage location
+
+#### Import/Export
 - Library import/export (two buttons)
-- Change media storage location (button)
-- Change settings storage location (button)
 
 ### Shortcuts
 - Scrollable grid view with each shortcut as an item in the list
@@ -121,13 +150,13 @@
 - Spacing, with options to create, import or export profiles (dropdown)
 - Size, with options to create, import or export profiles (dropdown)
 - List size, with options to create, import or export profiles (dropdown)
-- Toggle donation links (tickbox)
+- Toggle donation links (tick-box)
 
 ### About
-- ~~Version and other app info (e.g. musicApp v0.1.0 dollyShakeswerve)~~
+- ~~Version info (e.g. musicApp v0.1.0 dollyShakeswerve x64)~~
 - ~~Project link (https://github.com/fosterbarnes/musicApp)~~
 - ~~Issues link (https://github.com/fosterbarnes/musicApp/issues/new)~~
-- ~~Donation link (https://buymeacoffee.com/fosterbarnes)~~
+- Donation link (https://buymeacoffee.com/fosterbarnes)
 
 
 
@@ -248,6 +277,6 @@
 - Possible media server integration (primarily emby/jellyfin because that's what I use)
 
 #### Backend/Boring Stuff
-- Automatic updates integrated with GitHub releases
+- Automatic updates integrated with GitHub releases (WIP)
 - ~~Installer~~
 - ~~Option for portable version~~

@@ -9,9 +9,9 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using MaterialDesignThemes.Wpf;
 using NAudio.Wave;
-using MusicApp;
+using musicApp;
 
-namespace MusicApp.TitleBarPlus
+namespace musicApp.TitleBarPlus
 {
     public partial class TitleBar : System.Windows.Controls.UserControl
     {
@@ -28,10 +28,13 @@ namespace MusicApp.TitleBarPlus
         public event EventHandler<string>? SearchTextChanged;
         public event EventHandler<string>? ArtistNavigationRequested;
         public event EventHandler<string>? AlbumNavigationRequested;
+        /// <summary>Fired after the user commits a new position on the seek bar (drag release).</summary>
+        public event EventHandler? PlaybackPositionCommitted;
 
         // === Audio Playback State ===
-        private WaveOutEvent? waveOut;
+        private IWavePlayer? waveOut;
         private AudioFileReader? audioFileReader;
+        private bool _useSoftwareSessionVolume = true;
         private bool isPlaying = false;
         private bool isMuted = false;
         private double previousVolume = 50;
@@ -102,9 +105,7 @@ namespace MusicApp.TitleBarPlus
             {
                 sliderVolume.Value = Math.Max(0, Math.Min(VOLUME_MAX, value));
                 if (waveOut != null && !isMuted)
-                {
-                    SetWaveOutVolume(sliderVolume.Value);
-                }
+                    ApplyOutputVolumeFromUi(sliderVolume.Value);
             }
         }
 
@@ -262,9 +263,19 @@ namespace MusicApp.TitleBarPlus
         {
             try
             {
+                if (_searchDebounceTimer != null)
+                {
+                    _searchDebounceTimer.Tick -= SearchDebounceTimer_Tick;
+                    _searchDebounceTimer.Tick += SearchDebounceTimer_Tick;
+                }
+
+                if (seekBarTimer == null)
+                    InitializeSeekBarTimer();
+
                 var window = Window.GetWindow(this);
                 if (window != null)
                 {
+                    window.SizeChanged -= Window_SizeChanged;
                     window.SizeChanged += Window_SizeChanged;
                     UpdateSongInfoWidth();
                 }
@@ -291,6 +302,16 @@ namespace MusicApp.TitleBarPlus
         {
             try
             {
+                var window = Window.GetWindow(this);
+                if (window != null)
+                    window.SizeChanged -= Window_SizeChanged;
+
+                if (_searchDebounceTimer != null)
+                {
+                    _searchDebounceTimer.Stop();
+                    _searchDebounceTimer.Tick -= SearchDebounceTimer_Tick;
+                }
+
                 if (seekBarTimer != null)
                 {
                     seekBarTimer.Stop();
@@ -469,12 +490,7 @@ namespace MusicApp.TitleBarPlus
         // === Volume Control Events ===
         private void SliderVolume_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (waveOut != null && !isMuted)
-            {
-                SetWaveOutVolume(sliderVolume.Value);
-            }
-
-            VolumeChanged?.Invoke(this, sliderVolume.Value);
+            ApplyOutputVolumeFromUi(sliderVolume.Value);
         }
 
         private void IconVolume_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -484,10 +500,6 @@ namespace MusicApp.TitleBarPlus
                 isMuted = false;
                 iconVolume.Kind = PackIconKind.VolumeHigh;
                 sliderVolume.Value = previousVolume;
-                if (waveOut != null)
-                {
-                    SetWaveOutVolume(previousVolume);
-                }
             }
             else
             {
@@ -495,10 +507,6 @@ namespace MusicApp.TitleBarPlus
                 previousVolume = sliderVolume.Value;
                 iconVolume.Kind = PackIconKind.VolumeOff;
                 sliderVolume.Value = 0;
-                if (waveOut != null)
-                {
-                    waveOut.Volume = 0;
-                }
             }
         }
 
@@ -524,7 +532,7 @@ namespace MusicApp.TitleBarPlus
             }
         }
 
-        public void SetAudioObjects(WaveOutEvent? waveOut, AudioFileReader? audioFileReader)
+        public void SetAudioObjects(IWavePlayer? waveOut, AudioFileReader? audioFileReader, bool useSoftwareSessionVolume = true)
         {
             isUpdatingAudioObjects = true;
 
@@ -534,6 +542,7 @@ namespace MusicApp.TitleBarPlus
 
                 this.waveOut = waveOut;
                 this.audioFileReader = audioFileReader;
+                _useSoftwareSessionVolume = useSoftwareSessionVolume;
 
                 if (waveOut == null || audioFileReader == null)
                 {
@@ -542,15 +551,18 @@ namespace MusicApp.TitleBarPlus
                 else
                 {
                     if (!isMuted)
-                    {
-                        SetWaveOutVolume(sliderVolume.Value);
-                    }
+                        ApplyOutputVolumeFromUi(sliderVolume.Value);
 
                     try
                     {
                         totalDuration = audioFileReader.TotalTime;
+                        var pos = audioFileReader.CurrentTime;
+                        if (pos < TimeSpan.Zero)
+                            pos = TimeSpan.Zero;
+                        if (totalDuration > TimeSpan.Zero && pos > totalDuration)
+                            pos = totalDuration;
                         pausedPosition = TimeSpan.Zero;
-                        UpdateSeekBar(TimeSpan.Zero, totalDuration);
+                        UpdateSeekBar(pos, totalDuration);
                     }
                     catch (ObjectDisposedException)
                     {
@@ -567,6 +579,7 @@ namespace MusicApp.TitleBarPlus
             finally
             {
                 isUpdatingAudioObjects = false;
+                UpdateSeekBarTimer();
             }
         }
 
@@ -1084,7 +1097,10 @@ namespace MusicApp.TitleBarPlus
 
             if (waveOut != null && !isMuted)
             {
-                waveOut.Volume = 0;
+                if (_useSoftwareSessionVolume)
+                    VolumeChanged?.Invoke(this, 0);
+                else
+                    TrySetDeviceVolume(waveOut, 0f);
             }
 
             isDragging = true;
@@ -1135,11 +1151,26 @@ namespace MusicApp.TitleBarPlus
         {
         }
 
-        private void SetWaveOutVolume(double volume)
+        private void ApplyOutputVolumeFromUi(double slider0To100)
         {
-            if (waveOut != null)
+            if (!_useSoftwareSessionVolume && waveOut != null && !isMuted)
+                TrySetDeviceVolume(waveOut, (float)(slider0To100 / VOLUME_MAX));
+            VolumeChanged?.Invoke(this, slider0To100);
+        }
+
+        private static void TrySetDeviceVolume(IWavePlayer? player, float linear0To1)
+        {
+            switch (player)
             {
-                waveOut.Volume = (float)(volume / VOLUME_MAX);
+                case WaveOutEvent w:
+                    w.Volume = linear0To1;
+                    break;
+                case WasapiOut w:
+                    w.Volume = linear0To1;
+                    break;
+                case DirectSoundOut d:
+                    d.Volume = linear0To1;
+                    break;
             }
         }
 
@@ -1152,13 +1183,19 @@ namespace MusicApp.TitleBarPlus
         {
             if (waveOut != null)
             {
-                if (wasMutedBeforeDrag)
+                if (_useSoftwareSessionVolume)
                 {
-                    waveOut.Volume = 0;
+                    if (wasMutedBeforeDrag)
+                        VolumeChanged?.Invoke(this, 0);
+                    else
+                        VolumeChanged?.Invoke(this, volumeBeforeDrag);
                 }
                 else
                 {
-                    SetWaveOutVolume(volumeBeforeDrag);
+                    if (wasMutedBeforeDrag)
+                        TrySetDeviceVolume(waveOut, 0f);
+                    else
+                        TrySetDeviceVolume(waveOut, (float)(volumeBeforeDrag / VOLUME_MAX));
                 }
             }
 
@@ -1175,6 +1212,7 @@ namespace MusicApp.TitleBarPlus
 
             isDragging = false;
             seekBarBackground.ReleaseMouseCapture();
+            PlaybackPositionCommitted?.Invoke(this, EventArgs.Empty);
         }
 
         private void HandleError(string context, Exception ex)

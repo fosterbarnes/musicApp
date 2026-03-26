@@ -7,10 +7,10 @@ using System.IO;
 using System.Linq;
 using System.Windows.Media.Imaging;
 using ATL;
-using MusicApp;
-using MusicApp.Constants;
+using musicApp;
+using musicApp.Constants;
 
-namespace MusicApp.Helpers;
+namespace musicApp.Helpers;
 
 public static class AlbumArtLoader
 {

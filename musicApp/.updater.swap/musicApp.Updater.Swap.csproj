@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>musicApp.Updater.Swap</RootNamespace>
+    <AssemblyName>musicApp-updater-swap</AssemblyName>
+    <AssemblyTitle>musicApp Updater Swap</AssemblyTitle>
+    <Product>musicApp</Product>
+    <Company>musicApp</Company>
+  </PropertyGroup>
+
+</Project>

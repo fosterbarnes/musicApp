@@ -2,7 +2,7 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
-    <!-- Scalar spacing (sys:Double; *-space suffix — WPF does not support x:Double in ResourceDictionary) -->
+    <!-- Scalar spacing (sys:Double; *-space suffix - WPF does not support x:Double in ResourceDictionary) -->
     <sys:Double x:Key="Xs-space">2</sys:Double>
     <sys:Double x:Key="Sm-space">4</sys:Double>
     <sys:Double x:Key="Md-space">6</sys:Double>
@@ -48,6 +48,7 @@
     <Thickness x:Key="Bottom20-thk">0,0,0,20</Thickness>
     <Thickness x:Key="Top2-thk">0,2,0,0</Thickness>
     <Thickness x:Key="Top4-thk">0,4,0,0</Thickness>
+    <Thickness x:Key="Top6-thk">0,6,0,0</Thickness>
     <Thickness x:Key="Top8-thk">0,8,0,0</Thickness>
     <Thickness x:Key="Top10-thk">0,10,0,0</Thickness>
     <Thickness x:Key="TopBottom0-thk">0,0</Thickness>
@@ -57,6 +58,7 @@
     <Thickness x:Key="Right10-thk">0,0,10,0</Thickness>
     <Thickness x:Key="Right15-thk">0,0,15,0</Thickness>
     <Thickness x:Key="Left8-thk">8,0,0,0</Thickness>
+    <Thickness x:Key="Left8NudgeUp4-thk">8,-4,0,0</Thickness>
     <Thickness x:Key="Left10-thk">10,0,0,0</Thickness>
     <Thickness x:Key="Left20-thk">20,0,0,0</Thickness>
     <Thickness x:Key="Left180-thk">180,0,0,0</Thickness>
@@ -91,9 +93,14 @@
     <sys:Double x:Key="ToolButton32-size">32</sys:Double>
     <sys:Double x:Key="ToolButton24-size">24</sys:Double>
     <sys:Double x:Key="SettingsPlaybackCrossfadeSliderWidth-size">180</sys:Double>
-    <sys:Double x:Key="SettingsPlaybackSliderHeight-size">28</sys:Double>
     <sys:Double x:Key="AboutMainLineFontSize-size">18</sys:Double>
     <sys:Double x:Key="AboutIconSize-size">128</sys:Double>
     <sys:Double x:Key="AboutTitleFontSize-size">24</sys:Double>
     <sys:Double x:Key="AboutVersionSubtitleFontSize-size">14</sys:Double>
+    <sys:Double x:Key="SettingsLibraryActionButtonHeight-size">40</sys:Double>
+    <sys:Double x:Key="SettingsFormAuxFontSize-size">12</sys:Double>
+    <sys:Double x:Key="ProgressBarThin5-size">5</sys:Double>
+    <sys:Double x:Key="UpdaterProgressBarHeight-size">8</sys:Double>
+    <Thickness x:Key="SettingsLibraryActionButtonRowMargin-thk">0,0,8,4</Thickness>
+    <Thickness x:Key="SettingsLibraryActionButtonLastRowMargin-thk">0,0,8,0</Thickness>
 </ResourceDictionary>

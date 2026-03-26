@@ -1,6 +1,6 @@
 using System;
 
-namespace MusicApp.Constants;
+namespace musicApp.Constants;
 
 public static class UILayoutConstants
 {

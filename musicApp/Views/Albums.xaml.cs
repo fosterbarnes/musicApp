@@ -10,10 +10,10 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
-using MusicApp.Constants;
-using MusicApp.Helpers;
+using musicApp.Constants;
+using musicApp.Helpers;
 
-namespace MusicApp.Views
+namespace musicApp.Views
 {
     public partial class AlbumsView : UserControl
     {
@@ -226,7 +226,27 @@ namespace MusicApp.Views
             };
 
             Loaded += async (_, __) => await LoadVisibleAlbumArtAsync();
+            Unloaded += AlbumsView_OnUnloaded;
             SizeChanged += AlbumsView_SizeChanged;
+        }
+
+        private void AlbumsView_OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _rebuildCts?.Cancel();
+                _rebuildCts?.Dispose();
+                _rebuildCts = null;
+                _artLoadCts?.Cancel();
+                _artLoadCts?.Dispose();
+                _artLoadCts = null;
+                _artLoadDebounce.Stop();
+                _flyoutResizeDebounce.Stop();
+            }
+            catch
+            {
+                // ignore
+            }
         }
 
         private void ScheduleArtLoad()
@@ -879,7 +899,7 @@ namespace MusicApp.Views
             }
 
             var addToPlaylistItem = FindMenuItemByHeader(menu.Items, "Add to Playlist");
-            var mainWindow = Application.Current.MainWindow as MainWindow;
+            var mainWindow = Application.Current?.MainWindow as MainWindow;
             var playlists = mainWindow?.Playlists;
             if (addToPlaylistItem != null && playlists != null)
             {

@@ -1,13 +1,13 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using MusicApp.Helpers;
-using MusicApp.Views;
+using musicApp.Dialogs;
+using musicApp.Helpers;
+using musicApp.Views;
 
-namespace MusicApp
+namespace musicApp
 {
     public partial class MainWindow
     {
@@ -71,13 +71,24 @@ namespace MusicApp
             ClearSettings();
         }
 
-        private void BtnSettings_Click(object sender, RoutedEventArgs e)
+        private void BtnSettings_Click(object sender, RoutedEventArgs e) => ShowSettingsWindow();
+
+        private void ShowSettingsWindow(string? launchSection = null)
         {
-            var settingsWindow = new SettingsView
+            if (_settingsWindow != null && _settingsWindow.IsVisible)
             {
-                Owner = this
+                _settingsWindow.Activate();
+                return;
+            }
+
+            var w = new SettingsView(launchSection) { Owner = this };
+            _settingsWindow = w;
+            w.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_settingsWindow, w))
+                    _settingsWindow = null;
             };
-            settingsWindow.ShowDialog();
+            w.Show();
         }
 
         private void ShowLibraryView()
@@ -202,12 +213,28 @@ namespace MusicApp
             queueViewControl?.SelectTrack(track);
         }
 
-        private async void OnInfoRequested(object? sender, Song track)
+        private void OnInfoRequested(object? sender, Song track)
         {
             if (track == null)
                 return;
+            ShowTrackInfoDialog(track);
+        }
 
-            var infoWindow = new InfoMetadataView
+        private void OpenLaunchInfoDialog(string? launchSection = null)
+        {
+            var track = currentTrack ?? allTracks.FirstOrDefault();
+            if (track == null)
+            {
+                MessageDialog.Show(this, "Song info", "Add music to your library first, or play a track.", MessageDialog.Buttons.Ok);
+                return;
+            }
+
+            ShowTrackInfoDialog(track, launchSection);
+        }
+
+        private void ShowTrackInfoDialog(Song track, string? launchSection = null)
+        {
+            var infoWindow = new InfoMetadataView(launchSection)
             {
                 Owner = this
             };
@@ -218,12 +245,19 @@ namespace MusicApp
             infoWindow.RestorePlaybackAfterFile = RestorePlaybackAfterMetadataWrite;
             TrackMetadataLoader.ReloadTagFieldsFromFile(track);
             infoWindow.LoadTrack(track, allTracks);
-            var saved = infoWindow.ShowDialog() == true;
-            if (saved)
+
+            infoWindow.Closed += async (_, _) =>
             {
+                infoWindow.ShowInSongsRequested -= OnShowInSongsRequested;
+                infoWindow.ShowInArtistsRequested -= OnShowInArtistsRequested;
+                infoWindow.ShowInAlbumsRequested -= OnShowInAlbumsRequested;
+                if (!infoWindow.MetadataSavedOnClose)
+                    return;
                 await UpdateLibraryCacheAsync();
                 RefreshAfterMetadataEdit(track);
-            }
+            };
+
+            infoWindow.Show();
         }
     }
 }

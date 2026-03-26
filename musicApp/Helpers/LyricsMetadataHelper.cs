@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using ATL;
 
-namespace MusicApp.Helpers;
+namespace musicApp.Helpers;
 
 public static class LyricsMetadataHelper
 {

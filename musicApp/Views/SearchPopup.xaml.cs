@@ -5,11 +5,11 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
-using MusicApp;
-using MusicApp.Constants;
-using MusicApp.Helpers;
+using musicApp;
+using musicApp.Constants;
+using musicApp.Helpers;
 
-namespace MusicApp.Views;
+namespace musicApp.Views;
 
 public partial class SearchPopupView : UserControl
 {
@@ -243,7 +243,7 @@ public partial class SearchPopupView : UserControl
         var addToPlaylistItem = FindMenuItemByHeader(menu.Items, "Add to Playlist");
         if (addToPlaylistItem != null)
         {
-            var mainWindow = Application.Current.MainWindow as MainWindow;
+            var mainWindow = Application.Current?.MainWindow as MainWindow;
             var playlists = mainWindow?.Playlists;
             if (playlists != null)
             {
@@ -261,7 +261,7 @@ public partial class SearchPopupView : UserControl
         var showInQueueItem = FindMenuItemByHeader(menu.Items, "Show in Queue");
         if (showInQueueItem != null)
         {
-            var mainWindow = Application.Current.MainWindow as MainWindow;
+            var mainWindow = Application.Current?.MainWindow as MainWindow;
             bool isInQueue = _contextMenuSong != null && mainWindow?.IsTrackInQueue(_contextMenuSong) == true;
             showInQueueItem.Visibility = isInQueue ? Visibility.Visible : Visibility.Collapsed;
         }

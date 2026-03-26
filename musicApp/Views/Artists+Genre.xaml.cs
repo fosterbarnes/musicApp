@@ -5,7 +5,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
-namespace MusicApp.Views
+namespace musicApp.Views
 {
     public partial class ArtistGenreView : UserControl
     {

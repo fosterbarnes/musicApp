@@ -1,44 +1,32 @@
-Settings:
-	- Create scaffold for settings menu. (These items are placeholders, code-behind is not wired up yet):
-		General
-		- Check for updates (tickbox)
-		- Automatically install updates (tickbox)
-		- Import/Export Settings (two buttons)
-		- Language (dropdown)
-
-		Playback
-		- EQ options, with options to create, import or export profiles (dropdown)
-		- Cross-fade songs (slider)
-		- Volume normalization (tickbox for now, slider later)
-		- Multiple audio backends (dropdown)
-		- Sample rate (dropdown)
-		- Bits per sample (dropdown)
-
-		Library
-		- Library import/export (two buttons)
-		- Change media storage location (button)
-		- Change settings storage location (button)
-
-		Shortcuts
-		- Scrollable grid view with each shortcut as an item in the list
-
-		Theme/UI
-		- Color, with options to create, import or export profiles (dropdown)
-		- Spacing, with options to create, import or export profiles (dropdown)
-		- Size, with options to create, import or export profiles (dropdown)
-		- List size, with options to create, import or export profiles (dropdown)
-		- Toggle donation links (tickbox)
-
-		About
-		- Version and other app info (e.g. musicApp v0.1.0 dollyShakeswerve)
-		- Project link (https://github.com/fosterbarnes/musicApp)
-		- Issues link (https://github.com/fosterbarnes/musicApp/issues/new)
-		- Donation link (https://buymeacoffee.com/fosterbarnes)
-
-Info View:
-	- Change selected tab color to #523e6e
-	
 Main Window:
-	- Fix issues with re-scanning the library for new tracks. 
-	- Fix "Clear Settings" not clearing song count and storage info
-	- Change loading bar color to #523e6e
+- Move add music, re-scan, remove music & clear settings to Settings > Library (with options to show in main window)
+
+Updater:
+- Create updater exe
+- Compares version to github release versions, installs newer version if available
+- Automatic install setting
+- Launch after install setting
+- Add musicApp-updater-swap to facilitate swapping the old updater with the new
+
+Settings:
+- Make the title bar dark theme
+
+	General:
+	- Populate language dropdown list
+	- Determine user's windows install language, show this language first in settings
+	Playback:
+	- Volume normalization placeholder gui
+	- Add code behind for crossfading, update gui
+	- Add code behind for changing audio backend
+
+Scripts:
+- Stop pre-push scripts form adding extra blank lines to .md files
+- Add updater to main bin folder after building
+- Add launch flags to run script
+
+Backend/Boring Stuff:
+- Replace any existing instances of "MusicApp". Replace them with camelCase "musicApp"
+- Add launch flags --settings (--s) and --info(--i) to launch their respective windows
+- Stop info/settings windows from blocking usage of main window
+- Change selection border color for selected tab items in settings/info windows
+- Attempt to improve overall stabilization and memory usage

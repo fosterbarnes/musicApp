@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media.Imaging;
 
-namespace MusicApp.Views;
+namespace musicApp.Views;
 
 /// <summary>Display row for album in search popup. Text shown immediately; AlbumArtSource populated async.</summary>
 public sealed class AlbumRowViewModel : INotifyPropertyChanged

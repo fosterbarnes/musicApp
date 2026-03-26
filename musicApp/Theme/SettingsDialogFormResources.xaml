@@ -6,6 +6,16 @@
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="Margin" Value="{StaticResource FieldLabelMargin-thk}" />
     </Style>
+    <Style x:Key="SettingsPlaybackAuxTextStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource TextTertiary-brush}" />
+        <Setter Property="FontSize" Value="{StaticResource SettingsFormAuxFontSize-size}" />
+    </Style>
+    <Style x:Key="SettingsPlaybackCrossfadeLabelStyle"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource SettingsPlaybackAuxTextStyle}">
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="{StaticResource Right8-thk}" />
+    </Style>
     <Style x:Key="FileInfoValueStyle" TargetType="TextBlock">
         <Setter Property="Foreground" Value="{StaticResource TextPrimary-brush}" />
         <Setter Property="FontWeight" Value="Normal" />
@@ -45,6 +55,101 @@
         <Setter Property="TextAlignment" Value="Left" />
         <Setter Property="HorizontalAlignment" Value="Left" />
         <Setter Property="Margin" Value="{StaticResource Bottom4-thk}" />
+    </Style>
+    <Style x:Key="AboutHyperlinkStyle" TargetType="Hyperlink">
+        <Setter Property="TextDecorations" Value="{x:Null}" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="TextDecorations" Value="{x:Static TextDecorations.Underline}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+    <Style x:Key="AboutReadOnlySelectableTextBoxStyle" TargetType="TextBox">
+        <Setter Property="IsReadOnly" Value="True" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="CaretBrush" Value="{StaticResource TextSecondary-brush}" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="AcceptsReturn" Value="False" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style x:Key="FileStoragePathReadOnlyTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource AboutReadOnlySelectableTextBoxStyle}">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary-brush}" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="VerticalContentAlignment" Value="Top" />
+    </Style>
+    <Style x:Key="AboutPathReadOnlyRichTextBoxStyle" TargetType="RichTextBox">
+        <Setter Property="IsReadOnly" Value="True" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="CaretBrush" Value="{StaticResource TextSecondary-brush}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary-brush}" />
+    </Style>
+    <Style x:Key="AboutLinkReadOnlyRichTextBoxStyle" TargetType="RichTextBox" BasedOn="{StaticResource AboutPathReadOnlyRichTextBoxStyle}">
+        <Setter Property="IsDocumentEnabled" Value="True" />
+        <Setter Property="Margin" Value="{StaticResource Bottom4-thk}" />
+    </Style>
+    <Style x:Key="AboutTitleLinkRichTextBoxStyle" TargetType="RichTextBox" BasedOn="{StaticResource AboutLinkReadOnlyRichTextBoxStyle}">
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="FontSize" Value="{StaticResource AboutTitleFontSize-size}" />
+    </Style>
+    <Style x:Key="AboutVersionSubtitleLinkRichTextBoxStyle" TargetType="RichTextBox" BasedOn="{StaticResource AboutLinkReadOnlyRichTextBoxStyle}">
+        <Setter Property="Margin" Value="{StaticResource Bottom10-thk}" />
+        <Setter Property="FontSize" Value="{StaticResource AboutVersionSubtitleFontSize-size}" />
+    </Style>
+    <Style x:Key="AboutCreditLineStackPanelStyle" TargetType="StackPanel">
+        <Setter Property="Orientation" Value="Horizontal" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="Margin" Value="{StaticResource Top10-thk}" />
+    </Style>
+    <Style x:Key="AboutCreditLinePartTextBlockStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource AboutVersionSubtitleFontSize-size}" />
+        <Setter Property="FontFamily" Value="Consolas" />
+        <Setter Property="Opacity" Value="0.85" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="AboutOpenFolderIconButtonStyle" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="4" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Chrome"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{StaticResource Xs-cr}"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Hover-brush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Pressed-brush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.35" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
     <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
         <Setter Property="Foreground" Value="{StaticResource TextSecondary-brush}" />
@@ -150,6 +255,18 @@
         </ControlTemplate.Triggers>
     </ControlTemplate>
 
+    <Style x:Key="DarkFieldTextBoxStyle" TargetType="TextBox">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary-brush}" />
+        <Setter Property="Background" Value="{StaticResource ControlBackground-brush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderSubtle-brush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource Border1-thk}" />
+        <Setter Property="Height" Value="{StaticResource FieldHeight-size}" />
+        <Setter Property="MinWidth" Value="56" />
+        <Setter Property="Padding" Value="6,2" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
     <Style x:Key="DarkFieldComboBoxStyle" TargetType="ComboBox">
         <Style.Resources>
             <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="{Binding Color, Source={StaticResource ControlBackground-brush}}" />
@@ -172,50 +289,5 @@
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItemStyle}" />
         <Setter Property="Template" Value="{StaticResource DarkComboBoxControlTemplate}" />
-    </Style>
-
-    <Style x:Key="SettingsPlaybackSliderStyle" TargetType="Slider">
-        <Setter Property="SnapsToDevicePixels" Value="True" />
-        <Setter Property="Foreground" Value="{StaticResource TextSecondary-brush}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Slider">
-                    <Grid SnapsToDevicePixels="True">
-                        <Border Height="4"
-                                VerticalAlignment="Center"
-                                Background="{StaticResource BorderDefault-brush}"
-                                CornerRadius="{StaticResource Xs-cr}" />
-                        <Track x:Name="PART_Track" VerticalAlignment="Center">
-                            <Track.DecreaseRepeatButton>
-                                <RepeatButton Command="Slider.DecreaseLarge"
-                                              Opacity="0"
-                                              Focusable="False" />
-                            </Track.DecreaseRepeatButton>
-                            <Track.IncreaseRepeatButton>
-                                <RepeatButton Command="Slider.IncreaseLarge"
-                                              Opacity="0"
-                                              Focusable="False" />
-                            </Track.IncreaseRepeatButton>
-                            <Track.Thumb>
-                                <Thumb>
-                                    <Thumb.Template>
-                                        <ControlTemplate TargetType="Thumb">
-                                            <Path Width="10"
-                                                  Height="7"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"
-                                                  Data="M 0 0 L 10 0 L 5 7 Z"
-                                                  Fill="{StaticResource TextSecondary-brush}"
-                                                  SnapsToDevicePixels="True"
-                                                  Stretch="Fill" />
-                                        </ControlTemplate>
-                                    </Thumb.Template>
-                                </Thumb>
-                            </Track.Thumb>
-                        </Track>
-                    </Grid>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
     </Style>
 </ResourceDictionary>

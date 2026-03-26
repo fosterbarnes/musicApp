@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media.Imaging;
 
-namespace MusicApp.Views;
+namespace musicApp.Views;
 
 public sealed class AlbumGridItem : INotifyPropertyChanged
 {

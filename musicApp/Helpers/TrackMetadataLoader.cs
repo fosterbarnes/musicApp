@@ -4,10 +4,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using ATL;
-using MusicApp;
+using musicApp;
 using NAudio.Wave;
 
-namespace MusicApp.Helpers;
+namespace musicApp.Helpers;
 
 public static class TrackMetadataLoader
 {

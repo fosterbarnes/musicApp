@@ -35,40 +35,49 @@
 #### Queue
 - Ability to re-order songs
 
-#### Add Music Folder
-- Will most likely be moved to a library management window/menu
+#### Add Music
 
 #### Re-Scan Library
-- Will most likely be moved to a library management window/menu
 
-#### Remove Music Folder
-- Will most likely be moved to a library management window/menu
+#### Remove Music
 
 #### Clear Settings
-- Will most likely be moved to a library management window/menu
 
 ### Bottom Row
 
 ## Settings Menu
 
 ### General
-- Check for updates (tickbox)
-- Automatically install updates (tickbox)
-- Import/Export Settings (two buttons)
-- Language (dropdown)
+#### Updates
+
+#### Language
+- Write translations and localization files
+
+#### Import/Export
+- Write settings file format and import/export logic
 
 ### Playback
-- EQ options, with options to create, import or export profiles (dropdown)
-- Cross-fade songs (slider)
-- Volume normalization (tickbox for now, slider later)
-- Multiple audio backends (dropdown)
-- Sample rate (dropdown)
-- Bits per sample (dropdown)
+#### EQ
+- Pre-made EQ options, with options to create, import or export profiles (dropdown)
+#### Volume normalization
+- Write code-behind
+- Scan all button to build normalization cache
+- Clear cache button
+
+#### Cross-fade songs
+- Start time (slider)
+- Length (text box)
+
+#### Audio
 
 ### Library
+#### Actions
+
+#### File Storage
+- Change media storage location
+
+#### Import/Export
 - Library import/export (two buttons)
-- Change media storage location (button)
-- Change settings storage location (button)
 
 ### Shortcuts
 - Scrollable grid view with each shortcut as an item in the list
@@ -78,9 +87,10 @@
 - Spacing, with options to create, import or export profiles (dropdown)
 - Size, with options to create, import or export profiles (dropdown)
 - List size, with options to create, import or export profiles (dropdown)
-- Toggle donation links (tickbox)
+- Toggle donation links (tick-box)
 
 ### About
+- Donation link (https://buymeacoffee.com/fosterbarnes)
 
 ## General
 
@@ -152,4 +162,4 @@
 - Possible media server integration (primarily emby/jellyfin because that's what I use)
 
 #### Backend/Boring Stuff
-- Automatic updates integrated with GitHub releases
+- Automatic updates integrated with GitHub releases (WIP)

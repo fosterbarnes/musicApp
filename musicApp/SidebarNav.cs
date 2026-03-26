@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace MusicApp
+namespace musicApp
 {
     public static class SidebarNav
     {

@@ -1,0 +1,60 @@
+<ResourceDictionary x:Class="musicApp.Views.TrackContextMenu"
+                    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ContextMenu x:Key="TrackContextMenu"
+                 Style="{StaticResource TrackContextMenuStyle}">
+        <ContextMenu.Resources>
+            <Style TargetType="Separator"
+                   BasedOn="{StaticResource TrackContextMenuSeparatorStyle}" />
+        </ContextMenu.Resources>
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Play Next"
+                  Click="PlayNextMenuItem_Click" />
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Add to Queue"
+                  Click="AddToQueueMenuItem_Click" />
+        <Separator />
+        <MenuItem Style="{StaticResource TrackContextMenuItemWithSubmenuStyle}"
+                  Header="Add to Playlist"
+                  Click="AddToPlaylistMenuItem_Click">
+            <MenuItem.ItemContainerStyle>
+                <Style TargetType="MenuItem"
+                       BasedOn="{StaticResource TrackContextSubMenuItemStyle}" />
+            </MenuItem.ItemContainerStyle>
+            <MenuItem Header="New Playlist"
+                      Click="NewPlaylistMenuItem_Click" />
+            <Separator />
+        </MenuItem>
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Remove from Playlist"
+                  Click="RemoveFromPlaylistMenuItem_Click"
+                  Visibility="Collapsed" />
+        <Separator />
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Show in Artists"
+                  Click="ShowInArtistsMenuItem_Click" />
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Show in Albums"
+                  Click="ShowInAlbumsMenuItem_Click" />
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Show in Songs"
+                  Click="ShowInSongsMenuItem_Click" />
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Show in Queue"
+                  Click="ShowInQueueMenuItem_Click" />
+        <Separator />
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Info"
+                  Click="InfoMenuItem_Click" />
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Show in Explorer"
+                  Click="ShowInExplorerMenuItem_Click" />
+        <Separator />
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Remove from Library"
+                  Click="RemoveFromLibraryMenuItem_Click" />
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Delete"
+                  Click="DeleteMenuItem_Click" />
+    </ContextMenu>
+</ResourceDictionary>

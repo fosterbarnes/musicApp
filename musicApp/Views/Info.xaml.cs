@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Windows;
@@ -12,22 +11,24 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Interop;
 using System.Windows.Threading;
 using Microsoft.Win32;
-using MusicApp;
-using MusicApp.Constants;
-using MusicApp.Dialogs;
-using MusicApp.Helpers;
+using musicApp;
+using musicApp.Constants;
+using musicApp.Dialogs;
+using musicApp.Helpers;
 using NAudio.Wave;
 
-namespace MusicApp.Views;
+namespace musicApp.Views;
 
 public partial class InfoMetadataView : Window
 {
+    private static readonly string[] InfoSectionOrder =
+    {
+        "Details", "Artwork", "Lyrics", "Options", "Sorting", "File"
+    };
+
     private const string FileInfoEmpty = "\u2014";
-    private const int DwmWindowAttributeUseImmersiveDarkMode = 20;
-    private const int DwmWindowAttributeUseImmersiveDarkModeBefore20 = 19;
 
     private Song? _track;
     private bool _syncingPrimaryFields;
@@ -43,17 +44,19 @@ public partial class InfoMetadataView : Window
     public Func<string, MetadataAudioReleaseResult>? ReleasePlaybackForFile { get; set; }
     public Action<MetadataAudioReleaseResult>? RestorePlaybackAfterFile { get; set; }
 
-    public InfoMetadataView()
+    public bool MetadataSavedOnClose { get; private set; }
+
+    public InfoMetadataView(string? launchSection = null)
     {
         InitializeComponent();
-        SourceInitialized += (_, _) => ApplyDarkTitleBar();
+        SourceInitialized += (_, _) => WindowsTitleBarTheme.ApplyImmersiveDarkMode(this);
         Closing += InfoMetadataView_Closing;
         Activated += (_, _) => TryApplyLyricsFromTempIfChanged();
         GenreComboBox.ItemsSource = Array.Empty<string>();
         WirePrimarySortingFieldSync();
         WireSortAsFields();
         PopulatePlaceholderValues();
-        ShowSection("Details");
+        ShowSection(launchSection ?? "Details");
     }
 
     private void WirePrimarySortingFieldSync()
@@ -562,20 +565,6 @@ public partial class InfoMetadataView : Window
         _track.IsFavorite = _pendingFavorite;
     }
 
-    private void ApplyDarkTitleBar()
-    {
-        var hwnd = new WindowInteropHelper(this).Handle;
-        if (hwnd == IntPtr.Zero)
-            return;
-
-        int enabled = 1;
-        _ = DwmSetWindowAttribute(hwnd, DwmWindowAttributeUseImmersiveDarkMode, ref enabled, Marshal.SizeOf<int>());
-        _ = DwmSetWindowAttribute(hwnd, DwmWindowAttributeUseImmersiveDarkModeBefore20, ref enabled, Marshal.SizeOf<int>());
-    }
-
-    [DllImport("dwmapi.dll", CharSet = CharSet.Unicode, PreserveSig = true)]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int pvAttribute, int cbAttribute);
-
     private void SectionButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button || button.Tag is not string sectionName)
@@ -595,28 +584,21 @@ public partial class InfoMetadataView : Window
         SortingSectionPanel.Visibility = sectionName == "Sorting" ? Visibility.Visible : Visibility.Collapsed;
         FileSectionPanel.Visibility = sectionName == "File" ? Visibility.Visible : Visibility.Collapsed;
 
-        SetSectionButtonState(DetailsSectionButton, sectionName == "Details");
-        SetSectionButtonState(ArtworkSectionButton, sectionName == "Artwork");
-        SetSectionButtonState(LyricsSectionButton, sectionName == "Lyrics");
-        SetSectionButtonState(OptionsSectionButton, sectionName == "Options");
-        SetSectionButtonState(SortingSectionButton, sectionName == "Sorting");
-        SetSectionButtonState(FileSectionButton, sectionName == "File");
+        var idx = Array.IndexOf(InfoSectionOrder, sectionName);
+        SectionSegmentUi.ApplySegmentStates(
+            this,
+            new[]
+            {
+                DetailsSectionButton,
+                ArtworkSectionButton,
+                LyricsSectionButton,
+                OptionsSectionButton,
+                SortingSectionButton,
+                FileSectionButton
+            },
+            idx < 0 ? 0 : idx);
 
         AddArtworkButton.Visibility = sectionName == "Artwork" ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private void SetSectionButtonState(Button button, bool isActive)
-    {
-        var isLast = ReferenceEquals(button, FileSectionButton);
-        var key = (isActive, isLast) switch
-        {
-            (true, true) => "SectionSegmentActiveLastStyle",
-            (true, false) => "SectionSegmentActiveStyle",
-            (false, true) => "SectionSegmentInactiveLastStyle",
-            (false, false) => "SectionSegmentInactiveStyle",
-        };
-        if (TryFindResource(key) is Style style)
-            button.Style = style;
     }
 
     private void AddArtworkButton_Click(object sender, RoutedEventArgs e)
@@ -691,7 +673,7 @@ public partial class InfoMetadataView : Window
             _pendingFrontCoverPicture = null;
             LoadAlbumArt(_track);
             RestorePlaybackAfterFile?.Invoke(snap);
-            DialogResult = true;
+            MetadataSavedOnClose = true;
             Close();
         }
         catch (Exception ex)
@@ -703,7 +685,6 @@ public partial class InfoMetadataView : Window
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
-        DialogResult = false;
         Close();
     }
 
@@ -795,7 +776,10 @@ public partial class InfoMetadataView : Window
 
     private void StopLyricsPolling()
     {
-        _lyricsPollTimer?.Stop();
+        if (_lyricsPollTimer == null) return;
+        _lyricsPollTimer.Stop();
+        _lyricsPollTimer.Tick -= LyricsPollTimer_Tick;
+        _lyricsPollTimer = null;
     }
 
     private void LyricsPollTimer_Tick(object? sender, EventArgs e)
@@ -898,7 +882,7 @@ public partial class InfoMetadataView : Window
         if (_track == null)
             return;
         ShowInSongsRequested?.Invoke(this, _track);
-        DialogResult = false;
+        Close();
     }
 
     private void TopArtistNameText_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -906,7 +890,7 @@ public partial class InfoMetadataView : Window
         if (_track == null || string.IsNullOrWhiteSpace(_track.Artist))
             return;
         ShowInArtistsRequested?.Invoke(this, _track);
-        DialogResult = false;
+        Close();
     }
 
     private void TopAlbumNameText_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -914,6 +898,6 @@ public partial class InfoMetadataView : Window
         if (_track == null || string.IsNullOrWhiteSpace(_track.Album))
             return;
         ShowInAlbumsRequested?.Invoke(this, _track);
-        DialogResult = false;
+        Close();
     }
 }

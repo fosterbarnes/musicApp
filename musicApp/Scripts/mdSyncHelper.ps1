@@ -1,5 +1,44 @@
 Set-StrictMode -Version Latest
 
+function Normalize-MarkdownLineArray {
+    param(
+        [AllowNull()]
+        $Lines
+    )
+
+    if ($null -eq $Lines) { return @() }
+    if ($Lines -is [string]) {
+        $s = [string]$Lines
+        if ([string]::IsNullOrEmpty($s)) { return @() }
+        return @($s -split '\r?\n')
+    }
+
+    [string[]]$arr = @($Lines | ForEach-Object { [string]$_ })
+    return $arr
+}
+
+function Trim-TrailingBlankLines {
+    param([AllowNull()] $Lines)
+
+    $Lines = @(Normalize-MarkdownLineArray -Lines $Lines)
+    if ($Lines.Count -eq 0) { return @() }
+    $end = $Lines.Count - 1
+    while ($end -ge 0 -and ($Lines[$end] -match '^\s*$')) { $end-- }
+    if ($end -lt 0) { return @() }
+    return @($Lines[0..$end])
+}
+
+function Trim-LeadingBlankLines {
+    param([AllowNull()] $Lines)
+
+    $Lines = @(Normalize-MarkdownLineArray -Lines $Lines)
+    if ($Lines.Count -eq 0) { return @() }
+    $start = 0
+    while ($start -lt $Lines.Count -and ($Lines[$start] -match '^\s*$')) { $start++ }
+    if ($start -ge $Lines.Count) { return @() }
+    return @($Lines[$start..($Lines.Count - 1)])
+}
+
 function Build-HeaderTree {
     param(
         [string[]]$Lines,
@@ -199,11 +238,49 @@ function Get-FeatureTreeNodeLines {
     $out.ToArray()
 }
 
+function Get-MarkdownTopLevelSectionLines {
+    param(
+        [AllowNull()]
+        $Lines,
+        [Parameter(Mandatory)]
+        [string]$SectionTitle
+    )
+
+    $Lines = @(Normalize-MarkdownLineArray -Lines $Lines)
+    if ($Lines.Count -eq 0) { return @() }
+
+    $startPattern = '^##\s+' + [regex]::Escape($SectionTitle) + '\s*$'
+    $startIdx = -1
+    for ($i = 0; $i -lt $Lines.Length; $i++) {
+        if ($Lines[$i] -match $startPattern) {
+            $startIdx = $i
+            break
+        }
+    }
+
+    if ($startIdx -lt 0) { return @() }
+
+    $endIdx = $Lines.Length - 1
+    for ($i = $startIdx + 1; $i -lt $Lines.Length; $i++) {
+        if ($Lines[$i] -match '^##\s+') {
+            $endIdx = $i - 1
+            break
+        }
+    }
+
+    if ($endIdx -lt $startIdx) { return @() }
+    $section = @($Lines[$startIdx..$endIdx])
+    return (Trim-TrailingBlankLines $section)
+}
+
 function Merge-FeaturesFromTasks {
     param(
-        [string[]]$TaskLines,
-        [string[]]$FeatureLines
+        [AllowNull()] $TaskLines,
+        [AllowNull()] $FeatureLines
     )
+
+    [string[]]$TaskLines = @(Normalize-MarkdownLineArray -Lines $TaskLines)
+    [string[]]$FeatureLines = @(Normalize-MarkdownLineArray -Lines $FeatureLines)
 
     $taskTree = Build-HeaderTree -Lines $TaskLines
     $featureTree = Build-HeaderTree -Lines $FeatureLines
@@ -310,25 +387,25 @@ function Sync-ReadmeGeneralUsageFromFeatures {
         }
     }
 
-    $trimmedFeatures = @($FeaturesUpdatedLines)
-    while ($trimmedFeatures.Length -gt 0 -and ($trimmedFeatures[$trimmedFeatures.Length - 1] -match '^\s*$')) {
-        if ($trimmedFeatures.Length -eq 1) {
-            $trimmedFeatures = @()
-            break
-        }
-        $trimmedFeatures = $trimmedFeatures[0..($trimmedFeatures.Length - 2)]
-    }
+    $trimmedFeatures = Trim-TrailingBlankLines $FeaturesUpdatedLines
 
     $prefix = if ($startIdx -gt 0) {
-        $ReadmeLines[0..($startIdx - 1)]
+        Trim-TrailingBlankLines @($ReadmeLines[0..($startIdx - 1)])
     }
     else { @() }
 
     $suffixStart = $endIdx + 1
     $suffix = if ($suffixStart -lt $ReadmeLines.Length) {
-        $ReadmeLines[$suffixStart..($ReadmeLines.Length - 1)]
+        Trim-LeadingBlankLines @($ReadmeLines[$suffixStart..($ReadmeLines.Length - 1)])
     }
     else { @() }
 
-    @($prefix + @('') + @($trimmedFeatures) + @('') + $suffix)
+    $out = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in $prefix) { [void]$out.Add($line) }
+    if ($trimmedFeatures.Count -gt 0 -and $out.Count -gt 0) { [void]$out.Add('') }
+    foreach ($line in $trimmedFeatures) { [void]$out.Add($line) }
+    if ($suffix.Count -gt 0 -and $out.Count -gt 0) { [void]$out.Add('') }
+    foreach ($line in $suffix) { [void]$out.Add($line) }
+
+    return $out.ToArray()
 }

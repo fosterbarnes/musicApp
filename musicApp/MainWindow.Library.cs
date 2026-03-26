@@ -2,10 +2,10 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using MusicApp.Dialogs;
-using MusicApp.Helpers;
+using musicApp.Dialogs;
+using musicApp.Helpers;
 
-namespace MusicApp
+namespace musicApp
 {
     public partial class MainWindow
     {
@@ -112,5 +112,11 @@ namespace MusicApp
                 MessageDialog.Show(this, "Error", $"Error removing folder: {ex.Message}", MessageDialog.Buttons.Ok);
             }
         }
+
+        public Task RunAddMusicFromSettingsAsync() => AddMusicFolderAsync();
+
+        public Task RunRescanLibraryFromSettingsAsync() => RescanLibraryAsync();
+
+        public Task RunRemoveMusicFromSettingsAsync() => RemoveMusicFolderAsync();
     }
 }

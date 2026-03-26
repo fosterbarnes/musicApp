@@ -2,10 +2,11 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
-using MusicApp.Constants;
+using musicApp.Constants;
+using musicApp.Helpers;
 using NAudio.Wave;
 
-namespace MusicApp
+namespace musicApp
 {
     public partial class MainWindow
     {
@@ -15,6 +16,7 @@ namespace MusicApp
             {
                 LogDebug("Cleaning up audio objects...");
                 titleBarPlayer.IsPlaying = false;
+                TeardownCrossfadePlaybackState();
 
                 if (waveOut != null)
                 {
@@ -31,6 +33,9 @@ namespace MusicApp
                     audioFileReader.Dispose();
                     audioFileReader = null;
                 }
+
+                _sessionVolumeProvider = null;
+                ClearCrossfadeMixerReferences();
 
                 ResetToIdleState();
             }
@@ -61,6 +66,22 @@ namespace MusicApp
             {
                 if (isManuallyStopping || waveOut == null || audioFileReader == null)
                 {
+                    return;
+                }
+
+                if (_crossfadeOverlapActive)
+                {
+                    try
+                    {
+                        if (IsOutgoingReaderEnded())
+                            CompleteCrossfadeAndPromoteIncoming();
+                        else
+                            CancelCrossfadeIncomingBranch();
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
                     return;
                 }
 
@@ -125,29 +146,47 @@ namespace MusicApp
 
         internal MetadataAudioReleaseResult ReleasePlaybackForMetadataWrite(string filePath)
         {
-            if (currentTrack == null ||
-                string.IsNullOrWhiteSpace(filePath) ||
-                !string.Equals(currentTrack.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
-            {
+            if (string.IsNullOrWhiteSpace(filePath))
                 return default;
+
+            AudioFileReader? readerForPosition = audioFileReader;
+
+            if (_crossfadeOverlapActive && _incomingAudioFileReader != null)
+            {
+                if (currentTrack != null && string.Equals(currentTrack.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                    readerForPosition = _incomingAudioFileReader;
+                else if (_songOutgoingDuringCrossfade != null &&
+                         string.Equals(_songOutgoingDuringCrossfade.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                    readerForPosition = audioFileReader;
+                else
+                    return default;
+            }
+            else
+            {
+                if (currentTrack == null ||
+                    !string.Equals(currentTrack.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                    return default;
             }
 
-            if (audioFileReader == null || waveOut == null)
+            if (readerForPosition == null || waveOut == null)
                 return default;
 
-            var position = audioFileReader.CurrentTime;
+            var position = readerForPosition.CurrentTime;
             var wasPlaying = waveOut.PlaybackState == PlaybackState.Playing;
 
             try
             {
                 titleBarPlayer.IsPlaying = false;
+                TeardownCrossfadePlaybackState();
                 waveOut.PlaybackStopped -= WaveOut_PlaybackStopped;
                 waveOut.Stop();
                 waveOut.Dispose();
                 waveOut = null;
                 audioFileReader.Dispose();
                 audioFileReader = null;
-                titleBarPlayer.SetAudioObjects(null, null);
+                ClearCrossfadeMixerReferences();
+                _sessionVolumeProvider = null;
+                TitleBarSetAudioObjects(null, null);
             }
             catch (Exception ex)
             {
@@ -174,15 +213,19 @@ namespace MusicApp
 
             try
             {
+                TeardownCrossfadePlaybackState();
+                RefreshPlaybackAudioPreferenceFields();
                 audioFileReader = new AudioFileReader(path);
-                waveOut = new WaveOutEvent();
+                waveOut = AudioOutputDeviceFactory.Create(_cachedAudioBackend);
                 waveOut.PlaybackStopped += WaveOut_PlaybackStopped;
-                waveOut.Init(audioFileReader);
+                waveOut.Init(CreatePlaybackInitChain(audioFileReader, path));
 
                 if (release.Position > TimeSpan.Zero && release.Position < audioFileReader.TotalTime)
                     audioFileReader.CurrentTime = release.Position;
 
-                titleBarPlayer.SetAudioObjects(waveOut, audioFileReader);
+                TitleBarSetAudioObjects(waveOut, audioFileReader);
+                _crossfadeOverlapStartedForThisOutgoing = false;
+                EnsureCrossfadePollTimer();
 
                 if (release.WasPlaying)
                 {
@@ -197,6 +240,100 @@ namespace MusicApp
             catch (Exception ex)
             {
                 Debug.WriteLine($"RestorePlaybackAfterMetadataWrite: {ex.Message}");
+            }
+        }
+
+        private void RefreshPlaybackAudioPreferenceFields()
+        {
+            var prefs = PreferencesManager.Instance.LoadPreferencesSync();
+            PreferencesManager.EnsureInitialized(prefs);
+            _cachedAudioBackend = prefs.Playback.AudioBackend;
+            _useSoftwareSessionVolume = prefs.Playback.UseSoftwareSessionVolume;
+            _cachedOutputSampleRateHz = prefs.Playback.OutputSampleRateHz;
+            _cachedOutputBits = prefs.Playback.OutputBits;
+        }
+
+        private void TitleBarSetAudioObjects(IWavePlayer? w, AudioFileReader? r)
+        {
+            titleBarPlayer.SetAudioObjects(w, r, _useSoftwareSessionVolume);
+        }
+
+        private float GetTitleBarOutputVolumeLinear()
+        {
+            if (titleBarPlayer.IsMuted)
+                return 0f;
+            return (float)(titleBarPlayer.Volume / 100.0);
+        }
+
+        private void RecreateAudioOutputForPreferencesChange()
+        {
+            if (currentTrack == null)
+                return;
+            var path = currentTrack.FilePath;
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                return;
+
+            TimeSpan position;
+            bool wasPlaying;
+            try
+            {
+                position = audioFileReader?.CurrentTime ?? TimeSpan.Zero;
+                wasPlaying = waveOut?.PlaybackState == PlaybackState.Playing;
+            }
+            catch
+            {
+                position = TimeSpan.Zero;
+                wasPlaying = false;
+            }
+
+            TeardownCrossfadePlaybackState();
+            try
+            {
+                if (waveOut != null)
+                {
+                    waveOut.PlaybackStopped -= WaveOut_PlaybackStopped;
+                    waveOut.Stop();
+                    waveOut.Dispose();
+                    waveOut = null;
+                }
+            }
+            catch { }
+
+            try
+            {
+                audioFileReader?.Dispose();
+            }
+            catch { }
+            audioFileReader = null;
+            ClearCrossfadeMixerReferences();
+            _sessionVolumeProvider = null;
+
+            try
+            {
+                RefreshPlaybackAudioPreferenceFields();
+                audioFileReader = new AudioFileReader(path);
+                waveOut = AudioOutputDeviceFactory.Create(_cachedAudioBackend);
+                waveOut.PlaybackStopped += WaveOut_PlaybackStopped;
+                waveOut.Init(CreatePlaybackInitChain(audioFileReader, path));
+
+                if (position > TimeSpan.Zero && position < audioFileReader.TotalTime)
+                    audioFileReader.CurrentTime = position;
+
+                TitleBarSetAudioObjects(waveOut, audioFileReader);
+                _crossfadeOverlapStartedForThisOutgoing = false;
+                EnsureCrossfadePollTimer();
+
+                if (wasPlaying)
+                {
+                    waveOut.Play();
+                    titleBarPlayer.IsPlaying = true;
+                }
+                else
+                    titleBarPlayer.IsPlaying = false;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"RecreateAudioOutputForPreferencesChange: {ex.Message}");
             }
         }
     }

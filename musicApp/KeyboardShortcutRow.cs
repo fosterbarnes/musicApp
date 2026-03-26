@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace MusicApp;
+namespace musicApp;
 
 public sealed class KeyboardShortcutRow
 {

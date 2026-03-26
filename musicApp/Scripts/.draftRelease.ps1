@@ -14,7 +14,7 @@ $versionFile = Join-Path $basePath "Version"
 $version = (Get-Content $versionFile -First 1).Trim()
 $versionTagFile = Join-Path $basePath "VersionTag"
 $versionTag = (Get-Content $versionTagFile -First 1).Trim()
-$buildFolder = Join-Path $env:TEMP "MusicApp_${version}"
+$buildFolder = Join-Path $env:TEMP "musicApp_${version}"
 
 if (Test-Path $buildFolder) { Remove-Item $buildFolder -Recurse -Force }
 Copy-Item -Path $sourceBuild -Destination $buildFolder -Recurse

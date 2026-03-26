@@ -1,9 +1,9 @@
-<Window x:Class="MusicApp.Views.InfoMetadataView"
+<Window x:Class="musicApp.Views.InfoMetadataView"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:const="clr-namespace:MusicApp.Constants"
+        xmlns:const="clr-namespace:musicApp.Constants"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         Title="Info"
@@ -251,132 +251,6 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-        <Style x:Key="SectionSegmentInactiveStyle" TargetType="Button">
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Foreground" Value="{StaticResource TextTertiary-brush}" />
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="VerticalAlignment" Value="Stretch" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome"
-                                Background="{StaticResource ControlBackgroundAlt-brush}"
-                                BorderBrush="{StaticResource BorderMuted-brush}"
-                                BorderThickness="0,0,1,0"
-                                SnapsToDevicePixels="True">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Hover-brush}" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Pressed-brush}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style x:Key="SectionSegmentInactiveLastStyle" TargetType="Button" BasedOn="{StaticResource SectionSegmentInactiveStyle}">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome"
-                                Background="{StaticResource ControlBackgroundAlt-brush}"
-                                BorderBrush="{StaticResource BorderMuted-brush}"
-                                BorderThickness="0"
-                                SnapsToDevicePixels="True">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Hover-brush}" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Pressed-brush}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style x:Key="SectionSegmentActiveStyle" TargetType="Button">
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary-brush}" />
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="VerticalAlignment" Value="Stretch" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome"
-                                Background="#523E6E"
-                                BorderBrush="{StaticResource BorderStrong-brush}"
-                                BorderThickness="0,0,1,0"
-                                SnapsToDevicePixels="True">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#523E6E" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#523E6E" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style x:Key="SectionSegmentActiveLastStyle" TargetType="Button" BasedOn="{StaticResource SectionSegmentActiveStyle}">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome"
-                                Background="#523E6E"
-                                BorderBrush="{StaticResource BorderStrong-brush}"
-                                BorderThickness="0"
-                                SnapsToDevicePixels="True">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#523E6E" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#523E6E" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
         <Style x:Key="MetadataDialogFooterButtonStyle" TargetType="Button">
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Foreground" Value="{StaticResource TextSecondary-brush}" />
@@ -525,11 +399,11 @@
         <Border Grid.Row="1"
                 Margin="{StaticResource Bottom10-thk}"
                 Background="{StaticResource ControlBackgroundAlt-brush}"
-                BorderBrush="{StaticResource BorderMuted-brush}"
-                BorderThickness="1"
+                BorderThickness="0"
                 CornerRadius="{StaticResource Sm-cr}"
                 ClipToBounds="True">
-            <Grid>
+            <Grid UseLayoutRounding="True"
+                  Background="{StaticResource ControlBackgroundAlt-brush}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
@@ -546,32 +420,37 @@
                         Tag="Details" />
                 <Button x:Name="ArtworkSectionButton"
                         Grid.Column="1"
+                        Margin="-1,0,0,0"
                         Content="Artwork"
                         Style="{StaticResource SectionSegmentInactiveStyle}"
                         Click="SectionButton_Click"
                         Tag="Artwork" />
                 <Button x:Name="LyricsSectionButton"
                         Grid.Column="2"
+                        Margin="-1,0,0,0"
                         Content="Lyrics"
                         Style="{StaticResource SectionSegmentInactiveStyle}"
                         Click="SectionButton_Click"
                         Tag="Lyrics" />
                 <Button x:Name="OptionsSectionButton"
                         Grid.Column="3"
+                        Margin="-1,0,0,0"
                         Content="Options"
                         Style="{StaticResource SectionSegmentInactiveStyle}"
                         Click="SectionButton_Click"
                         Tag="Options" />
                 <Button x:Name="SortingSectionButton"
                         Grid.Column="4"
+                        Margin="-1,0,0,0"
                         Content="Sorting"
                         Style="{StaticResource SectionSegmentInactiveStyle}"
                         Click="SectionButton_Click"
                         Tag="Sorting" />
                 <Button x:Name="FileSectionButton"
                         Grid.Column="5"
+                        Margin="-1,0,0,0"
                         Content="File"
-                        Style="{StaticResource SectionSegmentInactiveLastStyle}"
+                        Style="{StaticResource SectionSegmentInactiveStyle}"
                         Click="SectionButton_Click"
                         Tag="File" />
             </Grid>
@@ -635,7 +514,7 @@
                             <TextBlock Grid.Row="6" Grid.Column="0" Text="Year" Style="{StaticResource FieldLabelStyle}" />
                             <TextBox x:Name="YearTextBox" Grid.Row="6" Grid.Column="1" Margin="{StaticResource FieldRowGap-thk}" Width="90" HorizontalAlignment="Left" Style="{StaticResource FieldTextBoxStyle}" />
 
-                            <TextBlock Grid.Row="7" Grid.Column="0" Text="Track #" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBlock Grid.Row="7" Grid.Column="0" Text="Track" Style="{StaticResource FieldLabelStyle}" />
                             <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Margin="{StaticResource FieldRowGap-thk}">
                                 <TextBox x:Name="TrackNumberTextBox" Width="58" Margin="{StaticResource Right6-thk}" Style="{StaticResource FieldTextBoxStyle}" />
                                 <TextBlock Text="of" Foreground="{StaticResource TextTertiary-brush}" VerticalAlignment="Center" Margin="{StaticResource Right6-thk}" />

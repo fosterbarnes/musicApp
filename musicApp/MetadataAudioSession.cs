@@ -1,6 +1,6 @@
 using System;
 
-namespace MusicApp;
+namespace musicApp;
 
 public readonly struct MetadataAudioReleaseResult
 {

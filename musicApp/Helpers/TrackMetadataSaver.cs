@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using ATL;
 
-namespace MusicApp.Helpers;
+namespace musicApp.Helpers;
 
 public sealed class TrackMetadataEdit
 {

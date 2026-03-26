@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>musicApp.Updater</RootNamespace>
+    <AssemblyName>musicApp-updater</AssemblyName>
+    <AssemblyTitle>musicApp Updater</AssemblyTitle>
+    <Product>musicApp</Product>
+    <Company>musicApp</Company>
+    <ApplicationIcon>..\Resources\icon\musicApp Icon.ico</ApplicationIcon>
+    <Platforms>AnyCPU;x64;x86</Platforms>
+    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Page Include="..\Theme\Colors.xaml" Link="Theme\Colors.xaml" />
+    <Page Include="..\Theme\Spacing.xaml" Link="Theme\Spacing.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Helpers\WindowsTitleBarTheme.cs" Link="Helpers\WindowsTitleBarTheme.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="..\Resources\icon\musicApp Icon.ico" Link="Resources\icon\musicApp Icon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\Version" Link="Version" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\VersionTag" Link="VersionTag" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\VersionBuild" Link="VersionBuild" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

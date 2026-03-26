@@ -9,11 +9,11 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-using MusicApp;
-using MusicApp.Constants;
-using MusicApp.Helpers;
+using musicApp;
+using musicApp.Constants;
+using musicApp.Helpers;
 
-namespace MusicApp.Views
+namespace musicApp.Views
 {
     public partial class TrackListView : UserControl
     {
@@ -104,6 +104,7 @@ namespace MusicApp.Views
         private SettingsManager.AppSettings? _cachedSettings;
         private DispatcherTimer? _columnWidthSaveTimer;
         private bool _columnWidthDirty;
+        private bool _contextMenuOpeningHandlerAdded;
 
         public TrackListView()
         {
@@ -138,14 +139,13 @@ namespace MusicApp.Views
             lstTracks.ItemsSource = ItemsSource;
             EnsureSettingsLoaded();
             BuildGridViewColumns();
-            WireUpColumnHeaderSorting();
-            WireUpColumnResizeHandlers();
-            WireUpColumnContextMenu();
             WireUpAddToPlaylistSubmenu();
         }
 
         private void WireUpAddToPlaylistSubmenu()
         {
+            if (_contextMenuOpeningHandlerAdded) return;
+            _contextMenuOpeningHandlerAdded = true;
             lstTracks.AddHandler(FrameworkElement.ContextMenuOpeningEvent,
                 (ContextMenuEventHandler)ContextMenu_Opening);
         }
@@ -157,7 +157,7 @@ namespace MusicApp.Views
             if (contextMenu?.Items == null) return;
             var selectedSong = listView?.SelectedItem as Song;
             var addToPlaylistItem = FindMenuItemByHeader(contextMenu.Items, "Add to Playlist");
-            var mainWindow = Application.Current.MainWindow as MainWindow;
+            var mainWindow = Application.Current?.MainWindow as MainWindow;
             var playlists = mainWindow?.Playlists;
             if (addToPlaylistItem != null && playlists != null)
             {
@@ -254,9 +254,6 @@ namespace MusicApp.Views
             _cachedSettings = null;
             EnsureSettingsLoaded();
             BuildGridViewColumns();
-            WireUpColumnHeaderSorting();
-            WireUpColumnResizeHandlers();
-            WireUpColumnContextMenu();
         }
 
         private void EnsureSettingsLoaded()
@@ -277,12 +274,40 @@ namespace MusicApp.Views
             return new List<string> { "Title", "Artist", "Album", "Time" };
         }
 
+        private void TeardownGridViewColumnHandlers(GridView gridView)
+        {
+            foreach (var header in _wiredHeaders.ToList())
+            {
+                try { header.Click -= ColumnHeader_Click; }
+                catch { /* ignore */ }
+            }
+            _wiredHeaders.Clear();
+
+            var widthDescriptor = DependencyPropertyDescriptor.FromProperty(GridViewColumn.WidthProperty, typeof(GridViewColumn));
+            foreach (var column in gridView.Columns)
+            {
+                if (!_wiredColumnWidthHandlers.Contains(column)) continue;
+                widthDescriptor?.RemoveValueChanged(column, OnGridViewColumnWidthChanged);
+            }
+            _wiredColumnWidthHandlers.Clear();
+        }
+
+        private void OnGridViewColumnWidthChanged(object? sender, EventArgs e)
+        {
+            if (sender is not GridViewColumn col) return;
+            const double minWidth = UILayoutConstants.TrackListMinimumColumnWidth;
+            if (!double.IsNaN(col.Width) && col.Width < minWidth)
+                col.Width = minWidth;
+            MarkColumnWidthDirty();
+        }
+
         private void BuildGridViewColumns()
         {
             try
             {
                 var gridView = lstTracks.View as GridView ?? new GridView();
                 lstTracks.View = gridView;
+                TeardownGridViewColumnHandlers(gridView);
                 gridView.Columns.Clear();
 
                 var visibleColumns = GetVisibleColumns();
@@ -329,6 +354,9 @@ namespace MusicApp.Views
                 {
                     UpdateLastColumnFillWidth();
                     LockLastColumnResizeGripper();
+                    WireUpHeadersForListView();
+                    WireUpColumnWidthMonitoring();
+                    WireUpContextMenuForHeaders();
                 }), DispatcherPriority.Loaded);
             }
             catch (Exception ex)
@@ -368,18 +396,12 @@ namespace MusicApp.Views
             lastColumn.Width = fillWidth;
         }
 
-        private void WireUpColumnHeaderSorting()
-        {
-            if (lstTracks.View is not GridView) return;
-            lstTracks.Loaded += (s, e) => Dispatcher.BeginInvoke(new Action(WireUpHeadersForListView), DispatcherPriority.Loaded);
-        }
-
         private void WireUpHeadersForListView()
         {
             foreach (var header in FindVisualChildren<GridViewColumnHeader>(lstTracks))
             {
                 if (_wiredHeaders.Contains(header)) continue;
-                header.Click += (sender, args) => ColumnHeader_Click(sender, args);
+                header.Click += ColumnHeader_Click;
                 _wiredHeaders.Add(header);
             }
         }
@@ -408,32 +430,16 @@ namespace MusicApp.Views
             view.Refresh();
         }
 
-        private void WireUpColumnResizeHandlers()
-        {
-            lstTracks.Loaded += (s, e) => WireUpColumnWidthMonitoring();
-        }
-
         private void WireUpColumnWidthMonitoring()
         {
             if (lstTracks.View is not GridView gridView) return;
-            const double minWidth = UILayoutConstants.TrackListMinimumColumnWidth;
+            var descriptor = DependencyPropertyDescriptor.FromProperty(GridViewColumn.WidthProperty, typeof(GridViewColumn));
+            if (descriptor == null) return;
             foreach (var column in gridView.Columns)
             {
                 if (_wiredColumnWidthHandlers.Contains(column)) continue;
-                var descriptor = DependencyPropertyDescriptor.FromProperty(GridViewColumn.WidthProperty, typeof(GridViewColumn));
-                if (descriptor != null)
-                {
-                    descriptor.AddValueChanged(column, (sender, ev) =>
-                    {
-                        if (sender is GridViewColumn col)
-                        {
-                            if (!double.IsNaN(col.Width) && col.Width < minWidth)
-                                col.Width = minWidth;
-                            MarkColumnWidthDirty();
-                        }
-                    });
-                    _wiredColumnWidthHandlers.Add(column);
-                }
+                descriptor.AddValueChanged(column, OnGridViewColumnWidthChanged);
+                _wiredColumnWidthHandlers.Add(column);
             }
         }
 
@@ -484,12 +490,6 @@ namespace MusicApp.Views
             {
                 System.Diagnostics.Debug.WriteLine($"TrackListView save column widths: {ex.Message}");
             }
-        }
-
-        private void WireUpColumnContextMenu()
-        {
-            if (lstTracks.View is not GridView) return;
-            lstTracks.Loaded += (s, e) => Dispatcher.BeginInvoke(new Action(() => WireUpContextMenuForHeaders()), DispatcherPriority.Loaded);
         }
 
         private void WireUpContextMenuForHeaders()
@@ -566,7 +566,6 @@ namespace MusicApp.Views
             _cachedSettings = null;
             EnsureSettingsLoaded();
             BuildGridViewColumns();
-            WireUpContextMenuForHeaders();
         }
 
         private static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject

@@ -10,7 +10,7 @@ using System.Text;
 using System.Windows.Media.Imaging;
 using ATL;
 
-namespace MusicApp.Helpers;
+namespace musicApp.Helpers;
 
 /// <summary>
 /// Manages a persistent on-disk thumbnail cache for album art.
@@ -24,7 +24,14 @@ public static class AlbumArtCacheManager
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "musicApp", "thumbnails");
 
+    private const int MemoryCacheMaxEntries = 512;
     private static readonly ConcurrentDictionary<string, BitmapImage?> _memoryCache = new();
+
+    private static void TrimMemoryCacheIfNeeded()
+    {
+        if (_memoryCache.Count <= MemoryCacheMaxEntries) return;
+        _memoryCache.Clear();
+    }
 
     private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
 
@@ -84,6 +91,7 @@ public static class AlbumArtCacheManager
             bmp.Freeze();
 
             _memoryCache[cacheKey] = bmp;
+            TrimMemoryCacheIfNeeded();
             return bmp;
         }
         catch
@@ -168,6 +176,7 @@ public static class AlbumArtCacheManager
     /// <summary>Deletes all cached thumbnails and clears the in-memory cache.</summary>
     public static void InvalidateAll()
     {
+        AlbumArtThumbnailHelper.ClearFullSizeCache();
         _memoryCache.Clear();
         try
         {
@@ -204,6 +213,7 @@ public static class AlbumArtCacheManager
     /// <summary>Clears the in-memory bitmap cache without touching disk files.</summary>
     public static void ClearMemoryCache()
     {
+        AlbumArtThumbnailHelper.ClearFullSizeCache();
         _memoryCache.Clear();
     }
 
