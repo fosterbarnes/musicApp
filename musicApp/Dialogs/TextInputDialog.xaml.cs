@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Input;
+using musicApp.Helpers;
 
 namespace musicApp.Dialogs
 {
@@ -25,6 +26,7 @@ namespace musicApp.Dialogs
             dlg.TxtInput.SelectAll();
             dlg.TxtInput.Focus();
             dlg.ShowDialog();
+            WindowFocusHelper.ScheduleActivate(dlg.Owner as Window);
             return dlg.Result;
         }
 

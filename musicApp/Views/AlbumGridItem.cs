@@ -9,11 +9,12 @@ public sealed class AlbumGridItem : INotifyPropertyChanged
 {
     private BitmapImage? _albumArtSource;
 
-    public AlbumGridItem(string albumTitle, string artist, Song representativeTrack)
+    public AlbumGridItem(string albumTitle, string artist, Song representativeTrack, BitmapImage? initialArt = null)
     {
         AlbumTitle = albumTitle;
         Artist = artist;
         RepresentativeTrack = representativeTrack;
+        _albumArtSource = initialArt;
     }
 
     public string AlbumTitle { get; }

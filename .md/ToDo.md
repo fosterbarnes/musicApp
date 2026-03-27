@@ -20,9 +20,6 @@
 #### Artists
 
 #### Albums
-- Improve load time
-- Cache the albums list (entire list and image data)
-- Loading indicator when building album cache
 
 #### Songs
 
@@ -59,6 +56,7 @@
 ### Playback
 #### EQ
 - Pre-made EQ options, with options to create, import or export profiles (dropdown)
+
 #### Volume normalization
 - Write code-behind
 - Scan all button to build normalization cache
@@ -73,13 +71,15 @@
 ### Library
 #### Actions
 
+#### Scan for missing album art
+
 #### File Storage
 - Change media storage location
 
 #### Import/Export
 - Library import/export (two buttons)
 
-### Shortcuts
+### Keyboard Shortcuts
 - Scrollable grid view with each shortcut as an item in the list
 
 ### Theme/UI
@@ -149,7 +149,6 @@
 - Visualizer
 - _POSSIBLE_ iTunes library import support
 - Audio file converting/compressing
-- Album art scraper
 - Optional metadata correction/cleanup
 - Robust queuing system/menu. I like to make "on the fly" playlists with my queues, so it must be as seamless and robust as possible
 - "Like" system and liked tracks menu

@@ -38,6 +38,9 @@
   - Album length and song count info
   - High quality album art
   - Artist, genre and year with ability to click artist or genre
+- Improve load time
+- Cache the albums list (entire list and image data)
+- Loading indicator when building album cache
 
 #### Songs
 - List of all songs in a scrollable, selectable lists

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using musicApp.Constants;
 
 namespace musicApp
 {
@@ -19,6 +20,7 @@ namespace musicApp
         {
             public WindowStateSettings WindowState { get; set; } = new WindowStateSettings();
             public PlayerSettings Player { get; set; } = new PlayerSettings();
+            public string LastActiveView { get; set; } = "Library";
         }
 
         public class PlayerSettings
@@ -41,7 +43,7 @@ namespace musicApp
             public double Height { get; set; } = 700;
             public double Left { get; set; } = 100;
             public double Top { get; set; } = 100;
-            public double SidebarWidth { get; set; } = 250;
+            public double SidebarWidth { get; set; } = UILayoutConstants.SidebarMinWidth;
             public Dictionary<string, double> SongsViewColumnWidths { get; set; } = new Dictionary<string, double>();
             public Dictionary<string, Dictionary<string, double>> ColumnWidths { get; set; } = new Dictionary<string, Dictionary<string, double>>();
             public Dictionary<string, List<string>> ColumnVisibility { get; set; } = new Dictionary<string, List<string>>();
@@ -78,6 +80,17 @@ namespace musicApp
             }
         }
 
+        /// <summary>
+        /// Older builds defaulted <see cref="WindowStateSettings.SidebarWidth"/> to 250 while the UI min width was 180.
+        /// Normalize that legacy default so saved settings match the narrow sidebar (without wiping custom widths).
+        /// </summary>
+        private static void MigrateLegacySidebarWidth(WindowStateSettings ws)
+        {
+            const double legacyDefaultSidebarWidth = 250;
+            if (Math.Abs(ws.SidebarWidth - legacyDefaultSidebarWidth) < 0.5)
+                ws.SidebarWidth = UILayoutConstants.SidebarMinWidth;
+        }
+
         #region Settings Management
 
         public AppSettings LoadSettingsSync()
@@ -107,6 +120,8 @@ namespace musicApp
                         
                         settings.Player ??= new PlayerSettings();
                         settings.WindowState ??= new WindowStateSettings();
+
+                        MigrateLegacySidebarWidth(settings.WindowState);
                         
                         Console.WriteLine($"LoadSettingsSync - After null coalescing - Player.IsShuffleEnabled: {settings.Player.IsShuffleEnabled}");
                         return settings;
@@ -155,6 +170,8 @@ namespace musicApp
                         
                         settings.Player ??= new PlayerSettings();
                         settings.WindowState ??= new WindowStateSettings();
+
+                        MigrateLegacySidebarWidth(settings.WindowState);
                         
                         Console.WriteLine($"LoadSettingsAsync - After null coalescing - Player.IsShuffleEnabled: {settings.Player.IsShuffleEnabled}");
                         return settings;

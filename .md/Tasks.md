@@ -43,9 +43,9 @@
   - ~~Album length and song count info~~
   - ~~High quality album art~~
   - ~~Artist, genre and year with ability to click artist or genre~~
-- Improve load time
-- Cache the albums list (entire list and image data)
-- Loading indicator when building album cache
+- ~~Improve load time~~
+- ~~Cache the albums list (entire list and image data)~~
+- ~~Loading indicator when building album cache~~
 
 #### Songs
 - ~~List of all songs in a scrollable, selectable lists~~
@@ -111,6 +111,7 @@
 ### Playback
 #### EQ
 - Pre-made EQ options, with options to create, import or export profiles (dropdown)
+
 #### Volume normalization
 - ~~Tickbox (on/off)~~
 - Write code-behind
@@ -134,6 +135,10 @@
 - ~~Clear Settings~~
 - ~~Tick-boxes for each to show in sidebar~~
 
+#### Scan for missing album art
+- ~~Library wide album art scan with multiple album art backends/fallbacks~~
+- ~~Progress bar fly-out~~
+
 #### File Storage
 - ~~Music library location~~
 - ~~Settings location~~
@@ -142,7 +147,7 @@
 #### Import/Export
 - Library import/export (two buttons)
 
-### Shortcuts
+### Keyboard Shortcuts
 - Scrollable grid view with each shortcut as an item in the list
 
 ### Theme/UI
@@ -216,6 +221,7 @@
   ##### Artwork
   - ~~Display full size, resizable artwork~~
   - ~~Ability to change album art~~
+  - ~~Button to scan for missing artwork~~
 
   ##### Lyrics
   - ~~Display lyrics if available~~
@@ -264,7 +270,6 @@
 - Visualizer
 - _POSSIBLE_ iTunes library import support
 - Audio file converting/compressing
-- Album art scraper
 - Optional metadata correction/cleanup
 - Robust queuing system/menu. I like to make "on the fly" playlists with my queues, so it must be as seamless and robust as possible
 - "Like" system and liked tracks menu

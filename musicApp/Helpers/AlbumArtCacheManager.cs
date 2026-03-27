@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -7,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Windows.Media.Imaging;
 using ATL;
 
@@ -26,6 +28,13 @@ public static class AlbumArtCacheManager
 
     private const int MemoryCacheMaxEntries = 512;
     private static readonly ConcurrentDictionary<string, BitmapImage?> _memoryCache = new();
+
+    /// <summary>Limits parallel album-art work; GDI+ is fragile under heavy parallel load.</summary>
+    private static readonly SemaphoreSlim ThumbnailGdiSemaphore = new(2, 2);
+
+    private static readonly ConcurrentDictionary<string, object> ThumbnailPathLocks = new();
+
+    private static readonly object JpegEncodeLock = new();
 
     private static void TrimMemoryCacheIfNeeded()
     {
@@ -79,29 +88,57 @@ public static class AlbumArtCacheManager
         if (_memoryCache.TryGetValue(cacheKey, out var cached))
             return cached;
 
-        try
+        for (int attempt = 0; attempt < 4; attempt++)
         {
-            var bmp = new BitmapImage();
-            bmp.BeginInit();
-            bmp.CacheOption = BitmapCacheOption.OnLoad;
-            bmp.UriSource = new Uri(cachePath, UriKind.Absolute);
-            if (decodePixelWidth > 0)
-                bmp.DecodePixelWidth = decodePixelWidth;
-            bmp.EndInit();
-            bmp.Freeze();
+            try
+            {
+                byte[] bytes = File.ReadAllBytes(cachePath);
+                if (bytes.Length < 24 || !LooksLikeRasterImageHeader(bytes))
+                {
+                    if (attempt < 3)
+                    {
+                        Thread.Sleep(25);
+                        continue;
+                    }
+                    return null;
+                }
 
-            _memoryCache[cacheKey] = bmp;
-            TrimMemoryCacheIfNeeded();
-            return bmp;
+                using var ms = new MemoryStream(bytes, 0, bytes.Length, writable: false, publiclyVisible: true);
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.StreamSource = ms;
+                if (decodePixelWidth > 0)
+                    bmp.DecodePixelWidth = decodePixelWidth;
+                bmp.EndInit();
+
+                if (bmp.PixelWidth <= 0 || bmp.PixelHeight <= 0)
+                {
+                    if (attempt < 3)
+                    {
+                        Thread.Sleep(25);
+                        continue;
+                    }
+                    return null;
+                }
+
+                bmp.Freeze();
+                _memoryCache[cacheKey] = bmp;
+                TrimMemoryCacheIfNeeded();
+                return bmp;
+            }
+            catch
+            {
+                if (attempt < 3)
+                    Thread.Sleep(25);
+            }
         }
-        catch
-        {
-            return null;
-        }
+
+        return null;
     }
 
     /// <summary>
-    /// Extracts album art for the given track (ATL embedded -> directory fallback),
+    /// Extracts album art for the given track (ATL embedded, then images beside the file),
     /// scales to CacheThumbnailSize, and saves as JPEG to the cache folder.
     /// Skips work if the cache file already exists.
     /// Returns the cache file path, or empty string if no art was found.
@@ -118,58 +155,71 @@ public static class AlbumArtCacheManager
 
         try { Directory.CreateDirectory(ThumbnailFolder); } catch { return ""; }
 
-        try
+        var pathLock = ThumbnailPathLocks.GetOrAdd(cachePath, _ => new object());
+        lock (pathLock)
         {
-            Bitmap? source = null;
+            if (File.Exists(cachePath))
+                return cachePath;
 
+            ThumbnailGdiSemaphore.Wait();
             try
             {
-                var atlTrack = new Track(track.FilePath);
-                var pics = atlTrack.EmbeddedPictures;
-                if (pics != null && pics.Count > 0)
+                if (File.Exists(cachePath))
+                    return cachePath;
+
+                Bitmap? source = null;
+
+                try
                 {
-                    using var ms = new MemoryStream(pics[0].PictureData);
-                    source = new Bitmap(ms);
+                    var atlTrack = new Track(track.FilePath);
+                    var pics = atlTrack.EmbeddedPictures;
+                    if (pics != null && pics.Count > 0)
+                        source = TryLoadBitmapFromPictureBytes(pics[0].PictureData);
                 }
-            }
-            catch
-            {
-                // Fall through to directory search
-            }
-
-            if (source == null)
-            {
-                var dir = Path.GetDirectoryName(track.FilePath);
-                if (dir != null && Directory.Exists(dir))
+                catch
                 {
-                    var imageFiles = Directory.GetFiles(dir, "*.*")
-                        .Where(f => ImageExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
-                        .ToList();
+                }
 
-                    var artFile = imageFiles.FirstOrDefault(f =>
+                if (source == null)
+                {
+                    var dir = Path.GetDirectoryName(track.FilePath);
+                    if (dir != null && Directory.Exists(dir))
                     {
-                        var name = Path.GetFileNameWithoutExtension(f).ToLowerInvariant();
-                        return name.Contains("album") || name.Contains("cover") || name.Contains("art") || name.Contains("folder");
-                    }) ?? imageFiles.FirstOrDefault();
+                        var imageFiles = Directory.GetFiles(dir, "*.*")
+                            .Where(f => ImageExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                            .ToList();
 
-                    if (artFile != null)
-                        source = new Bitmap(artFile);
+                        var artFile = imageFiles.FirstOrDefault(f =>
+                        {
+                            var name = Path.GetFileNameWithoutExtension(f).ToLowerInvariant();
+                            return name.Contains("album") || name.Contains("cover") || name.Contains("art") || name.Contains("folder");
+                        }) ?? imageFiles.FirstOrDefault();
+
+                        if (artFile != null)
+                            source = TryLoadBitmapFromImageFile(artFile);
+                    }
                 }
+
+                if (source == null)
+                    return "";
+
+                using (source)
+                {
+                    if (!TrySaveScaledJpeg(source, cachePath, CacheThumbnailSize))
+                        return "";
+                }
+
+                return cachePath;
             }
-
-            if (source == null)
-                return "";
-
-            using (source)
+            catch (Exception ex)
             {
-                SaveScaledJpeg(source, cachePath, CacheThumbnailSize);
+                Debug.WriteLine($"AlbumArtCacheManager.GenerateAndCache: {ex.Message}");
+                return "";
             }
-
-            return cachePath;
-        }
-        catch
-        {
-            return "";
+            finally
+            {
+                ThumbnailGdiSemaphore.Release();
+            }
         }
     }
 
@@ -217,38 +267,158 @@ public static class AlbumArtCacheManager
         _memoryCache.Clear();
     }
 
-    private static void SaveScaledJpeg(Bitmap original, string outputPath, int targetSize)
+    private static bool LooksLikeRasterImageHeader(ReadOnlySpan<byte> data)
     {
-        int w = original.Width;
-        int h = original.Height;
-        if (w <= 0 || h <= 0) return;
+        if (data.Length < 2) return false;
+        if (data[0] == 0xFF && data[1] == 0xD8) return true;
+        if (data.Length >= 4 && data[0] == 0x89 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G')
+            return true;
+        if (data.Length >= 3 && data[0] == 'G' && data[1] == 'I' && data[2] == 'F') return true;
+        if (data.Length >= 2 && data[0] == 'B' && data[1] == 'M') return true;
+        return false;
+    }
 
-        double ratio = Math.Min((double)targetSize / w, (double)targetSize / h);
-        int newW = Math.Max(1, (int)(w * ratio));
-        int newH = Math.Max(1, (int)(h * ratio));
+    private static Bitmap? TryLoadBitmapFromPictureBytes(byte[]? data)
+    {
+        if (data == null || data.Length < 24 || !LooksLikeRasterImageHeader(data))
+            return null;
 
-        using var scaled = new Bitmap(newW, newH, PixelFormat.Format32bppArgb);
-        using (var g = Graphics.FromImage(scaled))
+        try
         {
-            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            g.CompositingQuality = CompositingQuality.HighQuality;
-            g.DrawImage(original, 0, 0, newW, newH);
+            using var ms = new MemoryStream(data, 0, data.Length, writable: false, publiclyVisible: true);
+            using var img = Image.FromStream(ms, useEmbeddedColorManagement: false, validateImageData: false);
+            return new Bitmap(img);
         }
-
-        var jpegEncoder = ImageCodecInfo.GetImageEncoders()
-            .FirstOrDefault(e => e.FormatID == ImageFormat.Jpeg.Guid);
-
-        if (jpegEncoder != null)
+        catch
         {
-            var encoderParams = new EncoderParameters(1);
-            encoderParams.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 90L);
-            scaled.Save(outputPath, jpegEncoder, encoderParams);
+            return null;
         }
-        else
+    }
+
+    private static Bitmap? TryLoadBitmapFromImageFile(string path)
+    {
+        try
         {
-            scaled.Save(outputPath, ImageFormat.Jpeg);
+            var fi = new FileInfo(path);
+            if (!fi.Exists || fi.Length < 24) return null;
+
+            Span<byte> head = stackalloc byte[12];
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                if (fs.Read(head) < 2) return null;
+            }
+
+            if (!LooksLikeRasterImageHeader(head))
+                return null;
+
+            return new Bitmap(path);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private const int MaxAlbumArtDimensionPx = 8192;
+
+    private static Bitmap? TryFlattenTo32bppArgb(Image src)
+    {
+        try
+        {
+            int w = src.Width;
+            int h = src.Height;
+            if (w < 1 || h < 1 || w > MaxAlbumArtDimensionPx || h > MaxAlbumArtDimensionPx)
+                return null;
+
+            var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.Clear(Color.White);
+                g.DrawImage(src, 0, 0, w, h);
+            }
+
+            return bmp;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static bool TrySaveScaledJpeg(Bitmap original, string outputPath, int targetSize)
+    {
+        try
+        {
+            using var flat = TryFlattenTo32bppArgb(original);
+            if (flat == null)
+                return false;
+
+            int w = flat.Width;
+            int h = flat.Height;
+            double ratio = Math.Min((double)targetSize / w, (double)targetSize / h);
+            int newW = Math.Max(1, (int)(w * ratio));
+            int newH = Math.Max(1, (int)(h * ratio));
+
+            using var scaled = new Bitmap(newW, newH, PixelFormat.Format32bppArgb);
+            using (var g = Graphics.FromImage(scaled))
+            {
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.SmoothingMode = SmoothingMode.HighQuality;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                g.CompositingQuality = CompositingQuality.HighQuality;
+                g.DrawImage(flat, 0, 0, newW, newH);
+            }
+
+            byte[] jpegBytes;
+            lock (JpegEncodeLock)
+            {
+                using var ms = new MemoryStream();
+                var jpegEncoder = ImageCodecInfo.GetImageEncoders()
+                    .FirstOrDefault(e => e.FormatID == ImageFormat.Jpeg.Guid);
+
+                if (jpegEncoder != null)
+                {
+                    using var encoderParams = new EncoderParameters(1);
+                    encoderParams.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 90L);
+                    scaled.Save(ms, jpegEncoder, encoderParams);
+                }
+                else
+                    scaled.Save(ms, ImageFormat.Jpeg);
+
+                jpegBytes = ms.ToArray();
+            }
+
+            var tmpPath = outputPath + ".writing";
+            try
+            {
+                File.WriteAllBytes(tmpPath, jpegBytes);
+                File.Move(tmpPath, outputPath, overwrite: true);
+            }
+            catch
+            {
+                TryDeleteFileSilent(tmpPath);
+                TryDeleteFileSilent(outputPath);
+                return false;
+            }
+
+            return true;
+        }
+        catch
+        {
+            TryDeleteFileSilent(outputPath);
+            return false;
+        }
+    }
+
+    private static void TryDeleteFileSilent(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch
+        {
         }
     }
 }

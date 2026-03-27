@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -11,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Navigation;
 using System.Windows.Threading;
 using musicApp;
+using musicApp.Dialogs;
 using musicApp.Helpers;
 
 namespace musicApp.Views
@@ -27,6 +29,8 @@ namespace musicApp.Views
         private string _aboutSettingsPath = "";
         private string _fileStorageMusicPathOpen = "";
         private bool _playbackNormalizationCheckLoading;
+        private bool _sidebarLibraryActionCheckLoading;
+        private bool _libraryAlbumArtScanGuiBusy;
 
         public SettingsView(string? launchSection = null)
         {
@@ -38,6 +42,13 @@ namespace musicApp.Views
             KeyboardShortcutsGlobalListView.SizeChanged += (_, _) => BalanceKeyboardShortcutColumns(KeyboardShortcutsGlobalListView);
             Loaded += SettingsView_Loaded;
             ShowSection(launchSection ?? "General");
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            CleanupLibraryAlbumArtScanGuiState();
+            base.OnClosed(e);
+            WindowFocusHelper.ScheduleActivateOwner(this);
         }
 
         private void SettingsView_Loaded(object sender, RoutedEventArgs e)
@@ -80,7 +91,6 @@ namespace musicApp.Views
             AppLanguageCatalog.PopulateGeneralLanguageComboBox(GeneralLanguageComboBox);
             LoadPreferencesIntoUi();
             UpdateLibraryActionButtonsEnabled();
-            UpdatePlaybackNormalizationUiState();
             RefreshPlaybackNormalizationStatsLine();
         }
 
@@ -149,35 +159,125 @@ namespace musicApp.Views
 
         private void UpdateLibraryActionButtonsEnabled()
         {
-            var ok = Owner is MainWindow;
-            LibraryAddMusicButton.IsEnabled = ok;
-            LibraryRescanLibraryButton.IsEnabled = ok;
-            LibraryRemoveMusicButton.IsEnabled = ok;
-            LibraryClearSettingsButton.IsEnabled = ok;
+            var canRunLibraryActions = Owner is MainWindow && !_libraryAlbumArtScanGuiBusy;
+            LibraryAddMusicButton.IsEnabled = canRunLibraryActions;
+            LibraryRescanLibraryButton.IsEnabled = canRunLibraryActions;
+            LibraryRemoveMusicButton.IsEnabled = canRunLibraryActions;
+            LibraryClearSettingsButton.IsEnabled = canRunLibraryActions;
+            LibraryScanMissingAlbumArtButton.IsEnabled = canRunLibraryActions;
+        }
+
+        private MainWindow? OwnerMainWhenLibraryIdle()
+        {
+            if (_libraryAlbumArtScanGuiBusy) return null;
+            return Owner as MainWindow;
         }
 
         private async void LibraryAddMusicButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Owner is MainWindow main)
+            var main = OwnerMainWhenLibraryIdle();
+            if (main != null)
                 await main.RunAddMusicFromSettingsAsync();
         }
 
         private async void LibraryRescanLibraryButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Owner is MainWindow main)
+            var main = OwnerMainWhenLibraryIdle();
+            if (main != null)
                 await main.RunRescanLibraryFromSettingsAsync();
         }
 
         private async void LibraryRemoveMusicButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Owner is MainWindow main)
+            var main = OwnerMainWhenLibraryIdle();
+            if (main != null)
                 await main.RunRemoveMusicFromSettingsAsync();
         }
 
         private void LibraryClearSettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Owner is MainWindow main)
+            var main = OwnerMainWhenLibraryIdle();
+            if (main != null)
                 main.RunClearSettingsFromSettings();
+        }
+
+        private void CleanupLibraryAlbumArtScanGuiState()
+        {
+            _libraryAlbumArtScanGuiBusy = false;
+            LibraryAlbumArtScanProgressPanel.Visibility = Visibility.Collapsed;
+            LibraryScanMissingAlbumArtButton.Content = "Scan";
+            UpdateLibraryActionButtonsEnabled();
+        }
+
+        private async void LibraryScanMissingAlbumArtButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_libraryAlbumArtScanGuiBusy || Owner is not MainWindow main)
+                return;
+
+            _libraryAlbumArtScanGuiBusy = true;
+            LibraryScanMissingAlbumArtButton.Content = "Scanning...";
+            LibraryAlbumArtScanProgressStatusText.Text = "Starting scan…";
+            LibraryAlbumArtScanProgressBar.IsIndeterminate = true;
+            LibraryAlbumArtScanProgressBar.Value = 0;
+            LibraryAlbumArtScanProgressPanel.Visibility = Visibility.Visible;
+            UpdateLibraryActionButtonsEnabled();
+
+            var progress = new Progress<RemoteAlbumArtScanUiProgress>(p =>
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    LibraryAlbumArtScanProgressStatusText.Text = p.Message;
+                    if (p.Total < 0)
+                    {
+                        LibraryAlbumArtScanProgressBar.IsIndeterminate = true;
+                        return;
+                    }
+
+                    if (LibraryAlbumArtScanProgressBar.IsIndeterminate)
+                        LibraryAlbumArtScanProgressBar.IsIndeterminate = false;
+                    LibraryAlbumArtScanProgressBar.Maximum = p.Total;
+                    LibraryAlbumArtScanProgressBar.Value = Math.Min(p.Done, p.Total);
+                }), DispatcherPriority.Background);
+            });
+
+            try
+            {
+                var (ok, skipped, failed) =
+                    await main.RunScanMissingRemoteAlbumArtAsync(progress, CancellationToken.None).ConfigureAwait(true);
+
+                LibraryAlbumArtScanProgressStatusText.Text = ok == 0 && failed == 0
+                    ? $"Done. Nothing new to embed (skipped {skipped})."
+                    : $"Done. Saved {ok}, skipped {skipped}, failed {failed}.";
+            }
+            catch (OperationCanceledException)
+            {
+                LibraryAlbumArtScanProgressStatusText.Text = "Canceled.";
+            }
+            catch (Exception ex)
+            {
+                LibraryAlbumArtScanProgressStatusText.Text = $"Error: {ex.Message}";
+            }
+            finally
+            {
+                _libraryAlbumArtScanGuiBusy = false;
+                LibraryScanMissingAlbumArtButton.Content = "Scan";
+                LibraryAlbumArtScanProgressBar.IsIndeterminate = false;
+                UpdateLibraryActionButtonsEnabled();
+            }
+        }
+
+        private void SidebarLibraryActionShowInSidebar_CheckChanged(object sender, RoutedEventArgs e)
+        {
+            if (_sidebarLibraryActionCheckLoading)
+                return;
+            PreferencesManager.EnsureInitialized(_preferences);
+            _preferences.Sidebar.ShowAddMusic = SidebarAddMusicCheckBox.IsChecked == true;
+            _preferences.Sidebar.ShowRescanLibrary = SidebarRescanLibraryCheckBox.IsChecked == true;
+            _preferences.Sidebar.ShowRemoveMusic = SidebarRemoveMusicCheckBox.IsChecked == true;
+            _preferences.Sidebar.ShowClearSettings = SidebarClearSettingsCheckBox.IsChecked == true;
+            PreferencesManager.Instance.SavePreferencesSync(_preferences);
+            if (Owner is MainWindow main)
+                main.ApplySidebarPreferences();
         }
 
         private void LoadPreferencesIntoUi()
@@ -198,10 +298,18 @@ namespace musicApp.Views
                     .FirstOrDefault(i => i.Tag is string s && s == AppLanguageCatalog.SystemLanguageTag);
 
             var sb = _preferences.Sidebar;
-            SidebarAddMusicCheckBox.IsChecked = sb.ShowAddMusic;
-            SidebarRescanLibraryCheckBox.IsChecked = sb.ShowRescanLibrary;
-            SidebarRemoveMusicCheckBox.IsChecked = sb.ShowRemoveMusic;
-            SidebarClearSettingsCheckBox.IsChecked = sb.ShowClearSettings;
+            _sidebarLibraryActionCheckLoading = true;
+            try
+            {
+                SidebarAddMusicCheckBox.IsChecked = sb.ShowAddMusic;
+                SidebarRescanLibraryCheckBox.IsChecked = sb.ShowRescanLibrary;
+                SidebarRemoveMusicCheckBox.IsChecked = sb.ShowRemoveMusic;
+                SidebarClearSettingsCheckBox.IsChecked = sb.ShowClearSettings;
+            }
+            finally
+            {
+                _sidebarLibraryActionCheckLoading = false;
+            }
 
             _playbackNormalizationCheckLoading = true;
             try
@@ -397,7 +505,6 @@ namespace musicApp.Views
             _preferences.Playback.VolumeNormalization = PlaybackVolumeNormalizationCheckBox.IsChecked == true;
             PreferencesManager.Instance.SavePreferencesSync(_preferences);
             NotifyMainWindowIfOwner();
-            UpdatePlaybackNormalizationUiState();
             RefreshPlaybackNormalizationStatsLine();
         }
 
@@ -445,20 +552,6 @@ namespace musicApp.Views
             _preferences.Playback.OutputBits = PlaybackOutputBitsUtil.Normalize(bits);
             PreferencesManager.Instance.SavePreferencesSync(_preferences);
             NotifyMainWindowIfOwner();
-        }
-
-        private void UpdatePlaybackNormalizationUiState()
-        {
-            PlaybackScanAllLoudnormButton.IsEnabled = false;
-            PlaybackClearLoudnormCacheButton.IsEnabled = false;
-        }
-
-        private void PlaybackScanAllLoudnorm_Click(object sender, RoutedEventArgs e)
-        {
-        }
-
-        private void PlaybackClearLoudnormCache_Click(object sender, RoutedEventArgs e)
-        {
         }
 
         private void ApplyAboutTitle()
@@ -675,6 +768,7 @@ namespace musicApp.Views
 
             if (sectionName == "Playback")
                 RefreshPlaybackNormalizationStatsLine();
+
         }
     }
 }

@@ -35,6 +35,11 @@ namespace musicApp
             public GeneralPreferences General { get; set; } = new GeneralPreferences();
             public SidebarPreferences Sidebar { get; set; } = new SidebarPreferences();
             public PlaybackPreferences Playback { get; set; } = new PlaybackPreferences();
+            public LibraryPreferences Library { get; set; } = new LibraryPreferences();
+        }
+
+        public class LibraryPreferences
+        {
         }
 
         public class PlaybackPreferences
@@ -202,6 +207,7 @@ namespace musicApp
             preferences.General ??= new GeneralPreferences();
             preferences.Sidebar ??= new SidebarPreferences();
             preferences.Playback ??= new PlaybackPreferences();
+            preferences.Library ??= new LibraryPreferences();
             preferences.General.Language ??= "en-system";
             preferences.Playback.CrossfadeSeconds = Math.Clamp(preferences.Playback.CrossfadeSeconds, 0, 15);
             if (preferences.Playback.CrossfadeSeconds <= 0)
@@ -221,7 +227,8 @@ namespace musicApp
             {
                 General = new GeneralPreferences(),
                 Sidebar = new SidebarPreferences(),
-                Playback = new PlaybackPreferences()
+                Playback = new PlaybackPreferences(),
+                Library = new LibraryPreferences()
             };
         }
     }

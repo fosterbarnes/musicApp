@@ -78,6 +78,10 @@ public static class AlbumArtThumbnailHelper
             if (albumArtFile != null)
                 return ScaleToBitmapImageFromFile(albumArtFile, targetSizePx);
 
+            var itcBytes = FruitAppLocalAlbumArtCache.TryGetCoverImageBytesForAudioPath(track.FilePath);
+            if (itcBytes != null)
+                return ScaleToBitmapImage(itcBytes, targetSizePx);
+
             return null;
         }
         catch
@@ -134,6 +138,13 @@ public static class AlbumArtThumbnailHelper
                     if (albumArtFile != null)
                         result = LoadBitmapImageFromFile(albumArtFile);
                 }
+            }
+
+            if (result == null)
+            {
+                var itcBytes = FruitAppLocalAlbumArtCache.TryGetCoverImageBytesForAudioPath(track.FilePath);
+                if (itcBytes != null)
+                    result = LoadBitmapImageFromBytes(itcBytes);
             }
         }
         catch
@@ -205,15 +216,25 @@ public static class AlbumArtThumbnailHelper
             g.CompositingQuality = CompositingQuality.HighQuality;
             g.DrawImage(originalBitmap, 0, 0, newW, newH);
 
-            var wpfBitmap = new BitmapImage();
-            using var stream = new MemoryStream();
-            scaled.Save(stream, ImageFormat.Png);
-            stream.Position = 0;
+            byte[] pngBytes;
+            using (var pngStream = new MemoryStream())
+            {
+                scaled.Save(pngStream, ImageFormat.Png);
+                pngBytes = pngStream.ToArray();
+            }
 
-            wpfBitmap.BeginInit();
-            wpfBitmap.CacheOption = BitmapCacheOption.OnLoad;
-            wpfBitmap.StreamSource = stream;
-            wpfBitmap.EndInit();
+            var wpfBitmap = new BitmapImage();
+            using (var ms = new MemoryStream(pngBytes, 0, pngBytes.Length, writable: false, publiclyVisible: true))
+            {
+                wpfBitmap.BeginInit();
+                wpfBitmap.CacheOption = BitmapCacheOption.OnLoad;
+                wpfBitmap.StreamSource = ms;
+                wpfBitmap.EndInit();
+            }
+
+            if (wpfBitmap.PixelWidth <= 0 || wpfBitmap.PixelHeight <= 0)
+                return null;
+
             wpfBitmap.Freeze();
             return wpfBitmap;
         }
@@ -230,12 +251,16 @@ public static class AlbumArtThumbnailHelper
 
         try
         {
-            using var stream = new MemoryStream(imageData);
             var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.StreamSource = stream;
-            bitmap.EndInit();
+            using (var stream = new MemoryStream(imageData, 0, imageData.Length, writable: false, publiclyVisible: true))
+            {
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.StreamSource = stream;
+                bitmap.EndInit();
+            }
+            if (bitmap.PixelWidth <= 0 || bitmap.PixelHeight <= 0)
+                return null;
             bitmap.Freeze();
             return bitmap;
         }

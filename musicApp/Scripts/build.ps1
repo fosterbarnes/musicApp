@@ -8,5 +8,5 @@ Write-Host "`nBuilding musicApp for x64..." -ForegroundColor Yellow
 dotnet build musicApp.csproj -c Release -p:Platform=x64
 Write-Host "`nBuilding musicApp for AnyCPU..." -ForegroundColor Yellow
 dotnet build musicApp.csproj -c Release -p:Platform=AnyCPU
-& (Join-Path $PSScriptRoot "buildInstaller.ps1")
 & (Join-Path $PSScriptRoot "buildUpdater.ps1")
+& (Join-Path $PSScriptRoot "buildInstaller.ps1")

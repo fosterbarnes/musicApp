@@ -116,7 +116,7 @@ public partial class UpdaterWindow : Window
             StopUpToDateAutoCloseTimer();
     }
 
-    private void OnUpToDateAutoCloseTouchDown(object sender, TouchEventArgs e)
+    private void OnUpToDateAutoCloseTouchDown(object? sender, TouchEventArgs e)
     {
         if (_upToDateAutoCloseTimer != null)
             StopUpToDateAutoCloseTimer();

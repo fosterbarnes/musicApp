@@ -182,8 +182,11 @@ namespace musicApp
                 waveOut.Stop();
                 waveOut.Dispose();
                 waveOut = null;
-                audioFileReader.Dispose();
-                audioFileReader = null;
+                if (audioFileReader != null)
+                {
+                    audioFileReader.Dispose();
+                    audioFileReader = null;
+                }
                 ClearCrossfadeMixerReferences();
                 _sessionVolumeProvider = null;
                 TitleBarSetAudioObjects(null, null);

@@ -89,14 +89,78 @@ public static class TrackMetadataSaver
 
             if (edit.EmbeddedFrontCoverPictureData is { Length: > 0 } picBytes)
             {
-                // Touch EmbeddedPictures to load initial snapshot; then clear all so Save() marks every
-                // prior picture deleted. Removing only PicType.Front misses covers stored as Generic/other.
                 var pics = t.EmbeddedPictures;
                 for (int i = pics.Count - 1; i >= 0; i--)
                     pics.RemoveAt(i);
 
                 var newPicture = PictureInfo.fromBinaryData(picBytes, PictureInfo.PIC_TYPE.Front);
                 pics.Add(newPicture);
+            }
+
+            if (!t.Save())
+            {
+                error = "The tag writer could not save changes to this file.";
+                return false;
+            }
+
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            error = "Access denied. The file may be read-only or in use.";
+            return false;
+        }
+        catch (IOException ex)
+        {
+            error = $"Could not write the file: {ex.Message}";
+            return false;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public static bool TrySaveEmbeddedCoverOnly(string filePath, byte[] pictureBytes, string? musicBrainzReleaseId,
+        out string? error)
+    {
+        error = null;
+
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            error = "No file path.";
+            return false;
+        }
+
+        if (pictureBytes is not { Length: > 0 })
+        {
+            error = "No image data.";
+            return false;
+        }
+
+        try
+        {
+            if (!File.Exists(filePath))
+            {
+                error = "File not found.";
+                return false;
+            }
+
+            var t = new Track(filePath);
+
+            var pics = t.EmbeddedPictures;
+            for (int i = pics.Count - 1; i >= 0; i--)
+                pics.RemoveAt(i);
+
+            pics.Add(PictureInfo.fromBinaryData(pictureBytes, PictureInfo.PIC_TYPE.Front));
+
+            if (!string.IsNullOrWhiteSpace(musicBrainzReleaseId) &&
+                Guid.TryParse(musicBrainzReleaseId.Trim(), out _))
+            {
+                var id = musicBrainzReleaseId.Trim();
+                if (t.AdditionalFields != null)
+                    t.AdditionalFields["MUSICBRAINZ_RELEASEID"] = id;
             }
 
             if (!t.Save())

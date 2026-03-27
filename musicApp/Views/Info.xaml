@@ -1096,15 +1096,25 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <Button x:Name="AddArtworkButton"
-                    Grid.Column="0"
-                    HorizontalAlignment="Left"
-                    Content="Add Artwork"
-                    MinWidth="110"
-                    Width="Auto"
-                    Visibility="Collapsed"
-                    Style="{StaticResource MetadataDialogFooterButtonStyle}"
-                    Click="AddArtworkButton_Click" />
+            <StackPanel Grid.Column="0"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Left">
+                <Button x:Name="FetchArtworkButton"
+                        Content="Download artwork"
+                        MinWidth="128"
+                        Width="Auto"
+                        Visibility="Collapsed"
+                        Style="{StaticResource MetadataDialogFooterButtonStyle}"
+                        Click="FetchArtworkButton_Click" />
+                <Button x:Name="AddArtworkButton"
+                        Content="Add Artwork"
+                        MinWidth="110"
+                        Width="Auto"
+                        Margin="10,0,0,0"
+                        Visibility="Collapsed"
+                        Style="{StaticResource MetadataDialogFooterButtonStyle}"
+                        Click="AddArtworkButton_Click" />
+            </StackPanel>
 
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"

@@ -9,6 +9,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using musicApp.Constants;
 using musicApp.Helpers;
@@ -177,21 +179,36 @@ namespace musicApp.Views
         private int _itemsSourceCount = -1;
         private ObservableCollection<object> _albumItems = new();
         private CancellationTokenSource? _rebuildCts;
-        private CancellationTokenSource? _artLoadCts;
+        private CancellationTokenSource? _viewportArtCts;
+        private CancellationTokenSource? _prefetchArtCts;
         private Song? _contextMenuSong;
         
         private (string albumName, string? artistName, bool openDetails, string? selectedTrackFilePath)? _pendingAlbumSelection;
         private readonly DispatcherTimer _artLoadDebounce;
         private readonly DispatcherTimer _flyoutResizeDebounce;
+        private readonly DispatcherTimer _resizeAnchorDebounce;
 
         private AlbumGridItem? _selectedAlbum;
         private AlbumFlyoutItem? _currentFlyout;
         private bool _isRefreshingFlyoutLayout;
+        private ResizeAnchorState? _pendingResizeAnchor;
 
         private bool _isDraggingSlider;
         private double _dragStartTileSize;
         private double _dragTargetSize;
         private ScaleTransform? _dragScaleTransform;
+        
+        private enum ResizeAnchorKind
+        {
+            SelectedAlbum,
+            FirstVisibleAlbum
+        }
+
+        private readonly record struct ResizeAnchorState(
+            string AlbumTitle,
+            string Artist,
+            double OffsetFromViewportTop,
+            ResizeAnchorKind Kind);
 
         public static readonly DependencyProperty SelectedFlyoutTrackFilePathProperty =
             DependencyProperty.Register(
@@ -224,8 +241,19 @@ namespace musicApp.Views
                 _flyoutResizeDebounce.Stop();
                 RefreshOpenFlyoutLayout();
             };
+            _resizeAnchorDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(70) };
+            _resizeAnchorDebounce.Tick += (_, __) =>
+            {
+                _resizeAnchorDebounce.Stop();
+                RestoreResizeAnchorIfPending();
+            };
 
-            Loaded += async (_, __) => await LoadVisibleAlbumArtAsync();
+            Loaded += (_, __) => KickViewportAlbumArtNow();
+            IsVisibleChanged += (_, __) =>
+            {
+                if (IsVisible)
+                    KickViewportAlbumArtNow();
+            };
             Unloaded += AlbumsView_OnUnloaded;
             SizeChanged += AlbumsView_SizeChanged;
         }
@@ -237,11 +265,15 @@ namespace musicApp.Views
                 _rebuildCts?.Cancel();
                 _rebuildCts?.Dispose();
                 _rebuildCts = null;
-                _artLoadCts?.Cancel();
-                _artLoadCts?.Dispose();
-                _artLoadCts = null;
+                _viewportArtCts?.Cancel();
+                _viewportArtCts?.Dispose();
+                _viewportArtCts = null;
+                _prefetchArtCts?.Cancel();
+                _prefetchArtCts?.Dispose();
+                _prefetchArtCts = null;
                 _artLoadDebounce.Stop();
                 _flyoutResizeDebounce.Stop();
+                _resizeAnchorDebounce.Stop();
             }
             catch
             {
@@ -255,18 +287,86 @@ namespace musicApp.Views
             _artLoadDebounce.Start();
         }
 
+        /// <summary>Starts a viewport art pass ASAP (no debounce). Safe from any thread.</summary>
+        private void KickViewportAlbumArtNow()
+        {
+            _artLoadDebounce.Stop();
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(KickViewportAlbumArtNow, DispatcherPriority.Loaded);
+                return;
+            }
+            _ = LoadVisibleAlbumArtAsync();
+        }
+
+        private void CancelAllAlbumArtWork()
+        {
+            _viewportArtCts?.Cancel();
+            _viewportArtCts?.Dispose();
+            _viewportArtCts = null;
+            _prefetchArtCts?.Cancel();
+            _prefetchArtCts?.Dispose();
+            _prefetchArtCts = null;
+        }
+
+        private void ShowLoadingIndicator()
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(ShowLoadingIndicator); return; }
+            LoadingIndicator.Visibility = Visibility.Visible;
+            StartBounceAnimation();
+        }
+
+        private void HideLoadingIndicator()
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(HideLoadingIndicator); return; }
+            StopBounceAnimation();
+            LoadingIndicator.Visibility = Visibility.Collapsed;
+        }
+
+        private void StartBounceAnimation()
+        {
+            var dots = new[] { LoadDot0, LoadDot1, LoadDot2, LoadDot3 };
+            double bounce = 8;
+            double step = 1000.0 / 6.0;
+
+            for (int i = 0; i < dots.Length; i++)
+            {
+                var anim = new DoubleAnimationUsingKeyFrames
+                {
+                    Duration = TimeSpan.FromSeconds(1),
+                    RepeatBehavior = RepeatBehavior.Forever
+                };
+
+                double offset = i * step;
+                if (offset > 0)
+                    anim.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(offset))));
+                anim.KeyFrames.Add(new LinearDoubleKeyFrame(-bounce, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(offset + step))));
+                anim.KeyFrames.Add(new LinearDoubleKeyFrame(bounce, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(offset + step * 2))));
+                anim.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(offset + step * 3))));
+
+                ((TranslateTransform)dots[i].RenderTransform).BeginAnimation(TranslateTransform.YProperty, anim);
+            }
+        }
+
+        private void StopBounceAnimation()
+        {
+            var dots = new[] { LoadDot0, LoadDot1, LoadDot2, LoadDot3 };
+            foreach (var dot in dots)
+                ((TranslateTransform)dot.RenderTransform).BeginAnimation(TranslateTransform.YProperty, null);
+        }
+
         public IEnumerable? ItemsSource
         {
             get => _itemsSource;
             set
             {
                 int newCount = TryGetCount(value);
-                if (ReferenceEquals(_itemsSource, value) && newCount == _itemsSourceCount)
+                if (ReferenceEquals(_itemsSource, value) && newCount == _itemsSourceCount && _albumItems.Count > 0)
                     return;
 
                 _itemsSource = value;
                 _itemsSourceCount = newCount;
-                _ = RebuildAlbumItemsAsync();
+                _ = RebuildAlbumItemsAsync(preserveViewState: true);
             }
         }
 
@@ -290,16 +390,47 @@ namespace musicApp.Views
 
         public void RebuildColumns() { }
 
-        public void RefreshAlbumGridFromLibrary() => _ = RebuildAlbumItemsAsync();
+        public void RefreshAlbumGridFromLibrary() => _ = RebuildAlbumItemsAsync(preserveViewState: true);
+
+        public bool TryRefreshAlbumGroupInPlace(Song track)
+        {
+            if (track == null || !TryGetAlbumGridGroupKey(track, out var albumTitle, out var artistKey))
+                return false;
+
+            int targetSize = Math.Max(UILayoutConstants.AlbumArtMinimumTargetSize, (int)Math.Round(CurrentTileSize));
+            var matchedAny = false;
+
+            foreach (var item in _albumItems.OfType<AlbumGridItem>())
+            {
+                if (!string.Equals(item.AlbumTitle, albumTitle, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(item.Artist, artistKey, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                matchedAny = true;
+                var rep = item.RepresentativeTrack;
+                var img = rep != null ? AlbumArtThumbnailHelper.LoadForTrack(rep, targetSize) : null;
+                item.AlbumArtSource = img;
+            }
+
+            if (!matchedAny)
+                return false;
+
+            if (_currentFlyout != null &&
+                string.Equals(_currentFlyout.AlbumTitle, albumTitle, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(_currentFlyout.Artist, artistKey, StringComparison.OrdinalIgnoreCase))
+            {
+                PatchOpenFlyoutForGroup(albumTitle, artistKey);
+            }
+
+            KickViewportAlbumArtNow();
+            return true;
+        }
 
         public void ScrollToAlbum(string albumName)
         {
             SelectAlbum(albumName, null, openDetails: true, selectedTrackFilePath: null);
         }
 
-        /// <summary>
-        /// Selects the matching album tile for a track and opens its flyout.
-        /// </summary>
         public void SelectAlbum(Song track)
         {
             if (track == null || string.IsNullOrWhiteSpace(track.Album))
@@ -328,9 +459,31 @@ namespace musicApp.Views
             }
 
             _pendingAlbumSelection = null;
-            SelectAlbumItem(item, openDetails);
+            SelectAlbumItem(item, openDetails, bringTargetIntoView: true);
 
             SelectedFlyoutTrackFilePath = selectedTrackFilePath;
+        }
+
+        private void ApplyMergedAlbumSelection(
+            (string albumName, string? artistName, bool openDetails, string? selectedTrackFilePath) p,
+            bool bringTargetIntoView)
+        {
+            if (string.IsNullOrWhiteSpace(p.albumName))
+                return;
+
+            if (string.IsNullOrWhiteSpace(p.selectedTrackFilePath))
+                SelectedFlyoutTrackFilePath = null;
+
+            var item = FindAlbumItem(p.albumName, p.artistName);
+            if (item == null)
+            {
+                _pendingAlbumSelection = p;
+                return;
+            }
+
+            _pendingAlbumSelection = null;
+            SelectAlbumItem(item, p.openDetails, bringTargetIntoView);
+            SelectedFlyoutTrackFilePath = p.selectedTrackFilePath;
         }
 
         private AlbumGridItem? FindAlbumItem(string albumName, string? artistName)
@@ -348,15 +501,18 @@ namespace musicApp.Views
                 string.Equals(a.AlbumTitle, albumName, StringComparison.OrdinalIgnoreCase));
         }
 
-        private void SelectAlbumItem(AlbumGridItem album, bool openDetails)
+        private void SelectAlbumItem(AlbumGridItem album, bool openDetails, bool bringTargetIntoView = true)
         {
             if (openDetails)
             {
                 if (!ReferenceEquals(_selectedAlbum, album) || _currentFlyout == null)
-                    ShowAlbumDetail(album);
+                    ShowAlbumDetail(album, bringFlyoutIntoView: bringTargetIntoView);
                 else
                     RefreshOpenFlyoutLayout();
             }
+
+            if (!bringTargetIntoView)
+                return;
 
             Dispatcher.BeginInvoke(new Action(() =>
             {
@@ -413,6 +569,45 @@ namespace musicApp.Views
             return result;
         }
 
+        /// <summary>
+        /// Index range for viewport album-art load. Uses container intersection when available; otherwise estimates
+        /// from wrap geometry so art loads before layout exposes <see cref="GetVisibleIndices"/> hits.
+        /// </summary>
+        private void GetAlbumArtViewportIndexRange(out int firstIdx, out int lastIdx)
+        {
+            firstIdx = 0;
+            lastIdx = -1;
+            if (_albumItems.Count == 0)
+                return;
+
+            var visible = GetVisibleIndices();
+            if (visible.Count > 0)
+            {
+                firstIdx = Math.Max(0, visible[0] - UILayoutConstants.AlbumVisibleRangeOverscan);
+                lastIdx = Math.Min(_albumItems.Count - 1, visible[^1] + UILayoutConstants.AlbumVisibleRangeOverscan);
+                return;
+            }
+
+            if (AlbumScrollViewer == null)
+                return;
+
+            double vw = AlbumScrollViewer.ViewportWidth > 0
+                ? AlbumScrollViewer.ViewportWidth
+                : Math.Max(UILayoutConstants.AlbumWrapFallbackWidth, ActualWidth - UILayoutConstants.AlbumWrapHorizontalPadding);
+            double vh = AlbumScrollViewer.ViewportHeight > 0
+                ? AlbumScrollViewer.ViewportHeight
+                : UILayoutConstants.AlbumArtBootstrapViewportHeightFallback;
+
+            double tileStrideX = Math.Max(1, CurrentTileSize + Math.Max(0, TileMargin.Right));
+            double tileStrideY = Math.Max(1, CurrentTileSize + Math.Max(0, TileMargin.Bottom) + (UILayoutConstants.AlbumTrackMetaRowHeight * TileScaleRatio));
+            int perRow = Math.Max(1, (int)Math.Floor(Math.Max(1, vw) / tileStrideX));
+            int rowCount = Math.Max(
+                UILayoutConstants.AlbumArtViewportBootstrapMinRows,
+                (int)Math.Ceiling(vh / tileStrideY) + UILayoutConstants.AlbumVisibleRangeOverscan);
+
+            lastIdx = Math.Min(_albumItems.Count - 1, perRow * rowCount - 1);
+        }
+
         private static int TryGetCount(IEnumerable? source)
         {
             if (source is ICollection col)
@@ -453,121 +648,490 @@ namespace musicApp.Views
 
         // --- Album list building ---
 
-        private async Task RebuildAlbumItemsAsync()
+        private readonly record struct AlbumGridLayoutHint(
+            double ViewportWidth,
+            double ViewportHeight,
+            double TileSize,
+            double MarginRight,
+            double MarginBottom,
+            double TileScaleRatio);
+
+        private AlbumGridLayoutHint CaptureAlbumGridLayoutHint()
         {
+            double vw = 0, vh = 0;
+            if (AlbumScrollViewer != null)
+            {
+                vw = AlbumScrollViewer.ViewportWidth;
+                vh = AlbumScrollViewer.ViewportHeight;
+            }
+            if (vw <= 0)
+                vw = Math.Max(1, ActualWidth - UILayoutConstants.AlbumWrapHorizontalPadding * 2);
+            if (vh <= 0)
+                vh = 400;
+            return new AlbumGridLayoutHint(vw, vh, CurrentTileSize, TileMargin.Right, TileMargin.Bottom, TileScaleRatio);
+        }
+
+        private static void GetWrapPanelStride(in AlbumGridLayoutHint h, out double tileStrideX, out double tileStrideY)
+        {
+            tileStrideX = Math.Max(1, h.TileSize + Math.Max(0, h.MarginRight));
+            tileStrideY = Math.Max(1, h.TileSize + Math.Max(0, h.MarginBottom) + UILayoutConstants.AlbumTrackMetaRowHeight * h.TileScaleRatio);
+        }
+
+        private static int ComputePrefixGoal(IReadOnlyList<AlbumGridItem> grouped, int? targetIndex, in AlbumGridLayoutHint hint)
+        {
+            if (grouped.Count == 0)
+                return 0;
+            GetWrapPanelStride(hint, out var sx, out var sy);
+            double vw = hint.ViewportWidth > 0 ? hint.ViewportWidth : UILayoutConstants.AlbumWrapFallbackWidth;
+            double vh = hint.ViewportHeight > 0 ? hint.ViewportHeight : 400;
+            int perRow = Math.Max(1, (int)Math.Floor(Math.Max(1, vw) / sx));
+            int visibleRows = Math.Max(1, (int)Math.Ceiling(Math.Max(1, vh) / sy));
+            int overscanRows = UILayoutConstants.AlbumRebuildPrefixOverscanRows;
+            int firstScreen = Math.Min(grouped.Count, (visibleRows + overscanRows) * perRow);
+            if (!targetIndex.HasValue)
+                return firstScreen;
+            int extra = (visibleRows + overscanRows) * perRow;
+            return Math.Min(grouped.Count, targetIndex.Value + 1 + extra);
+        }
+
+        private static int? FindTargetAlbumIndex(IReadOnlyList<AlbumGridItem> grouped, string albumName, string? artistName)
+        {
+            if (string.IsNullOrWhiteSpace(albumName))
+                return null;
+            if (!string.IsNullOrWhiteSpace(artistName))
+            {
+                for (int i = 0; i < grouped.Count; i++)
+                {
+                    var g = grouped[i];
+                    if (string.Equals(g.AlbumTitle, albumName, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(g.Artist, artistName, StringComparison.OrdinalIgnoreCase))
+                        return i;
+                }
+            }
+            for (int i = 0; i < grouped.Count; i++)
+            {
+                if (string.Equals(grouped[i].AlbumTitle, albumName, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+            return null;
+        }
+
+        private static bool TryGetAlbumGridGroupKey(Song track, out string albumTitle, out string artistKey)
+        {
+            albumTitle = "";
+            artistKey = "";
+            if (track == null)
+                return false;
+            var album = track.Album ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(album) || album == "Unknown Album")
+                return false;
+
+            albumTitle = album;
+            artistKey = !string.IsNullOrWhiteSpace(track.AlbumArtist)
+                ? track.AlbumArtist
+                : track.Artist ?? string.Empty;
+            return true;
+        }
+
+        private static List<AlbumGridItem> BuildGroupedAlbums(IEnumerable<Song> songsEnumerable, AlbumSortMode sortMode, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            List<Song> songs;
+            try { songs = songsEnumerable.ToList(); }
+            catch { return new List<AlbumGridItem>(); }
+
+            var query = songs
+                .Where(t => !string.IsNullOrWhiteSpace(t.Album) && t.Album != "Unknown Album")
+                .GroupBy(t =>
+                {
+                    var albumArtist = !string.IsNullOrWhiteSpace(t.AlbumArtist)
+                        ? t.AlbumArtist
+                        : t.Artist ?? string.Empty;
+                    return (Album: t.Album ?? string.Empty, Artist: albumArtist);
+                })
+                .Select(g =>
+                {
+                    var rep = g.First();
+                    BitmapImage? art = null;
+                    if (!string.IsNullOrEmpty(rep.ThumbnailCachePath))
+                        art = AlbumArtCacheManager.LoadFromCachePath(rep.ThumbnailCachePath);
+                    return new AlbumGridItem(g.Key.Album, g.Key.Artist, rep, art);
+                });
+
+            query = sortMode switch
+            {
+                AlbumSortMode.Artist => query
+                    .OrderBy(a => a.Artist, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(a => a.AlbumTitle, StringComparer.OrdinalIgnoreCase),
+                _ => query
+                    .OrderBy(a => a.AlbumTitle, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(a => a.Artist, StringComparer.OrdinalIgnoreCase)
+            };
+
+            return query.ToList();
+        }
+
+        private (double? scrollRatio, double? scrollOffsetPixels, (string albumName, string? artistName, bool openDetails, string? selectedTrackFilePath)? mergedPending)
+            CaptureRebuildRestoreStateAndCloseFlyout(bool preserveViewState)
+        {
+            double? scrollRatio = null;
+            double? scrollOffsetPixels = null;
+            (string albumName, string? artistName, bool openDetails, string? selectedTrackFilePath)? mergedPending = null;
+
+            if (preserveViewState)
+            {
+                if (AlbumScrollViewer != null && AlbumScrollViewer.ExtentHeight > 0)
+                {
+                    scrollRatio = AlbumScrollViewer.VerticalOffset / AlbumScrollViewer.ExtentHeight;
+                    scrollOffsetPixels = AlbumScrollViewer.VerticalOffset;
+                }
+
+                if (_pendingAlbumSelection.HasValue)
+                    mergedPending = _pendingAlbumSelection;
+                else if (_selectedAlbum != null && _currentFlyout != null)
+                {
+                    var path = SelectedFlyoutTrackFilePath;
+                    mergedPending = (_selectedAlbum.AlbumTitle, _selectedAlbum.Artist, true, path);
+                }
+            }
+            else if (_pendingAlbumSelection.HasValue)
+                mergedPending = _pendingAlbumSelection;
+
             CloseAlbumDetail();
+            return (scrollRatio, scrollOffsetPixels, mergedPending);
+        }
+
+        private async Task RebuildAlbumItemsAsync(bool preserveViewState = true)
+        {
+            (double? scrollRatio, double? scrollOffsetPixels, var mergedPending) = Dispatcher.CheckAccess()
+                ? CaptureRebuildRestoreStateAndCloseFlyout(preserveViewState)
+                : await Dispatcher.InvokeAsync(() => CaptureRebuildRestoreStateAndCloseFlyout(preserveViewState)).Task.ConfigureAwait(false);
+
+            CancelAllAlbumArtWork();
             _rebuildCts?.Cancel();
             _rebuildCts?.Dispose();
             _rebuildCts = new CancellationTokenSource();
             var ct = _rebuildCts.Token;
 
-            _albumItems.Clear();
+            ShowLoadingIndicator();
 
-            if (_itemsSource is not IEnumerable<Song> songsEnumerable)
+            if (_itemsSource is not IEnumerable<Song> songsRef)
+            {
+                HideLoadingIndicator();
                 return;
+            }
 
-            List<Song> songs;
-            try { songs = songsEnumerable.ToList(); }
-            catch { return; }
+            var sortMode = _sortMode;
+
+            AlbumGridLayoutHint layoutHint;
+            if (Dispatcher.CheckAccess())
+                layoutHint = CaptureAlbumGridLayoutHint();
+            else
+                layoutHint = await Dispatcher.InvokeAsync(CaptureAlbumGridLayoutHint).Task.ConfigureAwait(false);
 
             List<AlbumGridItem> grouped;
             try
             {
-                grouped = await Task.Run(() =>
-                {
-                    var query = songs
-                        .Where(t => !string.IsNullOrWhiteSpace(t.Album) && t.Album != "Unknown Album")
-                        .GroupBy(t =>
-                        {
-                            var albumArtist = !string.IsNullOrWhiteSpace(t.AlbumArtist)
-                                ? t.AlbumArtist
-                                : t.Artist ?? string.Empty;
-                            return (Album: t.Album ?? string.Empty, Artist: albumArtist);
-                        })
-                        .Select(g => new AlbumGridItem(g.Key.Album, g.Key.Artist, g.First()));
-
-                    query = _sortMode switch
-                    {
-                        AlbumSortMode.Artist => query
-                            .OrderBy(a => a.Artist, StringComparer.OrdinalIgnoreCase)
-                            .ThenBy(a => a.AlbumTitle, StringComparer.OrdinalIgnoreCase),
-                        _ => query
-                            .OrderBy(a => a.AlbumTitle, StringComparer.OrdinalIgnoreCase)
-                            .ThenBy(a => a.Artist, StringComparer.OrdinalIgnoreCase)
-                    };
-
-                    return query.ToList();
-                }, ct).ConfigureAwait(false);
+                grouped = await Task.Run(() => BuildGroupedAlbums(songsRef, sortMode, ct), ct).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) { return; }
-
-            if (ct.IsCancellationRequested) return;
-
-            const int batchSize = UILayoutConstants.AlbumRebuildBatchSize;
-            for (int i = 0; i < grouped.Count; i += batchSize)
+            catch (OperationCanceledException)
             {
-                if (ct.IsCancellationRequested) break;
+                HideLoadingIndicator();
+                return;
+            }
 
-                int end = Math.Min(grouped.Count, i + batchSize);
+            if (ct.IsCancellationRequested)
+            {
+                HideLoadingIndicator();
+                return;
+            }
+
+            if (grouped.Count == 0)
+            {
                 await Dispatcher.InvokeAsync(() =>
                 {
-                    if (i == 0) _albumItems.Clear();
-                    for (int j = i; j < end; j++)
-                        _albumItems.Add(grouped[j]);
-                });
+                    _albumItems.Clear();
+                    HideLoadingIndicator();
+                }, DispatcherPriority.Loaded).Task.ConfigureAwait(false);
+                return;
+            }
 
-                await Task.Yield();
+            int? targetIndex = null;
+            if (mergedPending.HasValue)
+            {
+                var p = mergedPending.Value;
+                targetIndex = FindTargetAlbumIndex(grouped, p.albumName, p.artistName);
+            }
+
+            int prefixGoal = ComputePrefixGoal(grouped, targetIndex, layoutHint);
+
+            int i = 0;
+            int batchLoopIndex = 0;
+            int batchesSinceSample = int.MaxValue;
+            SystemResourceSnapshot? lastResourceSnapshot = null;
+            int scanConcurrencySmoothed = 0;
+
+            while (i < grouped.Count && !ct.IsCancellationRequested)
+            {
+                bool inPrefixPhase = i < prefixGoal;
+                bool mustSample = batchLoopIndex == 0 || batchesSinceSample >= UILayoutConstants.AlbumRebuildMetricsResampleEveryNBatches;
+                if (mustSample)
+                {
+                    var sampleInterval = lastResourceSnapshot.HasValue && lastResourceSnapshot.Value.CpuBusyPercent < 40
+                        ? TimeSpan.FromMilliseconds(50)
+                        : TimeSpan.FromMilliseconds(100);
+                    try
+                    {
+                        lastResourceSnapshot = await Task.Run(() => WindowsSystemMetrics.Sample(sampleInterval), ct).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        HideLoadingIndicator();
+                        return;
+                    }
+
+                    ScanConcurrencyAdvisor.Recommend(
+                        lastResourceSnapshot.Value,
+                        Environment.ProcessorCount,
+                        ref scanConcurrencySmoothed);
+                    batchesSinceSample = 0;
+                }
+                else
+                    batchesSinceSample++;
+
+                int baseBatch = AlbumRebuildUiAdvisor.ItemsPerDispatcherBatch(scanConcurrencySmoothed);
+                if (inPrefixPhase)
+                    baseBatch = AlbumRebuildUiAdvisor.PrefixPhaseItemsPerBatch(baseBatch);
+
+                int end = i + baseBatch;
+                if (inPrefixPhase)
+                    end = Math.Min(end, prefixGoal);
+                end = Math.Min(end, grouped.Count);
+
+                if (end <= i)
+                    end = Math.Min(i + UILayoutConstants.AlbumRebuildBatchMin, grouped.Count);
+
+                bool isFirstUiBatch = i == 0;
+                var priority = isFirstUiBatch ? DispatcherPriority.Loaded : DispatcherPriority.Background;
+                int endLocal = end;
+                int iLocal = i;
+
+                try
+                {
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        if (isFirstUiBatch)
+                            _albumItems.Clear();
+                        for (int j = iLocal; j < endLocal; j++)
+                            _albumItems.Add(grouped[j]);
+
+                        if (isFirstUiBatch && endLocal > iLocal)
+                            _ = LoadVisibleAlbumArtAsync();
+                    }, priority).Task.ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    HideLoadingIndicator();
+                    return;
+                }
+
+                i = endLocal;
+                batchLoopIndex++;
+
+                if (batchLoopIndex == 1)
+                    _ = PrefetchAllAlbumArtBackgroundAsync();
+
+                if (lastResourceSnapshot.HasValue && lastResourceSnapshot.Value.CpuBusyPercent >= 88 && !inPrefixPhase)
+                {
+                    try { await Task.Delay(5, ct).ConfigureAwait(false); }
+                    catch (OperationCanceledException)
+                    {
+                        HideLoadingIndicator();
+                        return;
+                    }
+                }
+                else
+                    await Task.Yield();
             }
 
             if (!ct.IsCancellationRequested)
             {
-                _ = LoadInitialAlbumArtAsync();
-
-                if (_pendingAlbumSelection.HasValue)
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    var pending = _pendingAlbumSelection.Value;
-                    await Dispatcher.InvokeAsync(() =>
-                        SelectAlbum(pending.albumName, pending.artistName, pending.openDetails, pending.selectedTrackFilePath));
-                }
+                    AlbumGrid.UpdateLayout();
+                    AlbumScrollViewer?.UpdateLayout();
+
+                    if (mergedPending.HasValue)
+                        ApplyMergedAlbumSelection(mergedPending.Value, bringTargetIntoView: false);
+
+                    AlbumGrid.UpdateLayout();
+                    AlbumScrollViewer?.UpdateLayout();
+
+                    if (preserveViewState && AlbumScrollViewer != null)
+                    {
+                        double y;
+                        if (scrollOffsetPixels.HasValue)
+                            y = scrollOffsetPixels.Value;
+                        else if (scrollRatio.HasValue)
+                            y = scrollRatio.Value * AlbumScrollViewer.ExtentHeight;
+                        else
+                            y = double.NaN;
+
+                        if (!double.IsNaN(y))
+                        {
+                            AlbumScrollViewer.ScrollToVerticalOffset(
+                                Math.Min(Math.Max(0, y), AlbumScrollViewer.ScrollableHeight));
+                        }
+                    }
+
+                    KickViewportAlbumArtNow();
+                    HideLoadingIndicator();
+                }, DispatcherPriority.Loaded).Task.ConfigureAwait(false);
             }
         }
 
         // --- Art loading ---
 
-        private async Task LoadInitialAlbumArtAsync()
+        private async Task PrefetchAllAlbumArtBackgroundAsync()
         {
-            if (_albumItems.Count == 0) return;
+            _prefetchArtCts?.Cancel();
+            _prefetchArtCts?.Dispose();
+            _prefetchArtCts = new CancellationTokenSource();
+            var ct = _prefetchArtCts.Token;
 
-            _artLoadCts?.Cancel();
-            _artLoadCts?.Dispose();
-            _artLoadCts = new CancellationTokenSource();
-            var ct = _artLoadCts.Token;
+            int batchesSinceSample = int.MaxValue;
+            SystemResourceSnapshot? lastResourceSnapshot = null;
 
-            int maxInitial = Math.Min(UILayoutConstants.InitialAlbumArtLoadCount, _albumItems.Count);
-            var itemsToLoad = Enumerable.Range(0, maxInitial)
-                .Select(i => _albumItems[i] as AlbumGridItem)
-                .Where(a => a != null && a.AlbumArtSource == null)
-                .Cast<AlbumGridItem>()
-                .ToList();
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    int countSnapshot;
+                    try
+                    {
+                        countSnapshot = await Dispatcher.InvokeAsync(
+                            () => _albumItems.Count,
+                            DispatcherPriority.Loaded).Task.ConfigureAwait(false);
+                    }
+                    catch (TaskCanceledException) { return; }
 
-            try { await LoadAlbumArtForItemsAsync(itemsToLoad, ct); }
-            catch (OperationCanceledException) { }
+                    if (countSnapshot == 0)
+                        break;
+
+                    int indexChunk = UILayoutConstants.AlbumArtPrefetchIndexChunk;
+                    if (lastResourceSnapshot.HasValue && lastResourceSnapshot.Value.CpuBusyPercent >= 88)
+                        indexChunk = Math.Max(8, indexChunk / 2);
+
+                    bool anyWorkThisPass = false;
+
+                    for (int start = 0; start < countSnapshot && !ct.IsCancellationRequested; start += indexChunk)
+                    {
+                        try
+                        {
+                            int liveCount = await Dispatcher.InvokeAsync(() => _albumItems.Count, DispatcherPriority.Loaded).Task.ConfigureAwait(false);
+                            if (liveCount > countSnapshot)
+                                countSnapshot = liveCount;
+                        }
+                        catch (TaskCanceledException) { return; }
+
+                        bool mustSample = batchesSinceSample >= UILayoutConstants.AlbumArtPrefetchMetricsResampleEveryNBatches;
+                        if (mustSample)
+                        {
+                            var sampleInterval = lastResourceSnapshot.HasValue && lastResourceSnapshot.Value.CpuBusyPercent < 40
+                                ? TimeSpan.FromMilliseconds(50)
+                                : TimeSpan.FromMilliseconds(100);
+                            try
+                            {
+                                lastResourceSnapshot = await Task.Run(() => WindowsSystemMetrics.Sample(sampleInterval), ct).ConfigureAwait(false);
+                            }
+                            catch (OperationCanceledException) { return; }
+                            batchesSinceSample = 0;
+                            indexChunk = UILayoutConstants.AlbumArtPrefetchIndexChunk;
+                            if (lastResourceSnapshot.HasValue && lastResourceSnapshot.Value.CpuBusyPercent >= 88)
+                                indexChunk = Math.Max(8, indexChunk / 2);
+                        }
+                        else
+                            batchesSinceSample++;
+
+                        int s = start;
+                        int e = Math.Min(start + indexChunk, countSnapshot);
+
+                        List<AlbumGridItem> batch;
+                        try
+                        {
+                            batch = await Dispatcher.InvokeAsync(() =>
+                            {
+                                var list = new List<AlbumGridItem>();
+                                for (int i = s; i < e; i++)
+                                {
+                                    if (_albumItems[i] is AlbumGridItem a && a.AlbumArtSource == null)
+                                        list.Add(a);
+                                }
+                                return list;
+                            }, DispatcherPriority.Loaded).Task.ConfigureAwait(false);
+                        }
+                        catch (TaskCanceledException) { return; }
+
+                        if (batch.Count > 0)
+                        {
+                            anyWorkThisPass = true;
+                            try { await LoadAlbumArtForItemsAsync(batch, ct, backgroundFriendly: true).ConfigureAwait(false); }
+                            catch (OperationCanceledException) { return; }
+                        }
+
+                        if (lastResourceSnapshot.HasValue && lastResourceSnapshot.Value.CpuBusyPercent >= 88)
+                        {
+                            try { await Task.Delay(5, ct).ConfigureAwait(false); }
+                            catch (OperationCanceledException) { return; }
+                        }
+                        else
+                            await Task.Yield();
+                    }
+
+                    bool anyMissing;
+                    try
+                    {
+                        anyMissing = await Dispatcher.InvokeAsync(() =>
+                        {
+                            for (int i = 0; i < _albumItems.Count; i++)
+                            {
+                                if (_albumItems[i] is AlbumGridItem a && a.AlbumArtSource == null)
+                                    return true;
+                            }
+                            return false;
+                        }, DispatcherPriority.Loaded).Task.ConfigureAwait(false);
+                    }
+                    catch (TaskCanceledException) { return; }
+
+                    if (!anyMissing)
+                        break;
+                    if (!anyWorkThisPass)
+                        break;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
         }
 
         private async Task LoadVisibleAlbumArtAsync()
         {
+            if (!Dispatcher.CheckAccess())
+            {
+                KickViewportAlbumArtNow();
+                return;
+            }
+
             if (AlbumScrollViewer == null || _albumItems.Count == 0) return;
 
-            _artLoadCts?.Cancel();
-            _artLoadCts?.Dispose();
-            _artLoadCts = new CancellationTokenSource();
-            var ct = _artLoadCts.Token;
+            GetAlbumArtViewportIndexRange(out int firstIdx, out int lastIdx);
+            if (lastIdx < firstIdx)
+                return;
 
-            var visible = GetVisibleIndices();
-            if (visible.Count == 0) return;
-
-            int firstIdx = Math.Max(0, visible[0] - UILayoutConstants.AlbumVisibleRangeOverscan);
-            int lastIdx = Math.Min(_albumItems.Count - 1, visible[^1] + UILayoutConstants.AlbumVisibleRangeOverscan);
+            _viewportArtCts?.Cancel();
+            _viewportArtCts?.Dispose();
+            _viewportArtCts = new CancellationTokenSource();
+            var ct = _viewportArtCts.Token;
 
             var itemsToLoad = new List<AlbumGridItem>();
             for (int i = firstIdx; i <= lastIdx; i++)
@@ -576,17 +1140,62 @@ namespace musicApp.Views
                     itemsToLoad.Add(a);
             }
 
-            try { await LoadAlbumArtForItemsAsync(itemsToLoad, ct); }
+            try { await LoadAlbumArtForItemsAsync(itemsToLoad, ct, backgroundFriendly: false); }
             catch (OperationCanceledException) { }
         }
 
-        private async Task LoadAlbumArtForItemsAsync(IReadOnlyCollection<AlbumGridItem> items, CancellationToken ct)
+        private async Task LoadAlbumArtForItemsAsync(IReadOnlyCollection<AlbumGridItem> items, CancellationToken ct, bool backgroundFriendly)
         {
             if (items.Count == 0)
                 return;
 
-            int targetSize = Math.Max(UILayoutConstants.AlbumArtMinimumTargetSize, (int)Math.Round(CurrentTileSize));
-            using var throttler = new SemaphoreSlim(4);
+            double tileDp = CurrentTileSize;
+            if (!Dispatcher.CheckAccess())
+            {
+                try
+                {
+                    tileDp = await Dispatcher.InvokeAsync(() => CurrentTileSize, DispatcherPriority.Loaded).Task.ConfigureAwait(false);
+                }
+                catch (TaskCanceledException)
+                {
+                    return;
+                }
+            }
+            int targetSize = Math.Max(UILayoutConstants.AlbumArtMinimumTargetSize, (int)Math.Round(tileDp));
+            int parallel = 4;
+            try
+            {
+                parallel = await Task.Run(() =>
+                {
+                    int smoothed = 0;
+                    var snap = WindowsSystemMetrics.Sample(TimeSpan.FromMilliseconds(50));
+                    return ScanConcurrencyAdvisor.Recommend(snap, Environment.ProcessorCount, ref smoothed);
+                }, ct).ConfigureAwait(false);
+                int maxP = backgroundFriendly ? UILayoutConstants.AlbumArtPrefetchMaxParallelism : UILayoutConstants.AlbumArtLoadMaxParallelism;
+                parallel = Math.Clamp(parallel, 1, maxP);
+                if (backgroundFriendly)
+                {
+                    parallel = Math.Max(1, parallel / 2);
+                    parallel = Math.Min(parallel, UILayoutConstants.AlbumArtPrefetchMaxParallelism);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch
+            {
+                int maxP = backgroundFriendly ? UILayoutConstants.AlbumArtPrefetchMaxParallelism : UILayoutConstants.AlbumArtLoadMaxParallelism;
+                parallel = Math.Clamp(4, 1, maxP);
+                if (backgroundFriendly)
+                {
+                    parallel = Math.Max(1, parallel / 2);
+                    parallel = Math.Min(parallel, UILayoutConstants.AlbumArtPrefetchMaxParallelism);
+                }
+            }
+
+            var assignPriority = DispatcherPriority.Normal;
+            using var throttler = new SemaphoreSlim(parallel);
             var tasks = items.Select(async item =>
             {
                 if (item.AlbumArtSource != null || ct.IsCancellationRequested)
@@ -603,7 +1212,7 @@ namespace musicApp.Views
                     {
                         if (!ct.IsCancellationRequested && item.AlbumArtSource == null)
                             item.AlbumArtSource = img;
-                    });
+                    }, assignPriority);
                 }
                 finally
                 {
@@ -643,12 +1252,68 @@ namespace musicApp.Views
         {
             if (!IsLoaded) return;
             _sortMode = SortModeCombo.SelectedIndex == 1 ? AlbumSortMode.Artist : AlbumSortMode.Album;
-            _ = RebuildAlbumItemsAsync();
+            _ = RebuildAlbumItemsAsync(preserveViewState: false);
         }
 
         // --- Album detail flyout ---
 
-        private void ShowAlbumDetail(AlbumGridItem album)
+        private void PopulateFlyoutTrackLists(AlbumFlyoutItem flyout, string albumTitle, string albumArtistKey)
+        {
+            if (_itemsSource is not IEnumerable<Song> songs)
+                return;
+
+            flyout.Tracks = AlbumTrackOrder.SortByAlbumSequence(
+                songs.Where(s =>
+                    string.Equals(s.Album, albumTitle, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(
+                        !string.IsNullOrWhiteSpace(s.AlbumArtist) ? s.AlbumArtist : s.Artist,
+                        albumArtistKey,
+                        StringComparison.OrdinalIgnoreCase)));
+
+            int half = (int)Math.Ceiling(flyout.Tracks.Count / 2.0);
+            flyout.TracksColumn1 = flyout.Tracks.Take(half).ToList();
+            flyout.TracksColumn2 = flyout.Tracks.Skip(half).ToList();
+            flyout.AlbumMetadata = BuildAlbumMetadata(flyout.Tracks);
+            FlyoutPanelHeight = CalculateFlyoutHeight(flyout.Tracks.Count);
+        }
+
+        private void PatchOpenFlyoutForGroup(string albumTitle, string albumArtistKey)
+        {
+            if (_currentFlyout == null)
+                return;
+
+            var flyout = _currentFlyout;
+            if (_selectedAlbum?.RepresentativeTrack is Song repMeta)
+            {
+                flyout.Genre = repMeta.Genre ?? "";
+                flyout.Year = repMeta.Year > 0 ? repMeta.Year.ToString() : "";
+            }
+
+            flyout.AlbumArtSource = _selectedAlbum?.AlbumArtSource;
+
+            PopulateFlyoutTrackLists(flyout, albumTitle, albumArtistKey);
+            FlyoutPanelWidth = GetWrapPanelWidth();
+            if (_selectedAlbum != null)
+                UpdateFlyoutArrowOffset(_selectedAlbum);
+
+            if (_selectedAlbum?.RepresentativeTrack is Song repForFull)
+            {
+                var flyoutRef = flyout;
+                _ = Task.Run(() =>
+                {
+                    var full = AlbumArtThumbnailHelper.LoadFullSizeForTrack(repForFull);
+                    if (full == null)
+                        return;
+                    Dispatcher.InvokeAsync(() =>
+                    {
+                        if (ReferenceEquals(_currentFlyout, flyoutRef))
+                            flyoutRef.AlbumArtSource = full;
+                    });
+                });
+            }
+        }
+
+        private void ShowAlbumDetail(AlbumGridItem album, bool bringFlyoutIntoView = true)
         {
             if (_currentFlyout != null)
             {
@@ -668,11 +1333,11 @@ namespace musicApp.Views
                 AlbumArtSource = album.AlbumArtSource
             };
 
-            if (album.AlbumArtSource == null)
+            if (album.AlbumArtSource == null && album.RepresentativeTrack is Song repForThumb)
             {
                 _ = Task.Run(() =>
                 {
-                    var img = AlbumArtThumbnailHelper.LoadForTrack(album.RepresentativeTrack);
+                    var img = AlbumArtThumbnailHelper.LoadForTrack(repForThumb);
                     if (img != null)
                     {
                         Dispatcher.InvokeAsync(() =>
@@ -686,40 +1351,23 @@ namespace musicApp.Views
             }
 
             // Flyout should display full-size album art; load it asynchronously so opening stays instant.
-            _ = Task.Run(() =>
+            if (album.RepresentativeTrack is Song repForFull)
             {
-                var full = AlbumArtThumbnailHelper.LoadFullSizeForTrack(album.RepresentativeTrack);
-                if (full != null)
+                _ = Task.Run(() =>
                 {
-                    Dispatcher.InvokeAsync(() =>
+                    var full = AlbumArtThumbnailHelper.LoadFullSizeForTrack(repForFull);
+                    if (full != null)
                     {
-                        if (_selectedAlbum == album && _currentFlyout == flyout)
-                            flyout.AlbumArtSource = full;
-                    });
-                }
-            });
-
-            if (_itemsSource is IEnumerable<Song> songs)
-            {
-                var albumArtist = album.Artist;
-                flyout.Tracks = songs
-                    .Where(s =>
-                        string.Equals(s.Album, album.AlbumTitle, StringComparison.OrdinalIgnoreCase) &&
-                        string.Equals(
-                            !string.IsNullOrWhiteSpace(s.AlbumArtist) ? s.AlbumArtist : s.Artist,
-                            albumArtist,
-                            StringComparison.OrdinalIgnoreCase))
-                    .OrderBy(s => int.TryParse(s.DiscNumber, out int d) ? d : 0)
-                    .ThenBy(s => s.TrackNumber)
-                    .ToList();
-
-                int half = (int)Math.Ceiling(flyout.Tracks.Count / 2.0);
-                flyout.TracksColumn1 = flyout.Tracks.Take(half).ToList();
-                flyout.TracksColumn2 = flyout.Tracks.Skip(half).ToList();
-                flyout.AlbumMetadata = BuildAlbumMetadata(flyout.Tracks);
+                        Dispatcher.InvokeAsync(() =>
+                        {
+                            if (_selectedAlbum == album && _currentFlyout == flyout)
+                                flyout.AlbumArtSource = full;
+                        });
+                    }
+                });
             }
 
-            FlyoutPanelHeight = CalculateFlyoutHeight(flyout.Tracks.Count);
+            PopulateFlyoutTrackLists(flyout, album.AlbumTitle, album.Artist);
 
             int albumIndex = _albumItems.IndexOf(album);
             int insertIndex = GetRowEndIndex(albumIndex);
@@ -729,6 +1377,9 @@ namespace musicApp.Views
 
             _currentFlyout = flyout;
             _albumItems.Insert(insertIndex, flyout);
+
+            if (!bringFlyoutIntoView)
+                return;
 
             Dispatcher.InvokeAsync(() =>
             {
@@ -752,6 +1403,10 @@ namespace musicApp.Views
 
         private void AlbumsView_SizeChanged(object sender, SizeChangedEventArgs e)
         {
+            TryCaptureResizeAnchor();
+            _resizeAnchorDebounce.Stop();
+            _resizeAnchorDebounce.Start();
+
             ScheduleArtLoad();
             if (_currentFlyout == null || _selectedAlbum == null)
                 return;
@@ -760,6 +1415,126 @@ namespace musicApp.Views
             FlyoutPanelWidth = GetWrapPanelWidth();
             _flyoutResizeDebounce.Stop();
             _flyoutResizeDebounce.Start();
+        }
+
+        private bool TryCaptureResizeAnchor()
+        {
+            if (AlbumScrollViewer == null)
+                return false;
+
+            if (_selectedAlbum != null)
+            {
+                if (!TryGetAlbumItemTopInViewport(_selectedAlbum, out var itemTop))
+                    itemTop = 12;
+
+                _pendingResizeAnchor = new ResizeAnchorState(
+                    _selectedAlbum.AlbumTitle,
+                    _selectedAlbum.Artist,
+                    itemTop,
+                    ResizeAnchorKind.SelectedAlbum);
+                return true;
+            }
+
+            if (!TryGetFirstVisibleAlbumItem(out var visibleAlbum, out var visibleTop) || visibleAlbum == null)
+                return false;
+
+            _pendingResizeAnchor = new ResizeAnchorState(
+                visibleAlbum.AlbumTitle,
+                visibleAlbum.Artist,
+                visibleTop,
+                ResizeAnchorKind.FirstVisibleAlbum);
+            return true;
+        }
+
+        private bool TryGetFirstVisibleAlbumItem(out AlbumGridItem? album, out double itemTop)
+        {
+            album = null;
+            itemTop = 0;
+
+            if (AlbumScrollViewer == null || _albumItems.Count == 0)
+                return false;
+
+            var visibleIndices = GetVisibleIndices();
+            if (visibleIndices.Count == 0)
+                return false;
+
+            double bestTop = double.MaxValue;
+            foreach (var index in visibleIndices)
+            {
+                if (index < 0 || index >= _albumItems.Count)
+                    continue;
+
+                if (_albumItems[index] is not AlbumGridItem candidate)
+                    continue;
+
+                if (!TryGetAlbumItemTopInViewport(candidate, out var top))
+                    continue;
+
+                if (top < bestTop)
+                {
+                    bestTop = top;
+                    album = candidate;
+                    itemTop = top;
+                }
+            }
+
+            return album != null;
+        }
+
+        private bool TryGetAlbumItemTopInViewport(AlbumGridItem album, out double itemTop)
+        {
+            itemTop = 0;
+            if (AlbumScrollViewer == null)
+                return false;
+
+            var container = AlbumGrid.ItemContainerGenerator.ContainerFromItem(album) as FrameworkElement;
+            if (container == null)
+                return false;
+
+            try
+            {
+                var transform = container.TransformToAncestor(AlbumScrollViewer);
+                itemTop = transform.Transform(new Point(0, 0)).Y;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void RestoreResizeAnchorIfPending()
+        {
+            if (!_pendingResizeAnchor.HasValue || AlbumScrollViewer == null || _albumItems.Count == 0)
+                return;
+
+            var pending = _pendingResizeAnchor.Value;
+            var anchor = FindAlbumItem(pending.AlbumTitle, pending.Artist);
+            if (anchor == null)
+            {
+                _pendingResizeAnchor = null;
+                return;
+            }
+
+            AlbumGrid.UpdateLayout();
+            AlbumScrollViewer.UpdateLayout();
+
+            if (!TryGetAlbumItemTopInViewport(anchor, out var currentTop))
+            {
+                _pendingResizeAnchor = null;
+                return;
+            }
+
+            double desiredTop = pending.OffsetFromViewportTop;
+            if (pending.Kind == ResizeAnchorKind.SelectedAlbum)
+                desiredTop = Math.Min(Math.Max(0, desiredTop), Math.Max(0, AlbumScrollViewer.ViewportHeight - CurrentTileSize));
+            else
+                desiredTop = Math.Max(0, desiredTop);
+
+            double targetOffset = AlbumScrollViewer.VerticalOffset + (currentTop - desiredTop);
+            targetOffset = Math.Min(Math.Max(0, targetOffset), AlbumScrollViewer.ScrollableHeight);
+            AlbumScrollViewer.ScrollToVerticalOffset(targetOffset);
+            _pendingResizeAnchor = null;
         }
 
         private void RefreshOpenFlyoutLayout()
@@ -938,7 +1713,6 @@ namespace musicApp.Views
 
         private void AlbumContextMenu_PlayNextClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) PlayNextRequested?.Invoke(this, _contextMenuSong); }
         private void AlbumContextMenu_AddToQueueClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) AddToQueueRequested?.Invoke(this, _contextMenuSong); }
-        private void AlbumContextMenu_AddToPlaylistClick(object sender, RoutedEventArgs e) { }
         private void AlbumContextMenu_NewPlaylistClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) CreateNewPlaylistWithTrackRequested?.Invoke(this, _contextMenuSong); }
         private void AlbumContextMenu_ShowInArtistsClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInArtistsRequested?.Invoke(this, _contextMenuSong); }
         private void AlbumContextMenu_ShowInAlbumsClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInAlbumsRequested?.Invoke(this, _contextMenuSong); }

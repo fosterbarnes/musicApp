@@ -68,8 +68,9 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <Grid Margin="{StaticResource Uniform12-thk}">
-        <Grid.RowDefinitions>
+    <Grid>
+        <Grid Margin="{StaticResource Uniform12-thk}">
+            <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -297,20 +298,6 @@
                                               VerticalAlignment="Center"
                                               Checked="PlaybackVolumeNormalizationCheckBox_Changed"
                                               Unchecked="PlaybackVolumeNormalizationCheckBox_Changed" />
-                                    <StackPanel Grid.Column="1"
-                                                Orientation="Horizontal"
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Center">
-                                        <Button x:Name="PlaybackScanAllLoudnormButton"
-                                                Content="Scan all"
-                                                Style="{StaticResource SettingsGeneralActionButtonStyle}"
-                                                Click="PlaybackScanAllLoudnorm_Click" />
-                                        <Button x:Name="PlaybackClearLoudnormCacheButton"
-                                                Margin="{StaticResource Left8-thk}"
-                                                Content="Clear Cache"
-                                                Style="{StaticResource SettingsGeneralActionButtonStyle}"
-                                                Click="PlaybackClearLoudnormCache_Click" />
-                                    </StackPanel>
                                 </Grid>
                                 <TextBlock x:Name="PlaybackLoudnormCacheStatsText"
                                            Margin="{StaticResource Top8-thk}"
@@ -466,20 +453,26 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <Grid Grid.Row="0"
                                   Grid.Column="0"
                                   Grid.ColumnSpan="2"
                                   Margin="{StaticResource FieldRowGap-thk}"
-                                  VerticalAlignment="Top">
+                                  VerticalAlignment="Top"
+                                  Grid.IsSharedSizeScope="True">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="2*" />
-                                    <ColumnDefinition Width="3*" />
+                                    <ColumnDefinition Width="Auto"
+                                                      SharedSizeGroup="SettingsLibrarySidebarPairCol" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="{StaticResource SettingsLibraryActionsPairGutter-gl}" />
+                                    <ColumnDefinition Width="Auto"
+                                                      SharedSizeGroup="SettingsLibrarySidebarPairCol" />
+                                    <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
@@ -487,84 +480,116 @@
 
                                 <TextBlock Grid.Row="0"
                                            Grid.Column="0"
+                                           Text="Sidebar"
+                                           Style="{StaticResource FieldLabelStyle}"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Top"
+                                           HorizontalAlignment="Center"
+                                           Margin="{StaticResource Top2-thk}" />
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="1"
                                            Text="Library actions"
                                            Style="{StaticResource FieldLabelStyle}"
                                            TextWrapping="Wrap"
                                            VerticalAlignment="Top"
                                            HorizontalAlignment="Left"
+                                           Margin="{StaticResource SettingsLibraryActionsLibraryHeaderMargin-thk}" />
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="3"
+                                           Text=""
+                                           Style="{StaticResource FieldLabelStyle}"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Top"
+                                           HorizontalAlignment="Center"
                                            Margin="{StaticResource Top2-thk}" />
                                 <TextBlock Grid.Row="0"
-                                           Grid.Column="1"
-                                           Text="Show in sidebar"
+                                           Grid.Column="4"
+                                           Text=""
                                            Style="{StaticResource FieldLabelStyle}"
                                            TextWrapping="Wrap"
                                            VerticalAlignment="Top"
                                            HorizontalAlignment="Left"
-                                           Margin="{StaticResource Top2-thk}" />
+                                           Margin="{StaticResource SettingsLibraryActionsLibraryHeaderMargin-thk}" />
 
+                                <CheckBox x:Name="SidebarAddMusicCheckBox"
+                                          Grid.Row="1"
+                                          Grid.Column="0"
+                                          Foreground="{StaticResource TextPrimary-brush}"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Center"
+                                          Margin="{StaticResource SettingsLibraryActionsSidebarCheckTopRowMargin-thk}"
+                                          Checked="SidebarLibraryActionShowInSidebar_CheckChanged"
+                                          Unchecked="SidebarLibraryActionShowInSidebar_CheckChanged"
+                                          IsChecked="False" />
                                 <Button x:Name="LibraryAddMusicButton"
                                         Grid.Row="1"
-                                        Grid.Column="0"
+                                        Grid.Column="1"
                                         Style="{StaticResource SettingsLibraryActionButtonStyle}"
-                                        Margin="{StaticResource SettingsLibraryActionButtonRowMargin-thk}"
+                                        Margin="{StaticResource SettingsLibraryActionButtonTopRowMargin-thk}"
                                         Click="LibraryAddMusicButton_Click">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="FolderPlus" VerticalAlignment="Center" Margin="{StaticResource Right10-thk}" />
                                         <TextBlock Text="Add Music" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
-                                <CheckBox x:Name="SidebarAddMusicCheckBox"
+
+                                <CheckBox x:Name="SidebarRescanLibraryCheckBox"
                                           Grid.Row="1"
-                                          Grid.Column="1"
+                                          Grid.Column="3"
                                           Foreground="{StaticResource TextPrimary-brush}"
                                           VerticalAlignment="Center"
-                                          HorizontalAlignment="Left"
-                                          Margin="{StaticResource Bottom4-thk}"
+                                          HorizontalAlignment="Center"
+                                          Margin="{StaticResource SettingsLibraryActionsSidebarCheckTopRowMargin-thk}"
+                                          Checked="SidebarLibraryActionShowInSidebar_CheckChanged"
+                                          Unchecked="SidebarLibraryActionShowInSidebar_CheckChanged"
                                           IsChecked="False" />
-
                                 <Button x:Name="LibraryRescanLibraryButton"
-                                        Grid.Row="2"
-                                        Grid.Column="0"
+                                        Grid.Row="1"
+                                        Grid.Column="4"
                                         Style="{StaticResource SettingsLibraryActionButtonStyle}"
-                                        Margin="{StaticResource SettingsLibraryActionButtonRowMargin-thk}"
+                                        Margin="{StaticResource SettingsLibraryActionButtonTopRowMargin-thk}"
                                         Click="LibraryRescanLibraryButton_Click">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="Refresh" VerticalAlignment="Center" Margin="{StaticResource Right10-thk}" />
                                         <TextBlock Text="Re-Scan Library" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
-                                <CheckBox x:Name="SidebarRescanLibraryCheckBox"
+
+                                <CheckBox x:Name="SidebarRemoveMusicCheckBox"
                                           Grid.Row="2"
-                                          Grid.Column="1"
+                                          Grid.Column="0"
                                           Foreground="{StaticResource TextPrimary-brush}"
                                           VerticalAlignment="Center"
-                                          HorizontalAlignment="Left"
-                                          Margin="{StaticResource Bottom4-thk}"
+                                          HorizontalAlignment="Center"
+                                          Margin="{StaticResource SettingsLibraryActionsSidebarCheckBottomRowMargin-thk}"
+                                          Checked="SidebarLibraryActionShowInSidebar_CheckChanged"
+                                          Unchecked="SidebarLibraryActionShowInSidebar_CheckChanged"
                                           IsChecked="False" />
-
                                 <Button x:Name="LibraryRemoveMusicButton"
-                                        Grid.Row="3"
-                                        Grid.Column="0"
+                                        Grid.Row="2"
+                                        Grid.Column="1"
                                         Style="{StaticResource SettingsLibraryActionButtonStyle}"
-                                        Margin="{StaticResource SettingsLibraryActionButtonRowMargin-thk}"
+                                        Margin="{StaticResource SettingsLibraryActionButtonLastRowMargin-thk}"
                                         Click="LibraryRemoveMusicButton_Click">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="FolderRemove" VerticalAlignment="Center" Margin="{StaticResource Right10-thk}" />
                                         <TextBlock Text="Remove Music" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
-                                <CheckBox x:Name="SidebarRemoveMusicCheckBox"
-                                          Grid.Row="3"
-                                          Grid.Column="1"
+
+                                <CheckBox x:Name="SidebarClearSettingsCheckBox"
+                                          Grid.Row="2"
+                                          Grid.Column="3"
                                           Foreground="{StaticResource TextPrimary-brush}"
                                           VerticalAlignment="Center"
-                                          HorizontalAlignment="Left"
-                                          Margin="{StaticResource Bottom4-thk}"
+                                          HorizontalAlignment="Center"
+                                          Margin="{StaticResource SettingsLibraryActionsSidebarCheckBottomRowMargin-thk}"
+                                          Checked="SidebarLibraryActionShowInSidebar_CheckChanged"
+                                          Unchecked="SidebarLibraryActionShowInSidebar_CheckChanged"
                                           IsChecked="False" />
-
                                 <Button x:Name="LibraryClearSettingsButton"
-                                        Grid.Row="4"
-                                        Grid.Column="0"
+                                        Grid.Row="2"
+                                        Grid.Column="4"
                                         Style="{StaticResource SettingsLibraryActionButtonStyle}"
                                         Margin="{StaticResource SettingsLibraryActionButtonLastRowMargin-thk}"
                                         Click="LibraryClearSettingsButton_Click">
@@ -573,13 +598,6 @@
                                         <TextBlock Text="Clear Settings" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
-                                <CheckBox x:Name="SidebarClearSettingsCheckBox"
-                                          Grid.Row="4"
-                                          Grid.Column="1"
-                                          Foreground="{StaticResource TextPrimary-brush}"
-                                          VerticalAlignment="Center"
-                                          HorizontalAlignment="Left"
-                                          IsChecked="False" />
                             </Grid>
 
                             <Separator Grid.Row="1"
@@ -587,7 +605,65 @@
                                        Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
                                        Background="{StaticResource BorderDefault-brush}" />
 
+                            <TextBlock Grid.Row="2"
+                                       Grid.Column="0"
+                                       Text="Scan for missing album art"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
                             <Grid Grid.Row="2"
+                                  Grid.Column="1"
+                                  Margin="{StaticResource FieldRowGap-thk}"
+                                  VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="LibraryScanMissingAlbumArtButton"
+                                        Grid.Column="0"
+                                        Content="Scan"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Left"
+                                        Style="{StaticResource SettingsGeneralActionButtonStyle}"
+                                        Click="LibraryScanMissingAlbumArtButton_Click" />
+                                <Border x:Name="LibraryAlbumArtScanProgressPanel"
+                                        Grid.Column="1"
+                                        Visibility="Collapsed"
+                                        Background="{StaticResource PanelBackground-brush}"
+                                        BorderBrush="{StaticResource BorderDefault-brush}"
+                                        BorderThickness="{StaticResource Border1-thk}"
+                                        CornerRadius="6"
+                                        SnapsToDevicePixels="True"
+                                        Padding="{StaticResource PopupContentPadding-thk}"
+                                        MinWidth="300"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Stretch"
+                                        Margin="18,0,0,0">
+                                    <StackPanel MinWidth="280">
+                                        <TextBlock x:Name="LibraryAlbumArtScanProgressStatusText"
+                                                   Text="Starting scan…"
+                                                   Style="{StaticResource SettingsPlaybackAuxTextStyle}"
+                                                   TextWrapping="Wrap" />
+                                        <ProgressBar x:Name="LibraryAlbumArtScanProgressBar"
+                                                     Height="{StaticResource ProgressBarThin5-size}"
+                                                     Margin="{StaticResource Top8-thk}"
+                                                     Minimum="0"
+                                                     Maximum="100"
+                                                     Value="0"
+                                                     IsIndeterminate="True"
+                                                     Foreground="{StaticResource ThemeBrand-brush}"
+                                                     Background="{StaticResource SurfaceLowered-brush}"
+                                                     BorderThickness="0" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <Separator Grid.Row="3"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <Grid Grid.Row="4"
                                   Grid.Column="0"
                                   Grid.ColumnSpan="2"
                                   Margin="{StaticResource FieldRowGap-thk}"
@@ -673,18 +749,18 @@
                                 </Grid>
                             </Grid>
 
-                            <Separator Grid.Row="3"
+                            <Separator Grid.Row="5"
                                        Grid.ColumnSpan="2"
                                        Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
                                        Background="{StaticResource BorderDefault-brush}" />
 
-                            <TextBlock Grid.Row="4"
+                            <TextBlock Grid.Row="6"
                                        Grid.Column="0"
                                        Text="Library import/export"
                                        Style="{StaticResource FieldLabelStyle}"
                                        TextWrapping="Wrap"
                                        VerticalAlignment="Center" />
-                            <StackPanel Grid.Row="4"
+                            <StackPanel Grid.Row="6"
                                         Grid.Column="1"
                                         Orientation="Horizontal"
                                         Margin="{StaticResource FieldRowGap-thk}"
@@ -1026,6 +1102,7 @@
                         Style="{StaticResource MetadataDialogFooterButtonStyle}"
                         Click="ApplyButton_Click" />
             </StackPanel>
+        </Grid>
         </Grid>
     </Grid>
 </Window>

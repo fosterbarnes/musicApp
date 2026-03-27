@@ -6,6 +6,8 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -31,6 +33,7 @@ public partial class InfoMetadataView : Window
     private const string FileInfoEmpty = "\u2014";
 
     private Song? _track;
+    private List<Song>? _libraryTracks;
     private bool _syncingPrimaryFields;
     private byte[]? _pendingFrontCoverPicture;
     private string? _lyricsExternalTempPath;
@@ -41,10 +44,14 @@ public partial class InfoMetadataView : Window
     public event EventHandler<Song>? ShowInArtistsRequested;
     public event EventHandler<Song>? ShowInAlbumsRequested;
 
+    public event EventHandler<Song>? SavedMetadataToDisk;
+
     public Func<string, MetadataAudioReleaseResult>? ReleasePlaybackForFile { get; set; }
     public Action<MetadataAudioReleaseResult>? RestorePlaybackAfterFile { get; set; }
 
     public bool MetadataSavedOnClose { get; private set; }
+
+    public bool HostNotifyRefreshDone { get; private set; }
 
     public InfoMetadataView(string? launchSection = null)
     {
@@ -57,6 +64,12 @@ public partial class InfoMetadataView : Window
         WireSortAsFields();
         PopulatePlaceholderValues();
         ShowSection(launchSection ?? "Details");
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        base.OnClosed(e);
+        WindowFocusHelper.ScheduleActivateOwner(this);
     }
 
     private void WirePrimarySortingFieldSync()
@@ -204,6 +217,7 @@ public partial class InfoMetadataView : Window
 
         _track = track;
         _pendingFrontCoverPicture = null;
+        _libraryTracks = libraryTracks?.ToList();
 
         var genres = BuildGenreList(libraryTracks ?? Array.Empty<Song>(), track.Genre);
         GenreComboBox.ItemsSource = genres;
@@ -598,7 +612,191 @@ public partial class InfoMetadataView : Window
             },
             idx < 0 ? 0 : idx);
 
-        AddArtworkButton.Visibility = sectionName == "Artwork" ? Visibility.Visible : Visibility.Collapsed;
+        var artVis = sectionName == "Artwork" ? Visibility.Visible : Visibility.Collapsed;
+        FetchArtworkButton.Visibility = artVis;
+        AddArtworkButton.Visibility = artVis;
+    }
+
+    private IReadOnlyList<Song> FindOtherLibraryTracksInSameAlbumGroup(string currentPath)
+    {
+        if (string.IsNullOrWhiteSpace(currentPath) || _libraryTracks == null || _libraryTracks.Count == 0)
+            return Array.Empty<Song>();
+
+        var album = (AlbumTextBox.Text ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(album) || string.Equals(album, "Unknown Album", StringComparison.OrdinalIgnoreCase))
+            return Array.Empty<Song>();
+
+        var albumArtist = (AlbumArtistTextBox.Text ?? "").Trim();
+        var artist = (ArtistTextBox.Text ?? "").Trim();
+        var artistKey = !string.IsNullOrWhiteSpace(albumArtist) ? albumArtist : artist;
+
+        var list = new List<Song>();
+        foreach (var s in _libraryTracks)
+        {
+            if (string.IsNullOrWhiteSpace(s.FilePath) || !File.Exists(s.FilePath))
+                continue;
+            if (LibraryPathHelper.PathsEqual(s.FilePath, currentPath))
+                continue;
+
+            var sa = (s.Album ?? "").Trim();
+            if (!string.Equals(sa, album, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var albumArtistTrim = (s.AlbumArtist ?? "").Trim();
+            var sKey = albumArtistTrim.Length > 0
+                ? albumArtistTrim
+                : (s.Artist ?? "").Trim();
+            if (!string.Equals(sKey, artistKey, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            list.Add(s);
+        }
+
+        return list;
+    }
+
+    private async void FetchArtworkButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_track == null)
+            return;
+
+        var path = _track.FilePath;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            MessageDialog.Show(Owner, "Download artwork", "The file is missing or has no path.", MessageDialog.Buttons.Ok);
+            return;
+        }
+
+        var album = AlbumTextBox.Text?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(album))
+        {
+            MessageDialog.Show(Owner, "Download artwork", "Album is required to look up cover art.", MessageDialog.Buttons.Ok);
+            return;
+        }
+
+        var year = 0;
+        if (int.TryParse((YearTextBox.Text ?? "").Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var y) &&
+            y is > 0 and <= 9999)
+            year = y;
+
+        var wasEnabledFetch = FetchArtworkButton.IsEnabled;
+        var wasEnabledAdd = AddArtworkButton.IsEnabled;
+        FetchArtworkButton.IsEnabled = false;
+        AddArtworkButton.IsEnabled = false;
+        Mouse.OverrideCursor = Cursors.Wait;
+        try
+        {
+            var progress = new Progress<string>(p => Debug.WriteLine("[AlbumArt] " + p));
+
+            var fetch = await AlbumArtRemoteFetcher.FetchCoverBytesAsync(
+                path,
+                album,
+                AlbumArtistTextBox.Text?.Trim() ?? "",
+                ArtistTextBox.Text?.Trim() ?? "",
+                year,
+                progress,
+                CancellationToken.None).ConfigureAwait(true);
+
+            if (!fetch.Ok || fetch.ImageBytes is not { Length: > 0 } pic)
+            {
+                MessageDialog.Show(Owner, "Download artwork",
+                    fetch.ErrorMessage ?? "Could not download artwork.",
+                    MessageDialog.Buttons.Ok);
+                return;
+            }
+
+            var snap = ReleasePlaybackForFile?.Invoke(path) ?? default;
+            try
+            {
+                if (!TrackMetadataSaver.TrySaveEmbeddedCoverOnly(path, pic, fetch.MusicBrainzReleaseId, out var saveErr))
+                {
+                    MessageDialog.Show(Owner, "Download artwork",
+                        saveErr ?? "Could not save artwork to the file.",
+                        MessageDialog.Buttons.Ok);
+                    return;
+                }
+            }
+            finally
+            {
+                RestorePlaybackAfterFile?.Invoke(snap);
+            }
+
+            var otherInAlbum = FindOtherLibraryTracksInSameAlbumGroup(path);
+            var albumOthersOk = 0;
+            var albumOthersFailed = 0;
+            if (otherInAlbum.Count > 0)
+            {
+                var applyAll = MessageDialog.Show(Owner, "Download artwork",
+                    $"Apply this artwork to the other {otherInAlbum.Count} track(s) from this album in your library?",
+                    MessageDialog.Buttons.YesNo);
+                if (applyAll == true)
+                {
+                    var picForAlbum = (byte[])pic.Clone();
+                    foreach (var os in otherInAlbum)
+                    {
+                        var op = os.FilePath;
+                        if (string.IsNullOrWhiteSpace(op) || !File.Exists(op))
+                        {
+                            albumOthersFailed++;
+                            continue;
+                        }
+
+                        var oSnap = ReleasePlaybackForFile?.Invoke(op) ?? default;
+                        try
+                        {
+                            if (TrackMetadataSaver.TrySaveEmbeddedCoverOnly(op, picForAlbum, fetch.MusicBrainzReleaseId,
+                                    out _))
+                            {
+                                albumOthersOk++;
+                                TrackMetadataLoader.ReloadTagFieldsFromFile(os);
+                                AlbumArtThumbnailHelper.InvalidateFullSizeCache(op);
+                            }
+                            else
+                                albumOthersFailed++;
+                        }
+                        finally
+                        {
+                            RestorePlaybackAfterFile?.Invoke(oSnap);
+                        }
+                    }
+                }
+            }
+
+            TrackMetadataLoader.ReloadTagFieldsFromFile(_track);
+            AlbumArtThumbnailHelper.InvalidateFullSizeCache(path);
+            _pendingFrontCoverPicture = (byte[])pic.Clone();
+            LoadAlbumArt(_track);
+            MetadataSavedOnClose = true;
+
+            var src = fetch.Source switch
+            {
+                AlbumArtFetchSource.TagMbidCoverArtArchive => "Cover Art Archive (tag MBID)",
+                AlbumArtFetchSource.MusicBrainzSearchCoverArtArchive => "MusicBrainz + Cover Art Archive",
+                AlbumArtFetchSource.FruitAppSearch => "fruitApp (fallback)",
+                AlbumArtFetchSource.DeezerSearch => "Deezer (fallback)",
+                _ => "Unknown source"
+            };
+            var doneMsg = $"Artwork embedded in this file ({src}).";
+            if (albumOthersOk > 0)
+                doneMsg += $"\n\nAlso embedded in {albumOthersOk} other album track(s).";
+            if (albumOthersFailed > 0)
+                doneMsg += $"\n\nCould not update {albumOthersFailed} album track(s) (file in use, permission, or format).";
+            MessageDialog.Show(Owner, "Download artwork", doneMsg, MessageDialog.Buttons.Ok);
+            Activate();
+            _ = Focus();
+            HostNotifyRefreshDone = true;
+            SavedMetadataToDisk?.Invoke(this, _track);
+        }
+        catch (Exception ex)
+        {
+            MessageDialog.Show(Owner, "Download artwork", ex.Message, MessageDialog.Buttons.Ok);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
+            FetchArtworkButton.IsEnabled = wasEnabledFetch;
+            AddArtworkButton.IsEnabled = wasEnabledAdd;
+        }
     }
 
     private void AddArtworkButton_Click(object sender, RoutedEventArgs e)
@@ -607,7 +805,9 @@ public partial class InfoMetadataView : Window
         {
             Filter = "Image files|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.webp|All files|*.*"
         };
-        if (dlg.ShowDialog(this) != true)
+        var picked = dlg.ShowDialog(this) == true;
+        WindowFocusHelper.ScheduleActivate(this);
+        if (!picked)
             return;
 
         try
@@ -659,6 +859,7 @@ public partial class InfoMetadataView : Window
 
         try
         {
+            HostNotifyRefreshDone = false;
             if (!TrackMetadataSaver.TrySave(path, edit, out var saveError))
             {
                 RestorePlaybackAfterFile?.Invoke(snap);

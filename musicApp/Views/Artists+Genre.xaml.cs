@@ -144,6 +144,7 @@ namespace musicApp.Views
 
         private void RefreshNamesList()
         {
+            var prevSelected = lstArtistsOrGenres.SelectedItem as string;
             _namesList.Clear();
             if (_allTracks == null) return;
 
@@ -156,6 +157,9 @@ namespace musicApp.Views
 
             foreach (var name in names)
                 _namesList.Add(name);
+
+            if (!string.IsNullOrEmpty(prevSelected) && _namesList.Contains(prevSelected))
+                lstArtistsOrGenres.SelectedItem = prevSelected;
         }
 
         private void LstArtistsOrGenres_SelectionChanged(object sender, SelectionChangedEventArgs e)

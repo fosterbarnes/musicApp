@@ -133,8 +133,11 @@ namespace musicApp
             SetSidebarNavActive(btnArtists);
         }
 
-        private void ShowAlbumsView()
+        /// <param name="bindFullLibrary">False when caller assigns a narrower ItemsSource (e.g. search subset).</param>
+        private void ShowAlbumsView(bool bindFullLibrary = true)
         {
+            if (bindFullLibrary && albumsViewControl != null)
+                albumsViewControl.ItemsSource = allTracks;
             contentHost.Content = albumsViewControl;
             SetSidebarNavActive(btnAlbums);
         }
@@ -243,6 +246,7 @@ namespace musicApp
             infoWindow.ShowInAlbumsRequested += OnShowInAlbumsRequested;
             infoWindow.ReleasePlaybackForFile = ReleasePlaybackForMetadataWrite;
             infoWindow.RestorePlaybackAfterFile = RestorePlaybackAfterMetadataWrite;
+            infoWindow.SavedMetadataToDisk += InfoWindow_SavedMetadataToDisk;
             TrackMetadataLoader.ReloadTagFieldsFromFile(track);
             infoWindow.LoadTrack(track, allTracks);
 
@@ -251,13 +255,24 @@ namespace musicApp
                 infoWindow.ShowInSongsRequested -= OnShowInSongsRequested;
                 infoWindow.ShowInArtistsRequested -= OnShowInArtistsRequested;
                 infoWindow.ShowInAlbumsRequested -= OnShowInAlbumsRequested;
+                infoWindow.SavedMetadataToDisk -= InfoWindow_SavedMetadataToDisk;
                 if (!infoWindow.MetadataSavedOnClose)
+                    return;
+                if (infoWindow.HostNotifyRefreshDone)
                     return;
                 await UpdateLibraryCacheAsync();
                 RefreshAfterMetadataEdit(track);
             };
 
             infoWindow.Show();
+        }
+
+        private async void InfoWindow_SavedMetadataToDisk(object? sender, Song track)
+        {
+            if (track == null)
+                return;
+            await UpdateLibraryCacheAsync();
+            RefreshAfterMetadataEdit(track);
         }
     }
 }

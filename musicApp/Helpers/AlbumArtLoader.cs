@@ -61,7 +61,11 @@ public static class AlbumArtLoader
                        fileName.Contains("folder");
             }) ?? imageFiles.FirstOrDefault();
 
-            return albumArtFile != null ? CreateScaledImageFromFile(albumArtFile) : null;
+            if (albumArtFile != null)
+                return CreateScaledImageFromFile(albumArtFile);
+
+            var itcBytes = FruitAppLocalAlbumArtCache.TryGetCoverImageBytesForAudioPath(track.FilePath);
+            return itcBytes != null ? CreateScaledImage(itcBytes) : null;
         }
         catch (Exception ex)
         {

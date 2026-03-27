@@ -96,11 +96,12 @@ function Start-MusicappRunner {
         $dotnetArgs += [string[]]$forward
     }
 
+    # NoNewWindow keeps dotnet in this console so build errors and CLI output are visible (Hidden hid them).
     $proc = Start-Process `
         -FilePath "dotnet" `
         -ArgumentList $dotnetArgs `
         -WorkingDirectory (Get-Location).Path `
-        -WindowStyle Hidden `
+        -NoNewWindow `
         -PassThru
 
     $global:AppExited = $false
@@ -109,6 +110,12 @@ function Start-MusicappRunner {
     $null = Register-ObjectEvent -InputObject $proc -EventName Exited -SourceIdentifier "musicApp_Exited" -Action {
         $global:AppExited = $true
         Write-Host "musicApp stopped."
+        try {
+            $code = $Event.Sender.ExitCode
+            if ($null -ne $code -and $code -ne 0) {
+                Write-Host "dotnet exit code: $code" -ForegroundColor Red
+            }
+        } catch { }
     }
 
     return $proc

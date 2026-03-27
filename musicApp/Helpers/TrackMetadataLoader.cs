@@ -15,16 +15,6 @@ public static class TrackMetadataLoader
     {
         try
         {
-            FileInfo? fileInfo = null;
-            try
-            {
-                fileInfo = new FileInfo(filePath);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error getting file info for {filePath}: {ex.Message}");
-            }
-
             var track = new Song
             {
                 Title = "Unknown Title",
@@ -38,15 +28,6 @@ public static class TrackMetadataLoader
                 Genre = "",
                 DateAdded = DateTime.Now
             };
-
-            if (fileInfo != null && fileInfo.Exists)
-            {
-                track.DateModified = fileInfo.LastWriteTime;
-                if (track.FileSize == 0)
-                {
-                    track.FileSize = fileInfo.Length;
-                }
-            }
 
             PopulateFileType(track, filePath);
 
@@ -92,29 +73,78 @@ public static class TrackMetadataLoader
                         }
                     }
 
-                    if (string.IsNullOrEmpty(track.Bitrate) &&
-                        track.FileSize > 0 &&
-                        track.DurationTimeSpan.TotalSeconds > 0)
-                    {
-                        var bitrateKbps = (int)((track.FileSize * 8) / (track.DurationTimeSpan.TotalSeconds * 1000));
-                        if (bitrateKbps > 0)
-                        {
-                            track.Bitrate = $"{bitrateKbps} kbps";
-                        }
-                    }
+                    TryFillBitrateFromFileSize(track);
                 }
                 catch (Exception audioEx)
                 {
                     Debug.WriteLine($"NAudio failed for {filePath}: {audioEx.Message}");
                 }
+
+                if (string.IsNullOrEmpty(track.ThumbnailCachePath))
+                    track.ThumbnailCachePath = AlbumArtCacheManager.GenerateAndCache(track);
             }
 
-            PopulateFileType(track, filePath);
+            EnsureFileStatsFromDisk(track, filePath);
             return track;
         }
         catch
         {
             return null;
+        }
+    }
+
+    private static void TryFillBitrateFromFileSize(Song track)
+    {
+        if (!string.IsNullOrEmpty(track.Bitrate) ||
+            track.DurationTimeSpan.TotalSeconds <= 0)
+            return;
+
+        var size = track.FileSize;
+        if (size <= 0 && !TryGetFileSizeLength(track.FilePath, out size))
+            return;
+        track.FileSize = size;
+
+        var bitrateKbps = (int)((track.FileSize * 8) / (track.DurationTimeSpan.TotalSeconds * 1000));
+        if (bitrateKbps > 0)
+            track.Bitrate = $"{bitrateKbps} kbps";
+    }
+
+    private static bool TryGetFileSizeLength(string filePath, out long length)
+    {
+        length = 0;
+        try
+        {
+            var fi = new FileInfo(filePath);
+            if (!fi.Exists)
+                return false;
+            length = fi.Length;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void EnsureFileStatsFromDisk(Song track, string filePath)
+    {
+        if (track.FileSize > 0 && track.DateModified != DateTime.MinValue)
+            return;
+
+        try
+        {
+            var fi = new FileInfo(filePath);
+            if (!fi.Exists)
+                return;
+
+            if (track.DateModified == DateTime.MinValue)
+                track.DateModified = fi.LastWriteTime;
+            if (track.FileSize == 0)
+                track.FileSize = fi.Length;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error reading file stats for {filePath}: {ex.Message}");
         }
     }
 

@@ -27,8 +27,7 @@
                       Click="AlbumContextMenu_AddToQueueClick" />
             <Separator />
             <MenuItem Style="{StaticResource TrackContextMenuItemWithSubmenuStyle}"
-                      Header="Add to Playlist"
-                      Click="AlbumContextMenu_AddToPlaylistClick">
+                      Header="Add to Playlist">
                 <MenuItem.ItemContainerStyle>
                     <Style TargetType="MenuItem"
                            BasedOn="{StaticResource TrackContextSubMenuItemStyle}" />
@@ -434,5 +433,23 @@
                 </ItemsControl.ItemsPanel>
             </ItemsControl>
         </ScrollViewer>
+
+        <Grid x:Name="LoadingIndicator" Grid.Row="0" Grid.RowSpan="2" Visibility="Collapsed"
+              HorizontalAlignment="Center" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal">
+                <Ellipse x:Name="LoadDot0" Width="10" Height="10" Fill="#523e6e" Margin="4,0">
+                    <Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse x:Name="LoadDot1" Width="10" Height="10" Fill="#523e6e" Margin="4,0">
+                    <Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse x:Name="LoadDot2" Width="10" Height="10" Fill="#523e6e" Margin="4,0">
+                    <Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse x:Name="LoadDot3" Width="10" Height="10" Fill="#523e6e" Margin="4,0">
+                    <Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform>
+                </Ellipse>
+            </StackPanel>
+        </Grid>
     </Grid>
 </UserControl>

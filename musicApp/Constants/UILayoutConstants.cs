@@ -10,6 +10,9 @@ public static class UILayoutConstants
     public const int DefaultWindowWidth = 1200;
     public const int DefaultWindowHeight = 700;
 
+    /// <summary>Sidebar column min width; also the default width when no saved width applies.</summary>
+    public const double SidebarMinWidth = 180;
+
     // Playback and state debounce
     public const int ManualNavigationResetDelayMs = 100;
     public static readonly TimeSpan SidebarWidthSaveDelay = TimeSpan.FromSeconds(0.5);
@@ -35,7 +38,37 @@ public static class UILayoutConstants
     // Albums view layout
     public const double AlbumTrackMetaRowHeight = 40.0;
     public const int AlbumRebuildBatchSize = 64;
-    public const int InitialAlbumArtLoadCount = 100;
+
+    /// <summary>UI append batch = smoothed scan DOP × scale, clamped to min/max.</summary>
+    public const int AlbumRebuildBatchMin = 32;
+    public const int AlbumRebuildBatchMax = 192;
+    public const int AlbumRebuildBatchDopScale = 12;
+
+    /// <summary>While filling the prefix (first screen or up to pending album), multiply batch size.</summary>
+    public const int AlbumRebuildPrefixBatchMultiplier = 2;
+    public const int AlbumRebuildPrefixMaxBatch = 384;
+    /// <summary>Extra wrap-panel rows beyond viewport when racing to a pending album index.</summary>
+    public const int AlbumRebuildPrefixOverscanRows = 3;
+
+    /// <summary>Re-sample RAM/CPU after this many UI batches (same idea as library scan).</summary>
+    public const int AlbumRebuildMetricsResampleEveryNBatches = 2;
+
+    public const int AlbumArtLoadMaxParallelism = 16;
+
+    /// <summary>Full-grid prefetch: max parallel decodes (lower than viewport).</summary>
+    public const int AlbumArtPrefetchMaxParallelism = 6;
+
+    /// <summary>Album indices per prefetch batch (top to bottom).</summary>
+    public const int AlbumArtPrefetchIndexChunk = 48;
+
+    public const int AlbumArtPrefetchMetricsResampleEveryNBatches = 3;
+
+    /// <summary>When the scroll viewport has no height yet, assume this many DIPs tall for bootstrap art index range.</summary>
+    public const double AlbumArtBootstrapViewportHeightFallback = 640.0;
+
+    /// <summary>Minimum wrap rows to load when estimating visible range without live container hits.</summary>
+    public const int AlbumArtViewportBootstrapMinRows = 4;
+
     public const int AlbumVisibleRangeOverscan = 30;
     public const int AlbumArtMinimumTargetSize = 80;
     public const double AlbumWrapFallbackWidth = 400.0;

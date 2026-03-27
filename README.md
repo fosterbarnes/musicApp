@@ -36,12 +36,12 @@
 
 musicApp is in early development, bugs are expected.
 
-If you want to use it, [download the latest release](https://github.com/fosterbarnes/musicApp/releases/download/v0.1.2/musicApp-v0.1.2-scammingCrack-portable.zip), unzip, then run MusicApp.exe
+If you want to use it, [download the latest release](https://github.com/fosterbarnes/musicApp/releases/download/v0.1.3/musicApp-v0.1.3-frederickRats-portable.zip), unzip, then run MusicApp.exe
 
 ## Progress
 
-![Progress Bar](https://progress-bars.entcheneric.com/bar.svg?progress=69&backgroundColor=%23212121&height=40&width=800&borderRadius=10&striped=false&animated=false&gradientAnimated=false&animationSpeed=1&stripeAnimationSpeed=1&gradientAnimationSpeed=1&initialAnimationSpeed=1&color=%23705399)  
-**112 / 163 tasks complete (68.7%)**
+![Progress Bar](https://progress-bars.entcheneric.com/bar.svg?progress=72&backgroundColor=%23212121&height=40&width=800&borderRadius=10&striped=false&animated=false&gradientAnimated=false&animationSpeed=1&stripeAnimationSpeed=1&gradientAnimationSpeed=1&initialAnimationSpeed=1&color=%23705399)  
+**118 / 165 tasks complete (71.5%)**
 [Tasks.md](https://github.com/fosterbarnes/musicApp/blob/main/.md/Tasks.md#main-window)
 
 # General Usage Info
@@ -86,6 +86,9 @@ If you want to use it, [download the latest release](https://github.com/fosterba
   - Album length and song count info
   - High quality album art
   - Artist, genre and year with ability to click artist or genre
+- Improve load time
+- Cache the albums list (entire list and image data)
+- Loading indicator when building album cache
 
 #### Songs
 - List of all songs in a scrollable, selectable lists

@@ -18,6 +18,7 @@ using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using ATL;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Collections.Generic;
 using musicApp.Views;
 using musicApp.Helpers;
@@ -110,6 +111,13 @@ namespace musicApp
         private ArtistGenreView? genresViewControl;
         private AlbumsView? albumsViewControl;
         private PlaylistsView? playlistsViewControl;
+        private const string MainViewLibrary = "Library";
+        private const string MainViewQueue = "Queue";
+        private const string MainViewPlaylists = "Playlists";
+        private const string MainViewRecentlyPlayed = "RecentlyPlayed";
+        private const string MainViewArtists = "Artists";
+        private const string MainViewAlbums = "Albums";
+        private const string MainViewGenres = "Genres";
 
         // ===========================================
         // CONSTRUCTOR AND INITIALIZATION
@@ -301,8 +309,60 @@ namespace musicApp
             playlistsViewControl.PlaylistPinnedChanged += PlaylistsViewControl_PlaylistPinnedChanged;
             playlistsViewControl.RemoveFromPlaylistRequested += OnRemoveFromPlaylistRequested;
 
-            contentHost.Content = songsView;
-            SetSidebarNavActive(btnLibrary);
+            ApplyInitialMainView(appSettings.LastActiveView);
+        }
+
+        private string GetCurrentMainViewKey()
+        {
+            if (ReferenceEquals(contentHost?.Content, queueViewControl))
+                return MainViewQueue;
+            if (ReferenceEquals(contentHost?.Content, playlistsViewControl))
+                return MainViewPlaylists;
+            if (ReferenceEquals(contentHost?.Content, recentlyPlayedViewControl))
+                return MainViewRecentlyPlayed;
+            if (ReferenceEquals(contentHost?.Content, artistsViewControl))
+                return MainViewArtists;
+            if (ReferenceEquals(contentHost?.Content, albumsViewControl))
+                return MainViewAlbums;
+            if (ReferenceEquals(contentHost?.Content, genresViewControl))
+                return MainViewGenres;
+            return MainViewLibrary;
+        }
+
+        private void ApplyInitialMainView(string? savedViewKey)
+        {
+            if (string.Equals(savedViewKey, MainViewQueue, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowQueueView();
+                return;
+            }
+            if (string.Equals(savedViewKey, MainViewPlaylists, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowPlaylistsView();
+                return;
+            }
+            if (string.Equals(savedViewKey, MainViewRecentlyPlayed, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowRecentlyPlayedView();
+                return;
+            }
+            if (string.Equals(savedViewKey, MainViewArtists, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowArtistsView();
+                return;
+            }
+            if (string.Equals(savedViewKey, MainViewAlbums, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowAlbumsView();
+                return;
+            }
+            if (string.Equals(savedViewKey, MainViewGenres, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowGenresView();
+                return;
+            }
+
+            ShowLibraryView();
         }
 
         /// <summary>
@@ -396,6 +456,7 @@ namespace musicApp
 
             libraryCache ??= await libraryManager.LoadLibraryCacheAsync();
 
+            var anyFolderDiskScan = false;
             foreach (var folderPath in musicFolders)
             {
                 if (Directory.Exists(folderPath))
@@ -404,7 +465,8 @@ namespace musicApp
 
                     if (hasNewFiles)
                     {
-                        await LoadMusicFromFolderAsync(folderPath, true);
+                        await LoadMusicFromFolderAsync(folderPath, true, false);
+                        anyFolderDiskScan = true;
                     }
                     else
                     {
@@ -412,6 +474,9 @@ namespace musicApp
                     }
                 }
             }
+
+            if (anyFolderDiskScan)
+                await MaybeRunPostScanSystemArtworkCacheAsync();
         }
 
         /// <summary>
@@ -633,6 +698,7 @@ namespace musicApp
             };
 
             var result = dialog.ShowDialog(this);
+            WindowFocusHelper.ScheduleActivate(this);
             if (result != true)
                 return;
 
@@ -662,6 +728,7 @@ namespace musicApp
             };
 
             var result = dialog.ShowDialog(this);
+            WindowFocusHelper.ScheduleActivate(this);
             if (result != true)
                 return;
 
@@ -700,6 +767,8 @@ namespace musicApp
         {
             RefreshAllViewDataSources();
             RefreshVisibleViews();
+            if (contentHost != null && ReferenceEquals(contentHost.Content, albumsViewControl))
+                albumsViewControl?.RefreshAlbumGridFromLibrary();
         }
 
         /// <summary>
@@ -770,6 +839,40 @@ namespace musicApp
             }
         }
 
+        private void UpdateStatusBarScanningLight(int processedFiles, int totalFiles)
+        {
+            if (statusBarText == null)
+                return;
+            statusBarText.Text = $"{allTracks.Count} songs, scanning files {processedFiles}/{totalFiles}…";
+        }
+
+        private void UpdateStatusBarPostScanAlbumWork(int done, int total)
+        {
+            if (statusBarText == null || total <= 0)
+                return;
+            statusBarText.Text = $"{allTracks.Count} songs, system artwork {done}/{total}…";
+            if (progressBarBackground != null && progressBarFill != null)
+            {
+                progressBarFill.Visibility = Visibility.Visible;
+                progressBarFill.Width = progressBarBackground.ActualWidth * (done / (double)total);
+            }
+        }
+
+        private void SortLibraryTracksByPathForScan()
+        {
+            if (allTracks.Count <= 1)
+                return;
+            var sorted = allTracks
+                .OrderBy(t => t.FilePath ?? "", StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            allTracks.Clear();
+            foreach (var t in sorted)
+                allTracks.Add(t);
+            filteredTracks.Clear();
+            foreach (var t in sorted)
+                filteredTracks.Add(t);
+        }
+
         /// <summary>
         /// Sets up data bindings and event handlers for UI controls
         /// </summary>
@@ -836,7 +939,6 @@ namespace musicApp
             if (recentlyPlayedViewControl != null) recentlyPlayedViewControl.ItemsSource = recentlyPlayed;
             if (artistsViewControl != null) artistsViewControl.ItemsSource = allTracks;
             if (genresViewControl != null) genresViewControl.ItemsSource = allTracks;
-            if (albumsViewControl != null) albumsViewControl.ItemsSource = allTracks;
         }
 
         private void RefreshVisibleViews()
@@ -855,22 +957,49 @@ namespace musicApp
             }
         }
 
-        private void RefreshAfterMetadataEdit(Song updatedTrack)
+        private void RefreshTrackListBindingsAndAlbumsView(Song? updatedTrack, bool allowInPlaceAlbumPatch)
         {
             songsView?.RefreshTrackListBindings();
             queueViewControl?.RefreshTrackListBindings();
             recentlyPlayedViewControl?.RefreshTrackListBindings();
             artistsViewControl?.RefreshTrackListBindings();
             genresViewControl?.RefreshTrackListBindings();
-            albumsViewControl?.RefreshAlbumGridFromLibrary();
+
+            if (contentHost != null && ReferenceEquals(contentHost.Content, albumsViewControl) && albumsViewControl != null)
+            {
+                if (!allowInPlaceAlbumPatch || updatedTrack == null || !albumsViewControl.TryRefreshAlbumGroupInPlace(updatedTrack))
+                    albumsViewControl.RefreshAlbumGridFromLibrary();
+            }
+
             playlistsViewControl?.RefreshTrackListBindings();
+        }
+
+        private void RefreshTitleBarFromCurrentTrack()
+        {
+            if (currentTrack == null)
+                return;
+
+            var albumArt = AlbumArtLoader.LoadAlbumArt(currentTrack);
+            titleBarPlayer.SetTrackInfo(currentTrack.Title, currentTrack.Artist, currentTrack.Album, albumArt);
+        }
+
+        private void RefreshAfterMetadataEdit(Song updatedTrack)
+        {
+            RefreshTrackListBindingsAndAlbumsView(updatedTrack, allowInPlaceAlbumPatch: true);
 
             if (currentTrack != null && updatedTrack != null &&
                 string.Equals(currentTrack.FilePath, updatedTrack.FilePath, StringComparison.OrdinalIgnoreCase))
             {
-                var albumArt = AlbumArtLoader.LoadAlbumArt(currentTrack);
-                titleBarPlayer.SetTrackInfo(currentTrack.Title, currentTrack.Artist, currentTrack.Album, albumArt);
+                RefreshTitleBarFromCurrentTrack();
             }
+
+            UpdateStatusBar();
+        }
+
+        private void RefreshAfterBatchMetadataEdit()
+        {
+            RefreshTrackListBindingsAndAlbumsView(updatedTrack: null, allowInPlaceAlbumPatch: false);
+            RefreshTitleBarFromCurrentTrack();
 
             UpdateStatusBar();
         }
@@ -969,7 +1098,7 @@ namespace musicApp
         private void SearchPopupView_AlbumSelected(object? sender, AlbumSearchItem album)
         {
             searchPopup.IsOpen = false;
-            ShowAlbumsView();
+            ShowAlbumsView(bindFullLibrary: false);
             if (albumsViewControl != null && album.Songs.Count > 0)
                 albumsViewControl.ItemsSource = album.Songs;
         }
@@ -1786,7 +1915,7 @@ namespace musicApp
 
         #region Music Management
 
-        private async Task LoadMusicFromFolderAsync(string folderPath, bool saveToSettings = false)
+        private async Task LoadMusicFromFolderAsync(string folderPath, bool saveToSettings = false, bool runPostScanSystemArtworkIfEnabled = false)
         {
             try
             {
@@ -1807,56 +1936,158 @@ namespace musicApp
                     });
                 }
 
-                int processedCount = 0;
+                var scanStopwatch = Stopwatch.StartNew();
 
-                await Task.Run(async () =>
+                int processedCount = 0;
+                int scanConcurrencySmoothed = 0;
+                const int scanBatchSize = 320;
+                const int scanUiFlushEvery = 22;
+
+                var pendingScanTracks = new List<Song>();
+                var pendingScanLock = new object();
+                SystemResourceSnapshot? lastResourceSnapshot = null;
+                var batchesSinceSample = int.MaxValue;
+                var batchIndex = 0;
+                var scanConcurrentWorkers = 0;
+                var scanPeakWorkersBatch = 0;
+
+                static void ScanRecordPeakConcurrent(ref int peakField, int currentConcurrent)
                 {
-                    foreach (var file in musicFiles)
+                    int oldPeak, newPeak;
+                    do
                     {
+                        oldPeak = Volatile.Read(ref peakField);
+                        if (currentConcurrent <= oldPeak)
+                            return;
+                        newPeak = currentConcurrent;
+                    } while (Interlocked.CompareExchange(ref peakField, newPeak, oldPeak) != oldPeak);
+                }
+
+                async Task FlushScanProgressAsync(int done)
+                {
+                    List<Song> toAdd;
+                    lock (pendingScanLock)
+                    {
+                        if (pendingScanTracks.Count == 0)
+                            toAdd = new List<Song>();
+                        else
+                        {
+                            toAdd = new List<Song>(pendingScanTracks);
+                            pendingScanTracks.Clear();
+                        }
+                    }
+
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        foreach (var t in toAdd)
+                        {
+                            allTracks.Add(t);
+                            filteredTracks.Add(t);
+                        }
+
+                        if (musicFiles.Count > 0)
+                        {
+                            double progressPercent = done / (double)musicFiles.Count;
+                            progressBarFill.Width = progressBarBackground.ActualWidth * progressPercent;
+                        }
+
+                        if (progressBarFill.Visibility == Visibility.Visible)
+                            UpdateStatusBarScanningLight(done, musicFiles.Count);
+                    });
+                }
+
+                var scanTotalBatches = musicFiles.Count == 0
+                    ? 0
+                    : (musicFiles.Count + scanBatchSize - 1) / scanBatchSize;
+
+                foreach (var batch in musicFiles.Chunk(scanBatchSize))
+                {
+                    scanPeakWorkersBatch = 0;
+                    var mustSample = batchIndex == 0 || batchesSinceSample >= 2;
+
+                    int dop;
+                    if (mustSample)
+                    {
+                        var sampleInterval = lastResourceSnapshot.HasValue && lastResourceSnapshot.Value.CpuBusyPercent < 40
+                            ? TimeSpan.FromMilliseconds(50)
+                            : TimeSpan.FromMilliseconds(100);
+                        lastResourceSnapshot = await Task.Run(() => WindowsSystemMetrics.Sample(sampleInterval));
+                        dop = ScanConcurrencyAdvisor.Recommend(
+                            lastResourceSnapshot.Value,
+                            Environment.ProcessorCount,
+                            ref scanConcurrencySmoothed);
+                        var batchNo = batchIndex + 1;
+                        Debug.WriteLine(
+                            $"[LibraryScan] Chunk {batchNo}/{scanTotalBatches}: about {batch.Length} files — took a fresh PC reading ({sampleInterval.TotalMilliseconds:F0} ms). " +
+                            $"Will scan up to {dop} at the same time.");
+                        batchesSinceSample = 0;
+                    }
+                    else
+                    {
+                        dop = scanConcurrencySmoothed;
+                        var batchNo = batchIndex + 1;
+                        Debug.WriteLine(
+                            $"[LibraryScan] Chunk {batchNo}/{scanTotalBatches}: about {batch.Length} files — skipped PC re-check (same limits). " +
+                            $"Still up to {dop} at the same time.");
+                    }
+
+                    var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = dop };
+
+                    await Parallel.ForEachAsync(batch, parallelOptions, async (file, _) =>
+                    {
+                        var concurrentNow = Interlocked.Increment(ref scanConcurrentWorkers);
+                        ScanRecordPeakConcurrent(ref scanPeakWorkersBatch, concurrentNow);
+                        Song? track = null;
                         try
                         {
                             if (!TryRegisterLibraryPath(file))
-                                continue;
-
-                            var track = TrackMetadataLoader.LoadSong(file);
-                            if (track != null)
                             {
-                                await Dispatcher.InvokeAsync(() =>
-                                {
-                                    allTracks.Add(track);
-                                    filteredTracks.Add(track);
-                                });
                             }
                             else
                             {
-                                ReleaseRegisteredLibraryPath(file);
+                                track = TrackMetadataLoader.LoadSong(file);
+                                if (track == null)
+                                    ReleaseRegisteredLibraryPath(file);
                             }
                         }
                         catch (Exception ex)
                         {
                             Debug.WriteLine($"Error loading {file}: {ex.Message}");
                             ReleaseRegisteredLibraryPath(file);
+                            track = null;
                         }
                         finally
                         {
-                            processedCount++;
-                            await Dispatcher.InvokeAsync(() =>
-                            {
-                                if (musicFiles.Count > 0)
-                                {
-                                    double progressPercent = (double)processedCount / musicFiles.Count;
-                                    progressBarFill.Width = progressBarBackground.ActualWidth * progressPercent;
-                                }
-                                if (progressBarFill.Visibility == Visibility.Visible)
-                                {
-                                    UpdateStatusBar();
-                                }
-                            });
-                            // Yield to allow UI thread to process updates
-                            await Task.Yield();
+                            Interlocked.Decrement(ref scanConcurrentWorkers);
                         }
-                    }
-                });
+
+                        var done = Interlocked.Increment(ref processedCount);
+                        if (track != null)
+                        {
+                            lock (pendingScanLock)
+                                pendingScanTracks.Add(track);
+                        }
+
+                        if (done % scanUiFlushEvery == 0)
+                            await FlushScanProgressAsync(done);
+                    });
+
+                    var doneBatchNo = batchIndex + 1;
+                    Debug.WriteLine(
+                        $"[LibraryScan] Chunk {doneBatchNo}/{scanTotalBatches} finished — {processedCount} of {musicFiles.Count} files touched so far. " +
+                        $"Peak parallel work: {scanPeakWorkersBatch} (limit {dop}).");
+
+                    if (!mustSample)
+                        batchesSinceSample++;
+                    batchIndex++;
+                }
+
+                await FlushScanProgressAsync(processedCount);
+
+                await Dispatcher.InvokeAsync(SortLibraryTracksByPathForScan);
+
+                scanStopwatch.Stop();
+                Debug.WriteLine($"[LibraryScan] Scan complete ({scanStopwatch.Elapsed.TotalSeconds:F2} seconds)");
 
                 if (saveToSettings)
                 {
@@ -1874,15 +2105,22 @@ namespace musicApp
                     UpdateQueueView();
                 }
 
-                if (musicFiles.Count > 0)
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    await Dispatcher.InvokeAsync(() =>
+                    UpdateUI();
+                    if (musicFiles.Count > 0)
                     {
-                        progressBarFill.Visibility = Visibility.Collapsed;
-                        progressBarFill.Width = 0;
+                        if (!runPostScanSystemArtworkIfEnabled)
+                        {
+                            progressBarFill.Visibility = Visibility.Collapsed;
+                            progressBarFill.Width = 0;
+                        }
                         UpdateStatusBar();
-                    });
-                }
+                    }
+                });
+
+                if (runPostScanSystemArtworkIfEnabled)
+                    await MaybeRunPostScanSystemArtworkCacheAsync().ConfigureAwait(true);
             }
             catch (Exception ex)
             {
@@ -2165,16 +2403,13 @@ namespace musicApp
                 ? selectedTrack.AlbumArtist
                 : selectedTrack.Artist ?? string.Empty;
 
-            var albumTracks = allTracks
-                .Where(s =>
+            var albumTracks = AlbumTrackOrder.SortByAlbumSequence(
+                allTracks.Where(s =>
                     string.Equals(s.Album, albumTitle, StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(
                         !string.IsNullOrWhiteSpace(s.AlbumArtist) ? s.AlbumArtist : s.Artist,
                         selectedAlbumArtist,
-                        StringComparison.OrdinalIgnoreCase))
-                .OrderBy(s => int.TryParse(s.DiscNumber, out int d) ? d : 0)
-                .ThenBy(s => s.TrackNumber)
-                .ToList();
+                        StringComparison.OrdinalIgnoreCase)));
 
             if (albumTracks.Count == 0)
                 return;
@@ -2205,17 +2440,6 @@ namespace musicApp
 
         #endregion
 
-        #region Playlist Management
-
-        #endregion
-
-        #region Settings Management
-
-        #endregion
-
-
-
-
 
         protected override void OnClosing(CancelEventArgs e)
         {
@@ -2235,6 +2459,8 @@ namespace musicApp
             {
                 try
                 {
+                    appSettings.LastActiveView = GetCurrentMainViewKey();
+
                     appSettings.Player = new SettingsManager.PlayerSettings
                     {
                         IsShuffleEnabled = titleBarPlayer.IsShuffleEnabled,
