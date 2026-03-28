@@ -48,6 +48,14 @@ namespace musicApp.Helpers
             _columnDefinitions = new Dictionary<string, ColumnDefinition>();
             _defaultVisibleColumns = new Dictionary<string, List<string>>();
 
+            _columnDefinitions["#"] = new ColumnDefinition
+            {
+                DisplayName = "",
+                PropertyName = "",
+                SortPropertyName = "",
+                DefaultWidth = 40
+            };
+
             _columnDefinitions["Title"] = new ColumnDefinition
             {
                 DisplayName = "Title",
@@ -226,7 +234,7 @@ namespace musicApp.Helpers
             };
 
             _defaultVisibleColumns["Songs"] = new List<string> { "Title", "Artist", "Album", "Time" };
-            _defaultVisibleColumns["Queue"] = new List<string> { "Title", "Artist", "Album", "Time" };
+            _defaultVisibleColumns["Queue"] = new List<string> { "#", "Title", "Artist", "Album", "Time" };
             _defaultVisibleColumns["Artists"] = new List<string> { "Title", "Artist", "Album", "Time" };
             _defaultVisibleColumns["Albums"] = new List<string> { "Title", "Artist", "Album", "Time" };
             _defaultVisibleColumns["Genres"] = new List<string> { "Title", "Artist", "Album", "Time" };

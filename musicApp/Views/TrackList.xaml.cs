@@ -11,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using musicApp;
 using musicApp.Constants;
+using musicApp.Converters;
 using musicApp.Helpers;
 
 namespace musicApp.Views
@@ -31,6 +32,9 @@ namespace musicApp.Views
         public static readonly DependencyProperty ContextMenuViewNameProperty = DependencyProperty.Register(
             nameof(ContextMenuViewName), typeof(string), typeof(TrackListView), new PropertyMetadata(string.Empty));
 
+        public static readonly DependencyProperty AllowRowReorderProperty = DependencyProperty.Register(
+            nameof(AllowRowReorder), typeof(bool), typeof(TrackListView), new PropertyMetadata(false, OnAllowRowReorderChanged));
+
         public string ViewName
         {
             get => (string)GetValue(ViewNameProperty);
@@ -43,7 +47,7 @@ namespace musicApp.Views
             set => SetValue(ItemsSourceProperty, value);
         }
 
-        /// <summary>When true, single-click plays the track (e.g. Queue, Recently Played, Artists, Genres). When false, only double-click plays (Songs view).</summary>
+        /// <summary>When true, single-click plays the track (e.g. Recently Played, Artists, Genres). When false, only double-click plays (Songs, Queue).</summary>
         public bool SingleClickPlays
         {
             get => (bool)GetValue(SingleClickPlaysProperty);
@@ -57,7 +61,14 @@ namespace musicApp.Views
             set => SetValue(ContextMenuViewNameProperty, value);
         }
 
+        public bool AllowRowReorder
+        {
+            get => (bool)GetValue(AllowRowReorderProperty);
+            set => SetValue(AllowRowReorderProperty, value);
+        }
+
         public event EventHandler<Song>? PlayTrackRequested;
+        public event EventHandler<(int fromViewIndex, int toViewIndex)>? TrackRowsReordered;
 
         public event EventHandler<Song>? AddToPlaylistRequested;
         public event EventHandler<(Song track, Playlist playlist)>? AddTrackToPlaylistRequested;
@@ -99,12 +110,17 @@ namespace musicApp.Views
 
         private readonly HashSet<GridViewColumnHeader> _wiredHeaders = new();
         private readonly HashSet<GridViewColumn> _wiredColumnWidthHandlers = new();
+        private readonly Dictionary<GridViewColumn, string> _columnPersistKeys = new();
         private (string column, ListSortDirection direction) _sortState;
         private ContextMenu? _columnContextMenu;
         private SettingsManager.AppSettings? _cachedSettings;
         private DispatcherTimer? _columnWidthSaveTimer;
         private bool _columnWidthDirty;
         private bool _contextMenuOpeningHandlerAdded;
+
+        private const string RowReorderDragFormat = "musicApp.TrackList.RowReorder";
+        private Point _rowReorderPressPos;
+        private int _rowReorderSourceIndex = -1;
 
         public TrackListView()
         {
@@ -114,7 +130,24 @@ namespace musicApp.Views
             lstTracks.SelectionChanged += LstTracks_SelectionChanged;
             lstTracks.MouseDoubleClick += LstTracks_MouseDoubleClick;
             lstTracks.SizeChanged += LstTracks_SizeChanged;
+            lstTracks.PreviewMouseLeftButtonDown += LstTracks_PreviewMouseLeftButtonDown;
+            lstTracks.PreviewMouseMove += LstTracks_PreviewMouseMove;
+            lstTracks.PreviewMouseLeftButtonUp += LstTracks_PreviewMouseLeftButtonUp;
+            lstTracks.DragOver += LstTracks_DragOver;
+            lstTracks.Drop += LstTracks_Drop;
             SetupColumnWidthTracking();
+            ApplyAllowRowReorderToListView();
+        }
+
+        private static void OnAllowRowReorderChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is TrackListView view)
+                view.ApplyAllowRowReorderToListView();
+        }
+
+        private void ApplyAllowRowReorderToListView()
+        {
+            lstTracks.AllowDrop = AllowRowReorder;
         }
 
         private void LstTracks_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -156,75 +189,23 @@ namespace musicApp.Views
             var contextMenu = listView?.ContextMenu;
             if (contextMenu?.Items == null) return;
             var selectedSong = listView?.SelectedItem as Song;
-            var addToPlaylistItem = FindMenuItemByHeader(contextMenu.Items, "Add to Playlist");
+            var addToPlaylistItem = TrackContextMenuHelper.FindMenuItemByHeader(contextMenu.Items, "Add to Playlist");
             var mainWindow = Application.Current?.MainWindow as MainWindow;
             var playlists = mainWindow?.Playlists;
             if (addToPlaylistItem != null && playlists != null)
-            {
-                // Keep "New Playlist" (0) and Separator (1); remove rest and add current playlists
-                while (addToPlaylistItem.Items.Count > 2)
-                    addToPlaylistItem.Items.RemoveAt(2);
-                foreach (var playlist in playlists)
-                {
-                    var mi = new MenuItem
-                    {
-                        Header = playlist.Name,
-                        Tag = playlist
-                    };
-                    mi.Click += PlaylistSubmenuItem_Click;
-                    addToPlaylistItem.Items.Add(mi);
-                }
-            }
-            // Show "Remove from Playlist" only when we're showing a playlist's tracks (Playlists view).
-            var removeFromPlaylistItem = FindMenuItemByHeader(contextMenu.Items, "Remove from Playlist");
-            if (removeFromPlaylistItem != null)
-                removeFromPlaylistItem.Visibility = CurrentPlaylist != null ? Visibility.Visible : Visibility.Collapsed;
+                TrackContextMenuHelper.RebuildAddToPlaylistChildren(addToPlaylistItem, playlists, PlaylistSubmenuItem_Click);
 
-            var showInArtistsItem = FindMenuItemByHeader(contextMenu.Items, "Show in Artists");
-            var showInSongsItem = FindMenuItemByHeader(contextMenu.Items, "Show in Songs");
-            var showInAlbumsItem = FindMenuItemByHeader(contextMenu.Items, "Show in Albums");
-            var showInQueueItem = FindMenuItemByHeader(contextMenu.Items, "Show in Queue");
+            var removeFromPlaylistItem = TrackContextMenuHelper.FindMenuItemByHeader(contextMenu.Items, "Remove from Playlist");
+            TrackContextMenuHelper.ApplyRemoveFromPlaylistVisibility(removeFromPlaylistItem, CurrentPlaylist != null);
+
+            var showInArtistsItem = TrackContextMenuHelper.FindMenuItemByHeader(contextMenu.Items, "Show in Artists");
+            var showInSongsItem = TrackContextMenuHelper.FindMenuItemByHeader(contextMenu.Items, "Show in Songs");
+            var showInAlbumsItem = TrackContextMenuHelper.FindMenuItemByHeader(contextMenu.Items, "Show in Albums");
+            var showInQueueItem = TrackContextMenuHelper.FindMenuItemByHeader(contextMenu.Items, "Show in Queue");
             bool isInQueue = selectedSong != null && mainWindow?.IsTrackInQueue(selectedSong) == true;
-            ApplyShowInMenuVisibility(showInArtistsItem, showInSongsItem, showInAlbumsItem, showInQueueItem, isInQueue);
-        }
-
-        private void ApplyShowInMenuVisibility(MenuItem? showInArtistsItem, MenuItem? showInSongsItem, MenuItem? showInAlbumsItem, MenuItem? showInQueueItem, bool isInQueue)
-        {
             var contextName = string.IsNullOrWhiteSpace(ContextMenuViewName) ? ViewName : ContextMenuViewName;
-            bool showArtists = true;
-            bool showSongs = true;
-            bool showAlbums = true;
-            bool showQueue = isInQueue;
-
-            if (string.Equals(contextName, "Artists", StringComparison.OrdinalIgnoreCase))
-            {
-                showArtists = false;
-            }
-            else if (string.Equals(contextName, "Albums", StringComparison.OrdinalIgnoreCase))
-            {
-                showAlbums = false;
-            }
-            else if (string.Equals(contextName, "Songs", StringComparison.OrdinalIgnoreCase))
-            {
-                showSongs = false;
-            }
-            else if (string.Equals(contextName, "Recently Played", StringComparison.OrdinalIgnoreCase))
-            {
-                showAlbums = false;
-            }
-            else if (string.Equals(contextName, "Queue", StringComparison.OrdinalIgnoreCase))
-            {
-                showQueue = false;
-            }
-
-            if (showInArtistsItem != null)
-                showInArtistsItem.Visibility = showArtists ? Visibility.Visible : Visibility.Collapsed;
-            if (showInSongsItem != null)
-                showInSongsItem.Visibility = showSongs ? Visibility.Visible : Visibility.Collapsed;
-            if (showInAlbumsItem != null)
-                showInAlbumsItem.Visibility = showAlbums ? Visibility.Visible : Visibility.Collapsed;
-            if (showInQueueItem != null)
-                showInQueueItem.Visibility = showQueue ? Visibility.Visible : Visibility.Collapsed;
+            TrackContextMenuHelper.ApplyShowInMenuVisibility(
+                contextName, showInArtistsItem, showInSongsItem, showInAlbumsItem, showInQueueItem, isInQueue);
         }
 
         private void PlaylistSubmenuItem_Click(object sender, RoutedEventArgs e)
@@ -237,16 +218,6 @@ namespace musicApp.Views
             if (listView?.SelectedItem is not Song song)
                 return;
             AddTrackToPlaylistRequested?.Invoke(this, (song, playlist));
-        }
-
-        private static MenuItem? FindMenuItemByHeader(ItemCollection items, string header)
-        {
-            foreach (var item in items)
-            {
-                if (item is MenuItem mi && mi.Header?.ToString() == header)
-                    return mi;
-            }
-            return null;
         }
 
         public void RebuildColumns()
@@ -295,7 +266,9 @@ namespace musicApp.Views
         private void OnGridViewColumnWidthChanged(object? sender, EventArgs e)
         {
             if (sender is not GridViewColumn col) return;
-            const double minWidth = UILayoutConstants.TrackListMinimumColumnWidth;
+            double minWidth = UILayoutConstants.TrackListMinimumColumnWidth;
+            if (_columnPersistKeys.TryGetValue(col, out var pk) && pk == "#")
+                minWidth = UILayoutConstants.TrackListQueueOrderColumnMinWidth;
             if (!double.IsNaN(col.Width) && col.Width < minWidth)
                 col.Width = minWidth;
             MarkColumnWidthDirty();
@@ -309,6 +282,7 @@ namespace musicApp.Views
                 lstTracks.View = gridView;
                 TeardownGridViewColumnHandlers(gridView);
                 gridView.Columns.Clear();
+                _columnPersistKeys.Clear();
 
                 var visibleColumns = GetVisibleColumns();
                 if (visibleColumns == null || visibleColumns.Count == 0)
@@ -327,20 +301,37 @@ namespace musicApp.Views
                     if (!TrackListColumnConfig.ColumnDefinitions.TryGetValue(columnName, out var columnDef))
                         continue;
                     bool isLastColumn = (i == visibleColumns.Count - 1);
-                    double width = savedWidths.TryGetValue(columnDef.DisplayName, out var w) && w > 0 ? w : columnDef.DefaultWidth;
+                    string persistKey = string.IsNullOrEmpty(columnDef.DisplayName) ? columnName : columnDef.DisplayName;
+                    double width = savedWidths.TryGetValue(persistKey, out var w) && w > 0 ? w : columnDef.DefaultWidth;
                     var column = new GridViewColumn
                     {
                         Header = columnDef.DisplayName,
                         Width = width
                     };
-                    var binding = new Binding(columnDef.PropertyName);
-                    if (columnDef.Converter != null)
-                        binding.Converter = columnDef.Converter;
+                    _columnPersistKeys[column] = persistKey;
                     var dataTemplate = new DataTemplate();
                     var textBlockFactory = new FrameworkElementFactory(typeof(TextBlock));
-                    textBlockFactory.SetBinding(TextBlock.TextProperty, binding);
-                    textBlockFactory.SetValue(TextBlock.MarginProperty, new Thickness(-9, 0, 0, 0));
                     textBlockFactory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+                    if (columnName == "#")
+                    {
+                        var orderBinding = new Binding
+                        {
+                            RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(ListViewItem), 1),
+                            Converter = new ListViewItemQueueOrderConverter(),
+                            ConverterParameter = lstTracks
+                        };
+                        textBlockFactory.SetBinding(TextBlock.TextProperty, orderBinding);
+                        textBlockFactory.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Right);
+                        textBlockFactory.SetValue(TextBlock.MarginProperty, new Thickness(0, 0, 4, 0));
+                    }
+                    else
+                    {
+                        var binding = new Binding(columnDef.PropertyName);
+                        if (columnDef.Converter != null)
+                            binding.Converter = columnDef.Converter;
+                        textBlockFactory.SetBinding(TextBlock.TextProperty, binding);
+                        textBlockFactory.SetValue(TextBlock.MarginProperty, new Thickness(-9, 0, 0, 0));
+                    }
                     dataTemplate.VisualTree = textBlockFactory;
                     column.CellTemplate = dataTemplate;
                     gridView.Columns.Add(column);
@@ -409,12 +400,15 @@ namespace musicApp.Views
         private void ColumnHeader_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not GridViewColumnHeader clickedHeader) return;
-            var columnName = clickedHeader.Content?.ToString() ?? "";
-            var direction = _sortState.column == columnName && _sortState.direction == ListSortDirection.Ascending
+            var col = clickedHeader.Column;
+            var columnKey = col != null && _columnPersistKeys.TryGetValue(col, out var pk) ? pk.Trim() : "";
+            if (string.IsNullOrEmpty(columnKey))
+                columnKey = clickedHeader.Content?.ToString() ?? "";
+            var direction = _sortState.column == columnKey && _sortState.direction == ListSortDirection.Ascending
                 ? ListSortDirection.Descending
                 : ListSortDirection.Ascending;
-            _sortState = (columnName, direction);
-            SortListView(columnName, direction);
+            _sortState = (columnKey, direction);
+            SortListView(columnKey, direction);
         }
 
         private void SortListView(string columnName, ListSortDirection direction)
@@ -426,6 +420,11 @@ namespace musicApp.Views
             var propertyName = TrackListColumnConfig.ColumnDefinitions.TryGetValue(columnName, out var def)
                 ? def.SortPropertyName
                 : columnName;
+            if (string.IsNullOrEmpty(propertyName))
+            {
+                view.Refresh();
+                return;
+            }
             view.SortDescriptions.Add(new SortDescription(propertyName, direction));
             view.Refresh();
         }
@@ -477,8 +476,9 @@ namespace musicApp.Views
                     {
                         var column = gridView.Columns[i];
                         if (i == lastIndex) continue; // last column is star-sized; don't persist
-                        if (column.Header != null && !double.IsNaN(column.Width))
-                            columnWidths[column.Header.ToString() ?? ""] = column.Width;
+                        var persistKey = _columnPersistKeys.TryGetValue(column, out var p) ? p : column.Header?.ToString() ?? "";
+                        if (!string.IsNullOrEmpty(persistKey) && !double.IsNaN(column.Width))
+                            columnWidths[persistKey] = column.Width;
                     }
                     settings.WindowState.ColumnWidths[ViewName] = columnWidths;
                     if (ViewName == "Songs")
@@ -518,7 +518,7 @@ namespace musicApp.Views
                 var isVisible = visibleColumns.Contains(columnName);
                 var menuItem = new MenuItem
                 {
-                    Header = kvp.Value.DisplayName,
+                    Header = string.IsNullOrEmpty(kvp.Value.DisplayName) ? "Order" : kvp.Value.DisplayName,
                     IsCheckable = true,
                     IsChecked = isVisible,
                     Foreground = new SolidColorBrush(Colors.White)
@@ -580,6 +580,220 @@ namespace musicApp.Views
                 foreach (var childOfChild in FindVisualChildren<T>(child))
                     yield return childOfChild;
             }
+        }
+
+        private static T? FindVisualAncestor<T>(DependencyObject? node) where T : DependencyObject
+        {
+            while (node != null)
+            {
+                if (node is T match)
+                    return match;
+                node = VisualTreeHelper.GetParent(node);
+            }
+            return null;
+        }
+
+        private int TryGetSongItemIndexFromSource(DependencyObject? source)
+        {
+            if (source == null)
+                return -1;
+            var row = FindVisualAncestor<ListViewItem>(source);
+            if (row == null || row.DataContext is not Song)
+                return -1;
+            return lstTracks.Items.IndexOf(row.DataContext);
+        }
+
+        private void AlignReorderDropLineToIndex(ref int toIndex, ref double lineY, int count)
+        {
+            toIndex = Math.Max(1, Math.Min(toIndex, count - 1));
+            var gen = lstTracks.ItemContainerGenerator;
+            if (gen.Status == GeneratorStatus.ContainersGenerated &&
+                gen.ContainerFromIndex(toIndex) is ListViewItem itemAt)
+                lineY = itemAt.TranslatePoint(new Point(0, 0), lstTracks).Y;
+            else if (toIndex > 0 &&
+                     gen.Status == GeneratorStatus.ContainersGenerated &&
+                     gen.ContainerFromIndex(toIndex - 1) is ListViewItem prev)
+            {
+                var tl = prev.TranslatePoint(new Point(0, 0), lstTracks);
+                lineY = tl.Y + prev.ActualHeight;
+            }
+        }
+
+        private void GetRowReorderDropGeometry(Point listPos, out int toIndex, out double lineY)
+        {
+            int count = lstTracks.Items.Count;
+            toIndex = -1;
+            lineY = 0;
+
+            if (count <= 1)
+                return;
+
+            var hit = VisualTreeHelper.HitTest(lstTracks, listPos);
+            var row = hit?.VisualHit != null ? FindVisualAncestor<ListViewItem>(hit.VisualHit) : null;
+
+            if (row == null)
+            {
+                toIndex = Math.Max(1, count - 1);
+                AlignReorderDropLineToIndex(ref toIndex, ref lineY, count);
+                if (lineY <= 0)
+                    lineY = Math.Clamp(listPos.Y, 1, Math.Max(1, lstTracks.ActualHeight - 2));
+                return;
+            }
+
+            int rowIndex = lstTracks.Items.IndexOf(row.DataContext);
+            if (rowIndex < 0)
+            {
+                toIndex = Math.Max(1, count - 1);
+                AlignReorderDropLineToIndex(ref toIndex, ref lineY, count);
+                if (lineY <= 0)
+                    lineY = Math.Clamp(listPos.Y, 1, Math.Max(1, lstTracks.ActualHeight - 2));
+                return;
+            }
+
+            Point topLeft = row.TranslatePoint(new Point(0, 0), lstTracks);
+            double bottom = topLeft.Y + row.ActualHeight;
+            double mid = topLeft.Y + row.ActualHeight * 0.5;
+
+            if (rowIndex == 0)
+            {
+                toIndex = 1;
+                lineY = bottom;
+            }
+            else if (listPos.Y < mid)
+            {
+                toIndex = rowIndex;
+                lineY = topLeft.Y;
+            }
+            else
+            {
+                toIndex = rowIndex + 1;
+                lineY = bottom;
+            }
+
+            AlignReorderDropLineToIndex(ref toIndex, ref lineY, count);
+            double maxY = Math.Max(0, lstTracks.ActualHeight - 2);
+            lineY = Math.Clamp(lineY, 0, maxY);
+        }
+
+        private int ComputeTargetViewIndexFromDrop(Point listPos)
+        {
+            GetRowReorderDropGeometry(listPos, out int toIndex, out _);
+            return toIndex;
+        }
+
+        private void UpdateRowReorderInsertLine(Point listPos)
+        {
+            GetRowReorderDropGeometry(listPos, out int toIndex, out double lineY);
+            if (toIndex < 1)
+            {
+                HideRowReorderInsertLine();
+                return;
+            }
+
+            RowReorderInsertLine.Margin = new Thickness(0, lineY, 0, 0);
+            RowReorderInsertLine.Visibility = Visibility.Visible;
+        }
+
+        private void HideRowReorderInsertLine()
+        {
+            RowReorderInsertLine.Visibility = Visibility.Collapsed;
+        }
+
+        private void LstTracks_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!AllowRowReorder)
+            {
+                _rowReorderSourceIndex = -1;
+                return;
+            }
+
+            int idx = TryGetSongItemIndexFromSource(e.OriginalSource as DependencyObject);
+            if (idx < 1)
+            {
+                _rowReorderSourceIndex = -1;
+                return;
+            }
+
+            _rowReorderSourceIndex = idx;
+            _rowReorderPressPos = e.GetPosition(lstTracks);
+        }
+
+        private void LstTracks_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_rowReorderSourceIndex < 1 || e.LeftButton != MouseButtonState.Pressed)
+                return;
+            if (!AllowRowReorder)
+                return;
+
+            var pos = e.GetPosition(lstTracks);
+            double dx = pos.X - _rowReorderPressPos.X;
+            double dy = pos.Y - _rowReorderPressPos.Y;
+            if (Math.Abs(dx) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(dy) < SystemParameters.MinimumVerticalDragDistance)
+                return;
+
+            int from = _rowReorderSourceIndex;
+            _rowReorderSourceIndex = -1;
+
+            var data = new DataObject();
+            data.SetData(RowReorderDragFormat, from);
+            try
+            {
+                DragDrop.DoDragDrop(lstTracks, data, DragDropEffects.Move);
+            }
+            catch
+            {
+                // ignore
+            }
+            finally
+            {
+                HideRowReorderInsertLine();
+            }
+        }
+
+        private void LstTracks_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            _rowReorderSourceIndex = -1;
+        }
+
+        private void LstTracks_DragOver(object sender, DragEventArgs e)
+        {
+            if (!AllowRowReorder || !e.Data.GetDataPresent(RowReorderDragFormat))
+                return;
+            e.Effects = DragDropEffects.Move;
+            e.Handled = true;
+            UpdateRowReorderInsertLine(e.GetPosition(lstTracks));
+        }
+
+        private void LstTracks_Drop(object sender, DragEventArgs e)
+        {
+            if (!AllowRowReorder || !e.Data.GetDataPresent(RowReorderDragFormat))
+                return;
+
+            if (e.Data.GetData(RowReorderDragFormat) is not int fromIndex || fromIndex < 1)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            int toIndex = ComputeTargetViewIndexFromDrop(e.GetPosition(lstTracks));
+            if (toIndex < 1)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (fromIndex == toIndex)
+            {
+                e.Effects = DragDropEffects.None;
+                e.Handled = true;
+                return;
+            }
+
+            TrackRowsReordered?.Invoke(this, (fromIndex, toIndex));
+            e.Effects = DragDropEffects.Move;
+            e.Handled = true;
+            HideRowReorderInsertLine();
         }
 
         private void LstTracks_SelectionChanged(object sender, SelectionChangedEventArgs e)

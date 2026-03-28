@@ -28,6 +28,7 @@ namespace musicApp.TitleBarPlus
         public event EventHandler<string>? SearchTextChanged;
         public event EventHandler<string>? ArtistNavigationRequested;
         public event EventHandler<string>? AlbumNavigationRequested;
+        public event EventHandler? QueuePopupToggleRequested;
         /// <summary>Fired after the user commits a new position on the seek bar (drag release).</summary>
         public event EventHandler? PlaybackPositionCommitted;
 
@@ -208,6 +209,8 @@ namespace musicApp.TitleBarPlus
 
         /// <summary>Search bar border for popup placement.</summary>
         public Border? SearchBarBorder => searchBarBorder;
+
+        public FrameworkElement? QueuePopupPlacementTarget => btnQueue;
 
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -464,6 +467,7 @@ namespace musicApp.TitleBarPlus
         private void BtnQueue_Click(object sender, RoutedEventArgs e)
         {
             e.Handled = true;
+            QueuePopupToggleRequested?.Invoke(this, EventArgs.Empty);
         }
 
         // === Song Info Navigation Events ===
@@ -641,6 +645,10 @@ namespace musicApp.TitleBarPlus
             {
                 IsShuffleEnabled = await SettingsManager.Instance.GetShuffleStateAsync();
                 RepeatMode = await SettingsManager.Instance.GetRepeatModeAsync();
+
+                double restoredVol = await SettingsManager.Instance.GetTitleBarVolume0To100Async();
+                sliderVolume.Value = Math.Max(0, Math.Min(VOLUME_MAX, restoredVol));
+                previousVolume = restoredVol > 0 ? restoredVol : 100;
 
                 UpdateShuffleIcon();
                 UpdateRepeatIcon();

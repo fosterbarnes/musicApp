@@ -1,0 +1,159 @@
+<UserControl x:Class="musicApp.Views.QueuePopupView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:views="clr-namespace:musicApp.Views"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             mc:Ignorable="d"
+             d:DesignHeight="320" d:DesignWidth="380"
+             Background="Transparent">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <ContextMenu x:Key="QueueTrackContextMenu" Style="{StaticResource TrackContextMenuStyle}" Opened="QueueContextMenu_Opened">
+            <ContextMenu.Resources>
+                <Style TargetType="Separator" BasedOn="{StaticResource TrackContextMenuSeparatorStyle}" />
+            </ContextMenu.Resources>
+            <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Play Next" Click="QueueContextMenu_PlayNextClick"/>
+            <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Add to Queue" Click="QueueContextMenu_AddToQueueClick"/>
+            <Separator/>
+            <MenuItem Style="{StaticResource TrackContextMenuItemWithSubmenuStyle}" Header="Add to Playlist" Click="QueueContextMenu_AddToPlaylistClick">
+                <MenuItem.ItemContainerStyle>
+                    <Style TargetType="MenuItem" BasedOn="{StaticResource TrackContextSubMenuItemStyle}"/>
+                </MenuItem.ItemContainerStyle>
+                <MenuItem Header="New Playlist" Click="QueueContextMenu_NewPlaylistClick"/>
+                <Separator/>
+            </MenuItem>
+            <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Show in Artists" Click="QueueContextMenu_ShowInArtistsClick"/>
+            <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Show in Albums" Click="QueueContextMenu_ShowInAlbumsClick"/>
+            <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Show in Songs" Click="QueueContextMenu_ShowInSongsClick"/>
+            <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Show in Queue" Click="QueueContextMenu_ShowInQueueClick"/>
+            <Separator/>
+            <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Info" Click="QueueContextMenu_InfoClick"/>
+            <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Show in Explorer" Click="QueueContextMenu_ShowInExplorerClick"/>
+            <Separator/>
+            <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Remove from Library" Click="QueueContextMenu_RemoveFromLibraryClick"/>
+            <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Delete" Click="QueueContextMenu_DeleteClick"/>
+        </ContextMenu>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <Grid SnapsToDevicePixels="True">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Polygon Grid.Row="0"
+                 Points="0,10 10,0 20,10"
+                 Fill="{StaticResource PanelBackground-brush}"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Top"
+                 Stretch="None"
+                 SnapsToDevicePixels="True"/>
+        <Border x:Name="PopupBorder"
+                Grid.Row="1"
+                Background="{StaticResource PanelBackground-brush}"
+                BorderBrush="{StaticResource BorderDefault-brush}"
+                BorderThickness="1,0,1,1"
+                CornerRadius="0,0,6,6"
+                Padding="{StaticResource PopupContentPadding-thk}"
+                MinWidth="360">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0"
+                        Orientation="Horizontal"
+                        Margin="0,2,0,8"
+                        HorizontalAlignment="Left">
+                <Button Style="{DynamicResource MaterialDesignToolButton}"
+                        materialDesign:RippleAssist.IsDisabled="True"
+                        Width="32" Height="32"
+                        ToolTip="Add to queue">
+                    <materialDesign:PackIcon Kind="Plus" Width="20" Height="20"/>
+                </Button>
+                <Button Style="{DynamicResource MaterialDesignToolButton}"
+                        materialDesign:RippleAssist.IsDisabled="True"
+                        Width="32" Height="32"
+                        Margin="8,0,0,0"
+                        ToolTip="Remove selected song from queue"
+                        Click="QueueToolbarRemove_Click">
+                    <materialDesign:PackIcon Kind="Minus" Width="20" Height="20"/>
+                </Button>
+                <Button Style="{DynamicResource MaterialDesignToolButton}"
+                        materialDesign:RippleAssist.IsDisabled="True"
+                        Width="32" Height="32"
+                        Margin="8,0,0,0"
+                        ToolTip="Move selected song up"
+                        Click="QueueToolbarMoveUp_Click">
+                    <materialDesign:PackIcon Kind="ChevronUp" Width="20" Height="20"/>
+                </Button>
+                <Button Style="{DynamicResource MaterialDesignToolButton}"
+                        materialDesign:RippleAssist.IsDisabled="True"
+                        Width="32" Height="32"
+                        Margin="8,0,0,0"
+                        ToolTip="Move selected song down"
+                        Click="QueueToolbarMoveDown_Click">
+                    <materialDesign:PackIcon Kind="ChevronDown" Width="20" Height="20"/>
+                </Button>
+            </StackPanel>
+
+            <ScrollViewer x:Name="QueueScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Grid MinHeight="0">
+                    <StackPanel x:Name="QueueContentPanel">
+                        <ItemsControl x:Name="QueueItemsList" Margin="0,0,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid SnapsToDevicePixels="True">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <views:CompactSongRow Grid.Row="0"
+                                                              Title="{Binding Title}"
+                                                              Artist="{Binding Artist}"
+                                                              AlbumArtSource="{Binding AlbumArtSource}"
+                                                              IsNowPlaying="{Binding IsNowPlaying}"
+                                                              IsSelected="{Binding IsSelected}"
+                                                              MouseLeftButtonDown="QueueSongItem_MouseLeftButtonDown"
+                                                              MouseDoubleClick="QueueSongItem_MouseDoubleClick"
+                                                              ContextMenu="{StaticResource QueueTrackContextMenu}"/>
+                                        <Border Grid.Row="1"
+                                                Height="1"
+                                                Background="{StaticResource Divider-brush}"
+                                                SnapsToDevicePixels="True"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock x:Name="EmptyQueueText" Text="Nothing in queue" Foreground="{StaticResource TextMuted-brush}" FontSize="13" Margin="0,12,0,0" Visibility="Collapsed"/>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+
+            <Grid Grid.Row="2" Margin="0,0,0,0" Height="1" Background="{StaticResource PanelBackground-brush}">
+                <Thumb x:Name="ResizeThumb"
+                       Cursor="SizeNS"
+                       DragDelta="ResizeThumb_DragDelta"
+                       Height="13"
+                       VerticalAlignment="Top"
+                       Margin="0,0,0,-12"
+                       IsHitTestVisible="True">
+                    <Thumb.Template>
+                        <ControlTemplate TargetType="Thumb">
+                            <Grid Background="Transparent">
+                                <Border Height="1" Background="{StaticResource BorderStrong-brush}" VerticalAlignment="Top"/>
+                            </Grid>
+                        </ControlTemplate>
+                    </Thumb.Template>
+                </Thumb>
+            </Grid>
+        </Grid>
+    </Border>
+    </Grid>
+</UserControl>

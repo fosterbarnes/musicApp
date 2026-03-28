@@ -7,6 +7,7 @@ namespace musicApp.Views
 {
     public partial class TrackContextMenu : ResourceDictionary
     {
+        // Dynamic playlist submenu and "Show in *" visibility live on TrackListView.ContextMenu_Opening (TrackContextMenuHelper).
 
         private void AddToPlaylistMenuItem_Click(object sender, RoutedEventArgs e)
         {

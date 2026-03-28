@@ -33,6 +33,8 @@ namespace musicApp.Views
             set => lstPlaylists.ItemsSource = value;
         }
 
+        public Playlist? SelectedPlaylist => lstPlaylists.SelectedItem as Playlist;
+
         public event System.EventHandler<Song>? PlayTrackRequested;
 
         public event System.EventHandler<Song>? AddToPlaylistRequested;

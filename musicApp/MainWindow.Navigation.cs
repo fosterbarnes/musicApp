@@ -31,6 +31,11 @@ namespace musicApp
             ShowRecentlyPlayedView();
         }
 
+        private void BtnRecentlyAdded_Click(object sender, RoutedEventArgs e)
+        {
+            ShowRecentlyAddedView();
+        }
+
         private void BtnArtists_Click(object sender, RoutedEventArgs e)
         {
             ShowArtistsView();
@@ -136,10 +141,22 @@ namespace musicApp
         /// <param name="bindFullLibrary">False when caller assigns a narrower ItemsSource (e.g. search subset).</param>
         private void ShowAlbumsView(bool bindFullLibrary = true)
         {
+            if (albumsViewControl != null)
+                albumsViewControl.BrowseMode = AlbumsBrowseMode.AllAlbums;
             if (bindFullLibrary && albumsViewControl != null)
                 albumsViewControl.ItemsSource = allTracks;
             contentHost.Content = albumsViewControl;
             SetSidebarNavActive(btnAlbums);
+        }
+
+        private void ShowRecentlyAddedView()
+        {
+            if (albumsViewControl == null)
+                return;
+            albumsViewControl.BrowseMode = AlbumsBrowseMode.RecentlyAdded;
+            albumsViewControl.ItemsSource = allTracks;
+            contentHost.Content = albumsViewControl;
+            SetSidebarNavActive(btnRecentlyAdded);
         }
 
         private void ShowGenresView()
@@ -152,15 +169,22 @@ namespace musicApp
         {
             foreach (var b in new[]
                      {
-                         btnArtists, btnAlbums, btnLibrary, btnGenres, btnPlaylists, btnRecentlyPlayed, btnQueue
+                         btnArtists, btnAlbums, btnLibrary, btnGenres, btnPlaylists, btnRecentlyAdded, btnRecentlyPlayed, btnQueue
                      })
                 SidebarNav.SetIsActive(b, false);
             if (activeButton != null)
                 SidebarNav.SetIsActive(activeButton, true);
         }
 
+        private void CloseQueuePopupIfFromQueuePopout(object? sender)
+        {
+            if (queuePopupView != null && ReferenceEquals(sender, queuePopupView))
+                CloseQueuePopupProgrammatically();
+        }
+
         private void OnShowInExplorerRequested(object? sender, Song track)
         {
+            CloseQueuePopupIfFromQueuePopout(sender);
             if (!IsValidTrackWithPath(track))
                 return;
             if (!File.Exists(track.FilePath))
@@ -182,6 +206,7 @@ namespace musicApp
 
         private void OnShowInArtistsRequested(object? sender, Song track)
         {
+            CloseQueuePopupIfFromQueuePopout(sender);
             if (track == null || string.IsNullOrWhiteSpace(track.Artist))
                 return;
 
@@ -191,6 +216,7 @@ namespace musicApp
 
         private void OnShowInAlbumsRequested(object? sender, Song track)
         {
+            CloseQueuePopupIfFromQueuePopout(sender);
             if (track == null || string.IsNullOrWhiteSpace(track.Album))
                 return;
 
@@ -200,6 +226,7 @@ namespace musicApp
 
         private void OnShowInSongsRequested(object? sender, Song track)
         {
+            CloseQueuePopupIfFromQueuePopout(sender);
             if (track == null)
                 return;
 
@@ -209,6 +236,7 @@ namespace musicApp
 
         private void OnShowInQueueRequested(object? sender, Song track)
         {
+            CloseQueuePopupIfFromQueuePopout(sender);
             if (track == null)
                 return;
 

@@ -27,6 +27,9 @@ namespace musicApp
         {
             public bool IsShuffleEnabled { get; set; } = false;
             public RepeatMode RepeatMode { get; set; } = RepeatMode.Off;
+
+            /// <summary>Title bar volume slider 0–100; omitted in older settings files means default 100.</summary>
+            public double? TitleBarVolume0To100 { get; set; }
         }
 
         public enum RepeatMode
@@ -254,6 +257,15 @@ namespace musicApp
                 settings.Player.RepeatMode = repeatMode;
                 await SaveSettingsAsync(settings);
             }
+        }
+
+        public async Task<double> GetTitleBarVolume0To100Async()
+        {
+            var settings = await LoadSettingsAsync();
+            var v = settings.Player?.TitleBarVolume0To100;
+            if (!v.HasValue)
+                return 100;
+            return Math.Clamp(v.Value, 0, 100);
         }
 
         #endregion

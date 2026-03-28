@@ -109,6 +109,22 @@ namespace musicApp
                     currentIndex = 0;
                 }
 
+                if (HasContextualPlaybackQueue())
+                {
+                    if (TryAdvanceContextualSessionMovingFinishedToHistory(out var nextContext) &&
+                        nextContext != null)
+                    {
+                        PlayTrack(nextContext);
+                        RefreshVisibleViews();
+                    }
+                    else
+                    {
+                        CleanupAudioObjects();
+                        ClearContextualPlaybackQueue();
+                    }
+                    return;
+                }
+
                 if (currentIndex < currentQueue.Count - 1)
                 {
                     var nextTrack = GetTrackFromCurrentQueue(currentIndex + 1);

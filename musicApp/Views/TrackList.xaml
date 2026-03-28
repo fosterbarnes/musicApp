@@ -19,5 +19,14 @@
                   BorderThickness="0"
                   Foreground="White"
                   ContextMenu="{StaticResource TrackContextMenu}" />
+        <Border x:Name="RowReorderInsertLine"
+                VerticalAlignment="Top"
+                HorizontalAlignment="Stretch"
+                Height="2"
+                Margin="0"
+                Background="White"
+                Visibility="Collapsed"
+                IsHitTestVisible="False"
+                SnapsToDevicePixels="True" />
     </Grid>
 </UserControl>

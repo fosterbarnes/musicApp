@@ -30,12 +30,26 @@ public sealed class AlbumRowViewModel : INotifyPropertyChanged
 public sealed class SongRowViewModel : INotifyPropertyChanged
 {
     private BitmapImage? _albumArtSource;
+    private bool _isNowPlaying;
+    private bool _isSelected;
 
     public SongRowViewModel(Song song) => Song = song;
 
     public Song Song { get; }
     public string Title => Song.Title;
     public string Artist => Song.Artist;
+
+    public bool IsNowPlaying
+    {
+        get => _isNowPlaying;
+        set { _isNowPlaying = value; OnPropertyChanged(); }
+    }
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set { _isSelected = value; OnPropertyChanged(); }
+    }
 
     public BitmapImage? AlbumArtSource
     {

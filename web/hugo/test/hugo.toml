@@ -1,0 +1,15 @@
+baseURL = "https://example.com/"
+languageCode = "en-us"
+title = "My MusicApp Site"
+theme = "hugo-blog-awesome"
+
+[author]
+name = "Foster Barnes"
+email = "foster@example.com"
+
+[params]
+author_name = "Foster Barnes"
+author_email = "foster@example.com"
+description = "My awesome music website"
+github = "https://github.com/Foster/musicApp"
+twitter = "https://twitter.com/Foster"

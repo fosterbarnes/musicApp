@@ -12,7 +12,7 @@
   - Repeat button
 
 ##### Queue button:
-
+  - Popout menu with re-orderable currently playing queue
 ##### Search bar:
   - Editable text area to input search
   - Menu with search results
@@ -58,6 +58,8 @@
 - Similar to songs, but only shows recently played tracks
 #### Queue
 - List of queued songs in a scrollable, selectable list
+- Queue action buttons
+- Ability to re-order songs
 #### Add Music
 - Simple button to recursively scan a given folder, then add it to the library
 - Hidden by default, can be shown in main window (Settings > Playback)

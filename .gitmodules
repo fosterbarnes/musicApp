@@ -1,0 +1,3 @@
+[submodule "musicApp/hugo/test/themes/hugo-blog-awesome"]
+	path = musicApp/hugo/test/themes/hugo-blog-awesome
+	url = https://github.com/hugo-sid/hugo-blog-awesome.git

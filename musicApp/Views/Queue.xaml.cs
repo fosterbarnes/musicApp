@@ -21,6 +21,8 @@ namespace musicApp.Views
             trackList.ShowInExplorerRequested += (s, track) => ShowInExplorerRequested?.Invoke(this, track);
             trackList.RemoveFromLibraryRequested += (s, track) => RemoveFromLibraryRequested?.Invoke(this, track);
             trackList.DeleteRequested += (s, track) => DeleteRequested?.Invoke(this, track);
+            trackList.PlayTrackRequested += (_, track) => PlayTrackRequested?.Invoke(this, track);
+            trackList.TrackRowsReordered += (_, args) => TracksReordered?.Invoke(this, args);
         }
 
         public System.Collections.IEnumerable? ItemsSource
@@ -30,6 +32,11 @@ namespace musicApp.Views
         }
 
         public event System.EventHandler<Song>? PlayTrackRequested;
+        public event System.EventHandler<(int fromViewIndex, int toViewIndex)>? TracksReordered;
+
+        public event EventHandler? QueueToolbarRemoveRequested;
+        public event EventHandler? QueueToolbarMoveUpRequested;
+        public event EventHandler? QueueToolbarMoveDownRequested;
 
         public event System.EventHandler<Song>? AddToPlaylistRequested;
         public event System.EventHandler<(Song track, Playlist playlist)>? AddTrackToPlaylistRequested;
@@ -48,6 +55,56 @@ namespace musicApp.Views
         public void RebuildColumns() => trackList.RebuildColumns();
 
         public void RefreshTrackListBindings() => trackList.RefreshItemBindings();
+
+        public Song? SelectedTrack => trackList.SelectedTrack;
+
+        public int GetSelectedViewIndex()
+        {
+            if (trackList.SelectedTrack is not Song selected || trackList.ItemsSource == null)
+                return -1;
+
+            if (!string.IsNullOrWhiteSpace(selected.FilePath))
+            {
+                int i = 0;
+                foreach (var item in trackList.ItemsSource)
+                {
+                    if (item is Song s && !string.IsNullOrWhiteSpace(s.FilePath) &&
+                        string.Equals(s.FilePath, selected.FilePath, StringComparison.OrdinalIgnoreCase))
+                        return i;
+                    i++;
+                }
+            }
+
+            int j = 0;
+            foreach (var item in trackList.ItemsSource)
+            {
+                if (item is Song s &&
+                    string.Equals(s.Title, selected.Title, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(s.Artist, selected.Artist, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(s.Album, selected.Album, StringComparison.OrdinalIgnoreCase))
+                    return j;
+                j++;
+            }
+
+            int k = 0;
+            foreach (var item in trackList.ItemsSource)
+            {
+                if (ReferenceEquals(item, selected))
+                    return k;
+                k++;
+            }
+
+            return -1;
+        }
+
+        private void QueueToolbarRemove_Click(object sender, System.Windows.RoutedEventArgs e) =>
+            QueueToolbarRemoveRequested?.Invoke(this, EventArgs.Empty);
+
+        private void QueueToolbarMoveUp_Click(object sender, System.Windows.RoutedEventArgs e) =>
+            QueueToolbarMoveUpRequested?.Invoke(this, EventArgs.Empty);
+
+        private void QueueToolbarMoveDown_Click(object sender, System.Windows.RoutedEventArgs e) =>
+            QueueToolbarMoveDownRequested?.Invoke(this, EventArgs.Empty);
 
         public void SelectTrack(Song track)
         {
@@ -81,11 +138,6 @@ namespace musicApp.Views
                     return;
                 }
             }
-        }
-
-        private void TrackList_PlayTrackRequested(object? sender, Song e)
-        {
-            PlayTrackRequested?.Invoke(this, e);
         }
     }
 }

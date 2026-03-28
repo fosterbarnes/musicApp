@@ -3,9 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:views="clr-namespace:musicApp.Views"
              mc:Ignorable="d"
              d:DesignHeight="320" d:DesignWidth="380"
-             Background="{StaticResource PanelBackground-brush}">
+             Background="Transparent">
     <UserControl.Resources>
         <ContextMenu x:Key="SearchResultContextMenu" Style="{StaticResource TrackContextMenuStyle}" Opened="SearchContextMenu_Opened">
             <ContextMenu.Resources>
@@ -33,13 +34,28 @@
             <MenuItem Style="{StaticResource TrackContextMenuItemStyle}" Header="Delete" Click="SearchContextMenu_DeleteClick"/>
         </ContextMenu>
     </UserControl.Resources>
-    <Border x:Name="PopupBorder"
-            Background="{StaticResource PanelBackground-brush}"
-            BorderBrush="{StaticResource BorderDefault-brush}"
-            BorderThickness="{StaticResource Border1-thk}"
-            CornerRadius="6"
-            Padding="{StaticResource PopupContentPadding-thk}"
-            MinWidth="360">
+    <Grid SnapsToDevicePixels="True">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Polygon Grid.Row="0"
+                 Points="0,10 10,0 20,10"
+                 Fill="{StaticResource PanelBackground-brush}"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Top"
+                 Margin="{StaticResource SearchPopupCaratMargin-thk}"
+                 Stretch="None"
+                 SnapsToDevicePixels="True"/>
+        <Border x:Name="PopupBorder"
+                Grid.Row="1"
+                Background="{StaticResource PanelBackground-brush}"
+                BorderBrush="{StaticResource BorderDefault-brush}"
+                BorderThickness="1,0,1,1"
+                CornerRadius="0,0,6,6"
+                Padding="{StaticResource PopupContentPadding-thk}"
+                MinWidth="360"
+                Margin="0,0,0,0">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
@@ -133,30 +149,12 @@
                         <ItemsControl x:Name="SongsList" Margin="0,0,0,0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="Transparent" Padding="{StaticResource SearchRowPadding-thk}" Cursor="Hand" MouseLeftButtonDown="SongItem_MouseLeftButtonDown" ContextMenu="{StaticResource SearchResultContextMenu}">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource Hover-brush}"/>
-                                                </Trigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="40"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Border Width="40" Height="40" Background="{StaticResource BorderDefault-brush}" CornerRadius="2" Grid.Column="0">
-                                            <Image Source="{Binding AlbumArtSource}" Stretch="UniformToFill"/>
-                                        </Border>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="{StaticResource SearchTextOffset-thk}">
-                                            <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextPrimary-brush}" FontSize="13" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding Artist}" Foreground="{StaticResource TextTertiary-brush}" FontSize="11" TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
+                                <views:CompactSongRow Title="{Binding Title}"
+                                                      Artist="{Binding Artist}"
+                                                      AlbumArtSource="{Binding AlbumArtSource}"
+                                                      IsNowPlaying="{Binding IsNowPlaying}"
+                                                      MouseLeftButtonDown="SongItem_MouseLeftButtonDown"
+                                                      ContextMenu="{StaticResource SearchResultContextMenu}"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -186,4 +184,5 @@
             </Grid>
         </Grid>
     </Border>
+    </Grid>
 </UserControl>

@@ -47,8 +47,6 @@ namespace musicApp
         private ObservableCollection<Song> allTracks = new ObservableCollection<Song>();
         private ObservableCollection<Song> filteredTracks = new ObservableCollection<Song>();
         private ObservableCollection<Song> shuffledTracks = new ObservableCollection<Song>();
-        private ObservableCollection<Song>? contextualPlaybackQueue;
-        private int contextualPlaybackIndex = -1;
         private ObservableCollection<Playlist> playlists = new ObservableCollection<Playlist>();
         private ObservableCollection<Song> recentlyPlayed = new ObservableCollection<Song>();
 
@@ -76,6 +74,8 @@ namespace musicApp
         private bool _shutdownCloseFinalized;
         private bool _pendingLaunchSettings;
         private bool _pendingLaunchInfo;
+        private bool _queuePopupProgrammaticClose;
+        private bool _suppressQueuePopupToggleOpen;
         private string? _pendingLaunchSettingsSection;
         private string? _pendingLaunchInfoSection;
         private SettingsView? _settingsWindow;
@@ -117,6 +117,7 @@ namespace musicApp
         private const string MainViewRecentlyPlayed = "RecentlyPlayed";
         private const string MainViewArtists = "Artists";
         private const string MainViewAlbums = "Albums";
+        private const string MainViewRecentlyAdded = "RecentlyAdded";
         private const string MainViewGenres = "Genres";
 
         // ===========================================
@@ -204,6 +205,10 @@ namespace musicApp
             void OnPlayTrackRequested(object? s, Song track) => PlayTrack(track, s);
             songsView.PlayTrackRequested += OnPlayTrackRequested;
             queueViewControl.PlayTrackRequested += OnPlayTrackRequested;
+            queueViewControl.TracksReordered += OnQueueTracksReordered;
+            queueViewControl.QueueToolbarRemoveRequested += OnQueueToolbarRemoveRequested;
+            queueViewControl.QueueToolbarMoveUpRequested += OnQueueToolbarMoveUpRequested;
+            queueViewControl.QueueToolbarMoveDownRequested += OnQueueToolbarMoveDownRequested;
             recentlyPlayedViewControl.PlayTrackRequested += OnPlayTrackRequested;
             artistsViewControl.PlayTrackRequested += OnPlayTrackRequested;
             genresViewControl.PlayTrackRequested += OnPlayTrackRequested;
@@ -322,8 +327,10 @@ namespace musicApp
                 return MainViewRecentlyPlayed;
             if (ReferenceEquals(contentHost?.Content, artistsViewControl))
                 return MainViewArtists;
-            if (ReferenceEquals(contentHost?.Content, albumsViewControl))
-                return MainViewAlbums;
+            if (ReferenceEquals(contentHost?.Content, albumsViewControl) && albumsViewControl != null)
+                return albumsViewControl.BrowseMode == AlbumsBrowseMode.RecentlyAdded
+                    ? MainViewRecentlyAdded
+                    : MainViewAlbums;
             if (ReferenceEquals(contentHost?.Content, genresViewControl))
                 return MainViewGenres;
             return MainViewLibrary;
@@ -349,6 +356,11 @@ namespace musicApp
             if (string.Equals(savedViewKey, MainViewArtists, StringComparison.OrdinalIgnoreCase))
             {
                 ShowArtistsView();
+                return;
+            }
+            if (string.Equals(savedViewKey, MainViewRecentlyAdded, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowRecentlyAddedView();
                 return;
             }
             if (string.Equals(savedViewKey, MainViewAlbums, StringComparison.OrdinalIgnoreCase))
@@ -893,6 +905,14 @@ namespace musicApp
             titleBarPlayer.AlbumNavigationRequested += TitleBarPlayer_AlbumNavigationRequested;
 
             titleBarPlayer.SearchTextChanged += TitleBarPlayer_SearchTextChanged;
+            if (titleBarPlayer.SearchBarBorder != null)
+                titleBarPlayer.SearchBarBorder.AddHandler(
+                    UIElement.MouseLeftButtonUpEvent,
+                    new MouseButtonEventHandler(SearchBarBorder_MouseLeftButtonUp),
+                    true);
+            titleBarPlayer.QueuePopupToggleRequested += TitleBarPlayer_QueuePopupToggleRequested;
+            if (titleBarPlayer.QueuePopupPlacementTarget is UIElement queuePlacementTarget)
+                queuePlacementTarget.PreviewMouseLeftButtonDown += QueuePopupPlacementTarget_PreviewMouseLeftButtonDown;
             titleBarPlayer.PlaybackPositionCommitted += OnTitleBarPlaybackPositionCommitted;
             titleBarPlayer.VolumeChanged += TitleBarPlayer_VolumeChanged;
             if (searchPopupView != null)
@@ -912,6 +932,29 @@ namespace musicApp
                 searchPopupView.ShowInExplorerRequested += OnShowInExplorerRequested;
                 searchPopupView.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
                 searchPopupView.DeleteRequested += OnDeleteRequested;
+            }
+
+            queuePopup.Opened += QueuePopup_Opened;
+            queuePopup.Closed += QueuePopup_Closed;
+
+            if (queuePopupView != null)
+            {
+                queuePopupView.SongPlayRequested += QueuePopupView_SongPlayRequested;
+                queuePopupView.QueueToolbarRemoveRequested += OnQueueToolbarRemoveRequested;
+                queuePopupView.QueueToolbarMoveUpRequested += OnQueueToolbarMoveUpRequested;
+                queuePopupView.QueueToolbarMoveDownRequested += OnQueueToolbarMoveDownRequested;
+                queuePopupView.PlayNextRequested += OnPlayNextRequested;
+                queuePopupView.AddToQueueRequested += OnAddToQueueRequested;
+                queuePopupView.AddTrackToPlaylistRequested += OnAddTrackToPlaylistRequested;
+                queuePopupView.CreateNewPlaylistWithTrackRequested += OnCreateNewPlaylistWithTrackRequested;
+                queuePopupView.InfoRequested += OnInfoRequested;
+                queuePopupView.ShowInArtistsRequested += OnShowInArtistsRequested;
+                queuePopupView.ShowInSongsRequested += OnShowInSongsRequested;
+                queuePopupView.ShowInAlbumsRequested += OnShowInAlbumsRequested;
+                queuePopupView.ShowInQueueRequested += OnShowInQueueRequested;
+                queuePopupView.ShowInExplorerRequested += OnShowInExplorerRequested;
+                queuePopupView.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
+                queuePopupView.DeleteRequested += OnDeleteRequested;
             }
 
             this.SizeChanged += MainWindow_SizeChanged;
@@ -1066,6 +1109,16 @@ namespace musicApp
             Debug.WriteLine(message);
         }
 
+        private void SearchBarBorder_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (searchPopup.IsOpen)
+                return;
+            var query = titleBarPlayer.GetSearchQuery();
+            if (string.IsNullOrWhiteSpace(query))
+                return;
+            TitleBarPlayer_SearchTextChanged(this, query);
+        }
+
         private void TitleBarPlayer_SearchTextChanged(object? sender, string query)
         {
             if (string.IsNullOrWhiteSpace(query))
@@ -1073,19 +1126,111 @@ namespace musicApp
                 searchPopup.IsOpen = false;
                 return;
             }
+            CloseQueuePopupProgrammatically();
             var results = SearchHelper.Run(query, allTracks);
             if (searchPopupView != null)
                 searchPopupView.Results = results;
             if (searchPopup.PlacementTarget == null && titleBarPlayer.SearchBarBorder != null)
                 searchPopup.PlacementTarget = titleBarPlayer.SearchBarBorder;
+            if (Mouse.Captured != null)
+                Mouse.Capture(null);
             searchPopup.IsOpen = true;
             searchPopupView?.RefreshHeightForSearch();
+        }
+
+        private void QueuePopup_Opened(object? sender, EventArgs e)
+        {
+            _ = Dispatcher.BeginInvoke(new Action(CenterQueuePopupUnderPlacementButton), DispatcherPriority.Loaded);
+        }
+
+        private void QueuePopup_Closed(object? sender, EventArgs e)
+        {
+            if (_queuePopupProgrammaticClose)
+            {
+                _queuePopupProgrammaticClose = false;
+                return;
+            }
+
+            if (titleBarPlayer.QueuePopupPlacementTarget is UIElement target)
+            {
+                var pos = Mouse.GetPosition(target);
+                if (target.InputHitTest(pos) != null)
+                    _suppressQueuePopupToggleOpen = true;
+            }
+        }
+
+        private void CloseQueuePopupProgrammatically()
+        {
+            if (!queuePopup.IsOpen)
+                return;
+            _queuePopupProgrammaticClose = true;
+            queuePopup.IsOpen = false;
+            queuePopup.HorizontalOffset = 0;
+        }
+
+        private void CenterQueuePopupUnderPlacementButton()
+        {
+            if (!queuePopup.IsOpen || queuePopup.PlacementTarget is not FrameworkElement target ||
+                queuePopup.Child is not FrameworkElement child)
+                return;
+
+            child.UpdateLayout();
+            double popupW = child.ActualWidth;
+            if (popupW <= 0 || double.IsNaN(popupW))
+            {
+                child.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                popupW = Math.Max(child.DesiredSize.Width, child.MinWidth);
+            }
+
+            double tw = target.ActualWidth;
+            if (tw <= 0 || double.IsNaN(tw))
+                return;
+
+            queuePopup.HorizontalOffset = (tw - popupW) / 2d;
+        }
+
+        private void QueuePopupPlacementTarget_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!queuePopup.IsOpen)
+                return;
+            CloseQueuePopupProgrammatically();
+            e.Handled = true;
+        }
+
+        private void TitleBarPlayer_QueuePopupToggleRequested(object? sender, EventArgs e)
+        {
+            if (queuePopup.PlacementTarget == null && titleBarPlayer.QueuePopupPlacementTarget != null)
+                queuePopup.PlacementTarget = titleBarPlayer.QueuePopupPlacementTarget;
+
+            if (_suppressQueuePopupToggleOpen)
+            {
+                _suppressQueuePopupToggleOpen = false;
+                return;
+            }
+
+            if (queuePopup.IsOpen)
+            {
+                CloseQueuePopupProgrammatically();
+                return;
+            }
+
+            searchPopup.IsOpen = false;
+            queuePopup.HorizontalOffset = 0;
+            if (queuePopupView != null)
+                queuePopupView.QueueTracks = BuildQueueView();
+            queuePopup.IsOpen = true;
+            queuePopupView?.RefreshHeight();
         }
 
         private void SearchPopupView_SongSelected(object? sender, Song song)
         {
             searchPopup.IsOpen = false;
             PlayTrack(song);
+        }
+
+        private void QueuePopupView_SongPlayRequested(object? sender, Song song)
+        {
+            PlayTrack(song, queuePopupView);
         }
 
         private void SearchPopupView_ArtistSelected(object? sender, ArtistSearchItem artist)
@@ -1098,6 +1243,8 @@ namespace musicApp
         private void SearchPopupView_AlbumSelected(object? sender, AlbumSearchItem album)
         {
             searchPopup.IsOpen = false;
+            if (albumsViewControl != null)
+                albumsViewControl.BrowseMode = AlbumsBrowseMode.AllAlbums;
             ShowAlbumsView(bindFullLibrary: false);
             if (albumsViewControl != null && album.Songs.Count > 0)
                 albumsViewControl.ItemsSource = album.Songs;
@@ -1133,6 +1280,9 @@ namespace musicApp
         {
             try
             {
+                if (HasContextualPlaybackQueue())
+                    return;
+
                 if (filteredTracks == null || filteredTracks.Count == 0)
                 {
                     shuffledTracks.Clear();
@@ -1148,33 +1298,34 @@ namespace musicApp
                         shuffledTracks.Add(track);
                 }
 
-                if (shuffledTracks.Count > 1)
+                if (!titleBarPlayer.IsShuffleEnabled)
                 {
-                    var random = new Random();
-                    for (int i = shuffledTracks.Count - 1; i > 0; i--)
-                    {
-                        int j = random.Next(i + 1);
-                        var temp = shuffledTracks[i];
-                        shuffledTracks[i] = shuffledTracks[j];
-                        shuffledTracks[j] = temp;
-                    }
+                    currentShuffledIndex = currentTrack != null ? filteredTracks.IndexOf(currentTrack) : -1;
+                    if (contentHost?.Content == queueViewControl)
+                        UpdateQueueView();
+                    return;
                 }
 
                 if (currentTrack != null)
                 {
-                    int trackIndex = shuffledTracks.IndexOf(currentTrack);
-                    if (trackIndex > 0)
+                    int li = filteredTracks.IndexOf(currentTrack);
+                    currentTrackIndex = li;
+                    currentShuffledIndex = li;
+                    if (li < 0)
                     {
-                        var trackToMove = shuffledTracks[trackIndex];
-                        shuffledTracks.RemoveAt(trackIndex);
-                        shuffledTracks.Insert(0, trackToMove);
+                        ShuffleRangeUntilOrderDiffersFromLinear(shuffledTracks, filteredTracks, 0, shuffledTracks.Count - 1);
+                        currentShuffledIndex = 0;
                     }
-
-                    currentShuffledIndex = 0;
+                    else if (li < shuffledTracks.Count - 1)
+                    {
+                        ShuffleRangeUntilOrderDiffersFromLinear(shuffledTracks, filteredTracks, li + 1, shuffledTracks.Count - 1);
+                    }
                 }
                 else
                 {
                     currentShuffledIndex = -1;
+                    if (shuffledTracks.Count > 1)
+                        ShuffleRangeUntilOrderDiffersFromLinear(shuffledTracks, filteredTracks, 0, shuffledTracks.Count - 1);
                 }
 
                 if (contentHost?.Content == queueViewControl)
@@ -1194,6 +1345,64 @@ namespace musicApp
                     Debug.WriteLine($"RegenerateShuffledTracks clear: {clearEx.Message}");
                 }
             }
+        }
+
+        private void ResyncLibraryShuffledUpcomingOrder(Song track)
+        {
+            if (track == null || filteredTracks == null)
+                return;
+
+            if (shuffledTracks.Count != filteredTracks.Count)
+            {
+                RegenerateShuffledTracks();
+                return;
+            }
+
+            int li = filteredTracks.IndexOf(track);
+            currentTrackIndex = li;
+            currentShuffledIndex = li;
+            if (li < 0)
+                return;
+
+            for (int i = 0; i <= li && i < shuffledTracks.Count; i++)
+                shuffledTracks[i] = filteredTracks[i];
+
+            if (li >= shuffledTracks.Count - 1)
+                return;
+
+            var remaining = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int r = li + 1; r < filteredTracks.Count; r++)
+            {
+                var s = filteredTracks[r];
+                if (!string.IsNullOrWhiteSpace(s?.FilePath))
+                    remaining.Add(s.FilePath);
+            }
+
+            var tail = new List<Song>();
+            for (int i = li + 1; i < shuffledTracks.Count; i++)
+            {
+                var s = shuffledTracks[i];
+                if (s != null && !string.IsNullOrWhiteSpace(s.FilePath) && remaining.Contains(s.FilePath))
+                    tail.Add(s);
+            }
+
+            if (tail.Count < remaining.Count)
+            {
+                var inTail = new HashSet<string>(tail.Select(s => s.FilePath), StringComparer.OrdinalIgnoreCase);
+                for (int r = li + 1; r < filteredTracks.Count; r++)
+                {
+                    var s = filteredTracks[r];
+                    if (s != null && !string.IsNullOrWhiteSpace(s.FilePath) && !inTail.Contains(s.FilePath))
+                    {
+                        tail.Add(s);
+                        inTail.Add(s.FilePath);
+                    }
+                }
+            }
+
+            int k = 0;
+            for (int i = li + 1; i < shuffledTracks.Count && k < tail.Count; i++, k++)
+                shuffledTracks[i] = tail[k];
         }
 
         private void EnsureShuffledTracksInitialized()
@@ -1247,18 +1456,15 @@ namespace musicApp
             if (!titleBarPlayer.IsShuffleEnabled || HasContextualPlaybackQueue())
                 return;
 
-            if (!isManualNavigation)
-                RegenerateShuffledTracks();
-
-            currentShuffledIndex = shuffledTracks.IndexOf(track);
+            ResyncLibraryShuffledUpcomingOrder(track);
         }
 
         private ObservableCollection<Song> GetCurrentPlayQueue()
         {
             try
             {
-                if (contextualPlaybackQueue != null && contextualPlaybackQueue.Count > 0)
-                    return contextualPlaybackQueue;
+                if (contextualPlaybackFuture != null && contextualPlaybackFuture.Count > 0)
+                    return contextualPlaybackFuture;
 
                 var queue = titleBarPlayer.IsShuffleEnabled ? shuffledTracks : filteredTracks;
 
@@ -1278,8 +1484,8 @@ namespace musicApp
         {
             try
             {
-                if (contextualPlaybackQueue != null && contextualPlaybackQueue.Count > 0)
-                    return contextualPlaybackIndex;
+                if (contextualPlaybackFuture != null && contextualPlaybackFuture.Count > 0)
+                    return 0;
 
                 return titleBarPlayer.IsShuffleEnabled ? currentShuffledIndex : currentTrackIndex;
             }
@@ -1292,11 +1498,8 @@ namespace musicApp
 
         private void SetCurrentTrackIndex(int index)
         {
-            if (contextualPlaybackQueue != null && contextualPlaybackQueue.Count > 0)
-            {
-                contextualPlaybackIndex = index;
+            if (contextualPlaybackFuture != null && contextualPlaybackFuture.Count > 0)
                 return;
-            }
 
             if (titleBarPlayer.IsShuffleEnabled)
             {
@@ -1341,11 +1544,15 @@ namespace musicApp
             RestartCurrentEdge,
         }
 
-        private static PreviousTrackSeekBehavior GetPreviousTrackSeekBehavior(double elapsedSeconds, int currentIndex)
+        private PreviousTrackSeekBehavior GetPreviousTrackSeekBehavior(double elapsedSeconds, int currentIndex)
         {
             if (elapsedSeconds >= UILayoutConstants.PreviousTrackRestartThresholdSeconds)
                 return PreviousTrackSeekBehavior.RestartCurrent;
-            if (elapsedSeconds <= UILayoutConstants.PreviousTrackEdgeThresholdSeconds && currentIndex > 0)
+
+            bool canGoPrevious = currentIndex > 0 ||
+                                 (HasContextualPlaybackQueue() && contextualPlaybackHistoryMru.Count > 0);
+
+            if (elapsedSeconds <= UILayoutConstants.PreviousTrackEdgeThresholdSeconds && canGoPrevious)
                 return PreviousTrackSeekBehavior.GoToPrevious;
             return PreviousTrackSeekBehavior.RestartCurrentEdge;
         }
@@ -1413,16 +1620,27 @@ namespace musicApp
                     break;
 
                 case PreviousTrackSeekBehavior.GoToPrevious:
-                    var previousTrack = GetTrackFromCurrentQueue(currentIndex - 1);
-                    if (previousTrack != null)
+                    if (HasContextualPlaybackQueue())
                     {
-                        LoadTrackWithoutPlayback(previousTrack);
-                        if (wasPlaying)
-                            ResumePlayback();
+                        if (TryRewindContextualSessionOne(out var prevContext) && prevContext != null)
+                        {
+                            LoadTrackWithoutPlayback(prevContext);
+                            if (wasPlaying)
+                                ResumePlayback();
+                        }
+                        else if (contentHost?.Content == queueViewControl)
+                            UpdateQueueView();
                     }
                     else
                     {
-                        if (contentHost?.Content == queueViewControl)
+                        var previousTrack = GetTrackFromCurrentQueue(currentIndex - 1);
+                        if (previousTrack != null)
+                        {
+                            LoadTrackWithoutPlayback(previousTrack);
+                            if (wasPlaying)
+                                ResumePlayback();
+                        }
+                        else if (contentHost?.Content == queueViewControl)
                             UpdateQueueView();
                     }
                     break;
@@ -1446,6 +1664,23 @@ namespace musicApp
             var currentIndex = GetCurrentTrackIndex();
 
             isManualNavigation = true;
+
+            if (HasContextualPlaybackQueue())
+            {
+                if (TryManualAdvanceContextualSession())
+                {
+                    var next = contextualPlaybackFuture![0];
+                    bool wasPlaying = titleBarPlayer.IsPlaying;
+                    LoadTrackWithoutPlayback(next);
+                    if (wasPlaying)
+                        ResumePlayback();
+                }
+                else
+                    ResetPlaybackToIdleAndRefreshQueue();
+
+                Task.Delay(UILayoutConstants.ManualNavigationResetDelayMs).ContinueWith(_ => isManualNavigation = false);
+                return;
+            }
 
             if (currentIndex < currentQueue.Count - 1)
             {
@@ -1628,17 +1863,29 @@ namespace musicApp
 
         private void TitleBarPlayer_ShuffleStateChanged(object? sender, bool isShuffleEnabled)
         {
-            if (isShuffleEnabled)
+            if (HasContextualPlaybackQueue())
+            {
+                RebuildContextualDisplayFromLinear();
+            }
+            else if (isShuffleEnabled)
             {
                 RegenerateShuffledTracks();
             }
             else
             {
+                shuffledTracks.Clear();
+                foreach (var t in filteredTracks)
+                    shuffledTracks.Add(t);
                 if (currentTrack != null)
                 {
                     currentTrackIndex = filteredTracks.IndexOf(currentTrack);
+                    currentShuffledIndex = currentTrackIndex;
                     if (currentTrackIndex == -1)
                         currentTrackIndex = 0;
+                }
+                else
+                {
+                    currentShuffledIndex = -1;
                 }
             }
 
@@ -1665,6 +1912,26 @@ namespace musicApp
         {
             if (!IsValidTrackWithPath(track))
                 return;
+
+            if (HasContextualPlaybackQueue() &&
+                contextualPlaybackFuture != null &&
+                contextualLinearFuture.Count == contextualPlaybackFuture.Count)
+            {
+                const int insertIdx = 1;
+                if (insertIdx > contextualLinearFuture.Count)
+                {
+                    contextualLinearFuture.Add(track);
+                    contextualPlaybackFuture.Add(track);
+                }
+                else
+                {
+                    contextualLinearFuture.Insert(insertIdx, track);
+                    contextualPlaybackFuture.Insert(insertIdx, track);
+                }
+
+                RefreshVisibleViews();
+                return;
+            }
 
             int insertAt = GetCurrentTrackIndex() + 1;
             if (insertAt < 0)
@@ -1694,10 +1961,101 @@ namespace musicApp
             if (!IsValidTrackWithPath(track))
                 return;
 
+            if (HasContextualPlaybackQueue() &&
+                contextualPlaybackFuture != null &&
+                contextualLinearFuture.Count == contextualPlaybackFuture.Count)
+            {
+                contextualLinearFuture.Add(track);
+                contextualPlaybackFuture.Add(track);
+                RefreshVisibleViews();
+                return;
+            }
+
             filteredTracks.Add(track);
             shuffledTracks.Add(track);
 
             RefreshVisibleViews();
+        }
+
+        private void OnQueueToolbarRemoveRequested(object? sender, EventArgs e)
+        {
+            int viewIndex = -1;
+            if (queuePopupView != null && ReferenceEquals(sender, queuePopupView))
+                viewIndex = queuePopupView.GetSelectedViewIndex();
+            else if (queueViewControl != null)
+                viewIndex = queueViewControl.GetSelectedViewIndex();
+
+            if (viewIndex < 0)
+                return;
+
+            var queue = GetCurrentPlayQueue();
+            int baseIdx = GetCurrentTrackIndex();
+            if (queue == null || baseIdx < 0 || queue.Count == 0)
+                return;
+
+            int q = baseIdx + viewIndex;
+            if (q < 0 || q >= queue.Count)
+                return;
+
+            Song? removed = queue[q];
+            bool removeWasCurrent = viewIndex == 0 && currentTrack != null && removed != null &&
+                ((!string.IsNullOrWhiteSpace(removed.FilePath) &&
+                  !string.IsNullOrWhiteSpace(currentTrack.FilePath) &&
+                  string.Equals(removed.FilePath, currentTrack.FilePath, StringComparison.OrdinalIgnoreCase)) ||
+                 ReferenceEquals(currentTrack, removed));
+
+            bool wasPlaying = titleBarPlayer.IsPlaying;
+
+            queue.RemoveAt(q);
+
+            if (HasContextualPlaybackQueue() &&
+                q >= 0 &&
+                q < contextualLinearFuture.Count)
+                contextualLinearFuture.RemoveAt(q);
+
+            if (removeWasCurrent)
+            {
+                if (baseIdx < queue.Count)
+                {
+                    var next = queue[baseIdx];
+                    if (wasPlaying)
+                        PlayTrack(next, null);
+                    else
+                        LoadTrackWithoutPlayback(next);
+                }
+                else
+                    StopPlayback();
+            }
+            else if (currentTrack != null)
+                SyncCurrentTrackIndices(currentTrack);
+
+            UpdateQueueView();
+            RefreshVisibleViews();
+        }
+
+        private void OnQueueToolbarMoveUpRequested(object? sender, EventArgs e)
+        {
+            int ix = queuePopupView != null && ReferenceEquals(sender, queuePopupView)
+                ? queuePopupView.GetSelectedViewIndex()
+                : queueViewControl?.GetSelectedViewIndex() ?? -1;
+            if (ix < 2)
+                return;
+            OnQueueTracksReordered(this, (ix, ix - 1));
+        }
+
+        private void OnQueueToolbarMoveDownRequested(object? sender, EventArgs e)
+        {
+            var playQ = GetCurrentPlayQueue();
+            int baseIdx = GetCurrentTrackIndex();
+            int ix = queuePopupView != null && ReferenceEquals(sender, queuePopupView)
+                ? queuePopupView.GetSelectedViewIndex()
+                : queueViewControl?.GetSelectedViewIndex() ?? -1;
+            if (playQ == null || baseIdx < 0 || ix < 1)
+                return;
+            int viewCount = playQ.Count - baseIdx;
+            if (ix >= viewCount - 1)
+                return;
+            OnQueueTracksReordered(this, (ix, ix + 1));
         }
 
         /// <summary>
@@ -1866,6 +2224,13 @@ namespace musicApp
                         queueViewControl.ItemsSource = queueView;
                     else
                         queueViewControl.ItemsSource = new ObservableCollection<Song>();
+                }
+
+                if (queuePopup.IsOpen && queuePopupView != null)
+                {
+                    queuePopupView.QueueTracks = queueView ?? new ObservableCollection<Song>();
+                    queuePopupView.RefreshHeight();
+                    _ = Dispatcher.BeginInvoke(new Action(CenterQueuePopupUnderPlacementButton), DispatcherPriority.ContextIdle);
                 }
             }
             catch (Exception ex)
@@ -2170,7 +2535,7 @@ namespace musicApp
                 if (!File.Exists(track.FilePath))
                     return;
 
-                TryInitializeAlbumContextQueue(requestSource, track);
+                TryInitializeContextFromPlayTrack(requestSource, track);
 
                 try
                 {
@@ -2201,7 +2566,7 @@ namespace musicApp
                 currentTrack = track;
 
                 // Set the current track index in the active queue context.
-                SyncCurrentTrackIndices(track);
+                SyncCurrentTrackIndices(track, requestSource);
                 UpdateShuffleIndicesAfterTrackChange(track);
 
                 var albumArt = AlbumArtLoader.LoadAlbumArt(track);
@@ -2372,70 +2737,11 @@ namespace musicApp
             }
         }
 
-        private bool HasContextualPlaybackQueue()
-        {
-            return contextualPlaybackQueue != null && contextualPlaybackQueue.Count > 0;
-        }
-
-        private void ClearContextualPlaybackQueue()
-        {
-            contextualPlaybackQueue = null;
-            contextualPlaybackIndex = -1;
-        }
-
         private bool IsPlaybackIdleAndQueueEmpty()
         {
             bool noTrackPlaying = currentTrack == null && !titleBarPlayer.IsPlaying;
             bool noQueueState = !HasContextualPlaybackQueue() && currentTrackIndex < 0 && currentShuffledIndex < 0;
             return noTrackPlaying && noQueueState;
-        }
-
-        private void TryInitializeAlbumContextQueue(object? requestSource, Song selectedTrack)
-        {
-            if (!ReferenceEquals(requestSource, albumsViewControl) || !IsPlaybackIdleAndQueueEmpty())
-                return;
-
-            string albumTitle = selectedTrack.Album ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(albumTitle))
-                return;
-
-            string selectedAlbumArtist = !string.IsNullOrWhiteSpace(selectedTrack.AlbumArtist)
-                ? selectedTrack.AlbumArtist
-                : selectedTrack.Artist ?? string.Empty;
-
-            var albumTracks = AlbumTrackOrder.SortByAlbumSequence(
-                allTracks.Where(s =>
-                    string.Equals(s.Album, albumTitle, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(
-                        !string.IsNullOrWhiteSpace(s.AlbumArtist) ? s.AlbumArtist : s.Artist,
-                        selectedAlbumArtist,
-                        StringComparison.OrdinalIgnoreCase)));
-
-            if (albumTracks.Count == 0)
-                return;
-
-            contextualPlaybackQueue = new ObservableCollection<Song>(albumTracks);
-            contextualPlaybackIndex = contextualPlaybackQueue.IndexOf(selectedTrack);
-        }
-
-        private void SyncCurrentTrackIndices(Song track)
-        {
-            if (HasContextualPlaybackQueue())
-            {
-                int contextIndex = contextualPlaybackQueue!.IndexOf(track);
-                if (contextIndex >= 0)
-                {
-                    contextualPlaybackIndex = contextIndex;
-                    currentTrackIndex = filteredTracks.IndexOf(track);
-                    currentShuffledIndex = shuffledTracks.IndexOf(track);
-                    return;
-                }
-
-                ClearContextualPlaybackQueue();
-            }
-
-            currentTrackIndex = filteredTracks.IndexOf(track);
-            currentShuffledIndex = shuffledTracks.IndexOf(track);
         }
 
         #endregion
@@ -2464,7 +2770,8 @@ namespace musicApp
                     appSettings.Player = new SettingsManager.PlayerSettings
                     {
                         IsShuffleEnabled = titleBarPlayer.IsShuffleEnabled,
-                        RepeatMode = titleBarPlayer.RepeatMode
+                        RepeatMode = titleBarPlayer.RepeatMode,
+                        TitleBarVolume0To100 = titleBarPlayer.Volume
                     };
 
                     appSettings.WindowState = windowManager.GetCurrentWindowState();

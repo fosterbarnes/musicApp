@@ -1,0 +1,41 @@
+<UserControl x:Class="musicApp.Views.CompactSongRow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="48" d:DesignWidth="320"
+             Cursor="Hand">
+    <Border x:Name="RootBorder"
+            Padding="{StaticResource SearchRowPadding-thk}">
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="Background" Value="Transparent"/>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="{StaticResource Hover-brush}"/>
+                    </Trigger>
+                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                        <Setter Property="Background" Value="{StaticResource Selected-brush}"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsNowPlaying, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                        <Setter Property="Background" Value="{StaticResource ThemeBrand-brush}"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="40"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Border Width="40" Height="40" Background="{StaticResource BorderDefault-brush}" CornerRadius="2" Grid.Column="0">
+                <Image Source="{Binding AlbumArtSource, RelativeSource={RelativeSource AncestorType=UserControl}}" Stretch="UniformToFill"/>
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="{StaticResource SearchTextOffset-thk}">
+                <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=UserControl}}" Foreground="{StaticResource TextPrimary-brush}" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Text="{Binding Artist, RelativeSource={RelativeSource AncestorType=UserControl}}" Foreground="{StaticResource TextTertiary-brush}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

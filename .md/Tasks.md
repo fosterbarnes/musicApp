@@ -12,7 +12,7 @@
   - ~~Repeat button~~
 
 #### Queue button:
-  - Popout menu with re-orderable currently playing queue
+  - ~~Popout menu with re-orderable currently playing queue~~
 
 #### Search bar:
   - ~~Editable text area to input search~~
@@ -26,7 +26,7 @@
 ### Main Window Buttons
 
 #### Recently Added
-- Inherit albums view, but sort by most recently added songs
+- ~~Inherit albums view, but sort by most recently added songs~~
 - Option to view 'recently added' as albums, songs, or artists view
 
 #### Artists
@@ -65,7 +65,8 @@
 
 #### Queue
 - ~~List of queued songs in a scrollable, selectable list~~
-- Ability to re-order songs
+- ~~Queue action buttons~~
+- ~~Ability to re-order songs~~
 
 #### Add Music
 - ~~Simple button to recursively scan a given folder, then add it to the library~~
@@ -119,8 +120,8 @@
 - Clear cache button
 
 #### Cross-fade songs
-- Start time (slider)
-- Length (text box)
+- ~~Start time (slider)~~
+- ~~Length (text box)~~
 
 #### Audio
 - ~~Multiple audio backends (dropdown)~~
@@ -175,12 +176,12 @@
 - Cut down on if statements. Use more switch/loops
 - ~~Use hard-coded custom "pop-ups" and info menus rather than built in windows pop-ups~~
 - Improve startup load times
-- Improve album art load time
+- Improve album art load time (WIP)
 
 ### Bugs
-- General sluggishness/startup time
+- General sluggishness/startup time (WIP)
 - Window sized is not always properly remembered and restored
-- Queue does not work as intended and needs fixing
+- Queue does not work as intended and needs fixing (WIP)
 
 ### Right-Click Context Menu
 
@@ -271,7 +272,7 @@
 - _POSSIBLE_ iTunes library import support
 - Audio file converting/compressing
 - Optional metadata correction/cleanup
-- Robust queuing system/menu. I like to make "on the fly" playlists with my queues, so it must be as seamless and robust as possible
+- Robust queuing system/menu. I like to make "on the fly" playlists with my queues, so it must be as seamless and robust as possible (WIP)
 - "Like" system and liked tracks menu
 - Keyboard shortcuts for actions like "play/pause", "skip" "volume up/down" etc. These should work whether or not the app window is focused
 - Mini-player window that can be open in addition to the main window, or as a replacement to the main window

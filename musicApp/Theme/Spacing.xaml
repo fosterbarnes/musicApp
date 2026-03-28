@@ -19,6 +19,7 @@
     <Thickness x:Key="PopupContentPadding-thk">12</Thickness>
     <Thickness x:Key="SearchRowPadding-thk">4,6</Thickness>
     <Thickness x:Key="SearchTextOffset-thk">8,0,0,0</Thickness>
+    <Thickness x:Key="SearchPopupCaratMargin-thk">-93,0,0,0</Thickness>
     <Thickness x:Key="TrackRowPadding-thk">8,3</Thickness>
     <Thickness x:Key="TrackDurationMargin-thk">12,0,0,0</Thickness>
     <Thickness x:Key="ListItemPadding-thk">10,8,10,8</Thickness>

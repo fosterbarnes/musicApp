@@ -32,6 +32,12 @@ public sealed class AlbumGridItem : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
+public sealed class AlbumSectionHeaderItem
+{
+    public AlbumSectionHeaderItem(string title) => Title = title;
+    public string Title { get; }
+}
+
 public sealed class AlbumFlyoutItem : INotifyPropertyChanged
 {
     private BitmapImage? _albumArtSource;

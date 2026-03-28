@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Windows.Controls;
 using System.Windows.Data;
 using MaterialDesignThemes.Wpf;
 using musicApp.Helpers;
@@ -280,6 +281,25 @@ namespace musicApp.Converters
             var n = (int)Math.Round(d);
             var unit = n == 1 ? "second" : "seconds";
             return $"{n.ToString(culture)} {unit} before the next song";
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class ListViewItemQueueOrderConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is ListViewItem item && parameter is ListView lv)
+            {
+                int i = lv.ItemContainerGenerator.IndexFromContainer(item);
+                if (i >= 0)
+                    return (i + 1).ToString(culture);
+            }
+            return "";
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

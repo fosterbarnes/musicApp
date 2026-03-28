@@ -41,8 +41,7 @@
                       Click="AlbumContextMenu_ShowInArtistsClick" />
             <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
                       Header="Show in Albums"
-                      Click="AlbumContextMenu_ShowInAlbumsClick"
-                      Visibility="Collapsed" />
+                      Click="AlbumContextMenu_ShowInAlbumsClick" />
             <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
                       Header="Show in Songs"
                       Click="AlbumContextMenu_ShowInSongsClick" />
@@ -64,6 +63,55 @@
                       Header="Delete"
                       Click="AlbumContextMenu_DeleteClick" />
         </ContextMenu>
+
+        <DataTemplate x:Key="AlbumFlyoutTrackRowTemplate">
+            <Border Padding="{StaticResource TrackRowPadding-thk}" Cursor="Hand"
+                    MouseLeftButtonDown="FlyoutTrack_MouseLeftButtonDown"
+                    ContextMenu="{StaticResource AlbumTrackContextMenu}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource AlternatingRowBrushConverter}, ConverterParameter=invert}"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource ControlBackgroundAlt-brush}"/>
+                            </Trigger>
+                            <DataTrigger Value="True">
+                                <DataTrigger.Binding>
+                                    <MultiBinding Converter="{StaticResource StringEqualsMultiConverter}">
+                                        <Binding Path="FilePath"/>
+                                        <Binding Path="SelectedFlyoutTrackFilePath" RelativeSource="{RelativeSource AncestorType={x:Type views:AlbumsView}}"/>
+                                    </MultiBinding>
+                                </DataTrigger.Binding>
+                                <Setter Property="Background" Value="{StaticResource Selected-brush}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="32"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding TrackNumber}"
+                               Foreground="{StaticResource TextMuted-brush}"
+                               FontSize="13"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding Title}"
+                               Foreground="{StaticResource TextPrimary-brush}"
+                               FontSize="13"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding Duration}"
+                               Foreground="{StaticResource TextMuted-brush}"
+                               FontSize="13"
+                               VerticalAlignment="Center"
+                               Margin="{StaticResource TrackDurationMargin-thk}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
     </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -76,20 +124,22 @@
                     Orientation="Horizontal"
                     Margin="24,10,24,4"
                     HorizontalAlignment="Center">
-            <TextBlock Text="Sort by"
-                       Foreground="{StaticResource TextPrimary-brush}"
-                       VerticalAlignment="Center"
-                       Margin="0,0,8,0"/>
-            <ComboBox x:Name="SortModeCombo"
-                      Width="140"
-                      SelectedIndex="0"
-                      VerticalAlignment="Center"
-                      SelectionChanged="SortModeCombo_SelectionChanged"
-                      Foreground="{StaticResource TextPrimary-brush}"
-                      Margin="0,0,16,0">
-                <ComboBoxItem Content="Album"/>
-                <ComboBoxItem Content="Artist"/>
-            </ComboBox>
+            <StackPanel x:Name="AlbumSortControlsPanel" Orientation="Horizontal">
+                <TextBlock Text="Sort by"
+                           Foreground="{StaticResource TextPrimary-brush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+                <ComboBox x:Name="SortModeCombo"
+                          Width="140"
+                          SelectedIndex="0"
+                          VerticalAlignment="Center"
+                          SelectionChanged="SortModeCombo_SelectionChanged"
+                          Foreground="{StaticResource TextPrimary-brush}"
+                          Margin="0,0,16,0">
+                    <ComboBoxItem Content="Album"/>
+                    <ComboBoxItem Content="Artist"/>
+                </ComboBox>
+            </StackPanel>
             <TextBlock Text="Album size"
                        Foreground="{StaticResource TextPrimary-brush}"
                        VerticalAlignment="Center"
@@ -112,6 +162,19 @@
                       ScrollChanged="AlbumScrollViewer_ScrollChanged">
             <ItemsControl x:Name="AlbumGrid">
                 <ItemsControl.Resources>
+                    <DataTemplate DataType="{x:Type views:AlbumSectionHeaderItem}">
+                        <StackPanel Width="{Binding SectionHeaderWidth, RelativeSource={RelativeSource AncestorType=views:AlbumsView}}"
+                                    Margin="0,12,0,0">
+                            <TextBlock Text="{Binding Title}"
+                                       Foreground="{StaticResource TextPrimary-brush}"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"/>
+                            <Border Height="1"
+                                    Margin="0,8,0,4"
+                                    Background="{StaticResource BorderDefault-brush}"
+                                    HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                    </DataTemplate>
                     <!-- Album tile template -->
                     <DataTemplate DataType="{x:Type views:AlbumGridItem}">
                         <Border Width="{Binding CurrentTileSize, RelativeSource={RelativeSource AncestorType=views:AlbumsView}}"
@@ -311,113 +374,17 @@
                                             <ColumnDefinition Width="*" MaxWidth="550"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <ItemsControl Grid.Column="0" ItemsSource="{Binding TracksColumn1}" AlternationCount="2">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Padding="{StaticResource TrackRowPadding-thk}" Cursor="Hand"
-                                                            MouseLeftButtonDown="FlyoutTrack_MouseLeftButtonDown"
-                                                            ContextMenu="{StaticResource AlbumTrackContextMenu}">
-                                                        <Border.Style>
-                                                            <Style TargetType="Border">
-                                                                <Setter Property="Background" Value="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource AlternatingRowBrushConverter}, ConverterParameter=invert}"/>
-                                                                <Style.Triggers>
-                                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                                        <Setter Property="Background" Value="{StaticResource ControlBackgroundAlt-brush}"/>
-                                                                    </Trigger>
-                                                                    <DataTrigger Value="True">
-                                                                        <DataTrigger.Binding>
-                                                                            <MultiBinding Converter="{StaticResource StringEqualsMultiConverter}">
-                                                                                <Binding Path="FilePath"/>
-                                                                                <Binding Path="SelectedFlyoutTrackFilePath" RelativeSource="{RelativeSource AncestorType={x:Type views:AlbumsView}}"/>
-                                                                            </MultiBinding>
-                                                                        </DataTrigger.Binding>
-                                                                        <Setter Property="Background" Value="{StaticResource Selected-brush}"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </Border.Style>
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="32"/>
-                                                                <ColumnDefinition Width="*"/>
-                                                                <ColumnDefinition Width="Auto"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <TextBlock Text="{Binding TrackNumber}"
-                                                                       Foreground="{StaticResource TextMuted-brush}"
-                                                                       FontSize="13"
-                                                                       VerticalAlignment="Center"/>
-                                                            <TextBlock Grid.Column="1"
-                                                                       Text="{Binding Title}"
-                                                                       Foreground="{StaticResource TextPrimary-brush}"
-                                                                       FontSize="13"
-                                                                       VerticalAlignment="Center"
-                                                                       TextTrimming="CharacterEllipsis"/>
-                                                            <TextBlock Grid.Column="2"
-                                                                       Text="{Binding Duration}"
-                                                                       Foreground="{StaticResource TextMuted-brush}"
-                                                                       FontSize="13"
-                                                                       VerticalAlignment="Center"
-                                                                       Margin="{StaticResource TrackDurationMargin-thk}"/>
-                                                        </Grid>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
+                                        <ItemsControl Grid.Column="0"
+                                                      ItemsSource="{Binding TracksColumn1}"
+                                                      AlternationCount="2"
+                                                      ItemTemplate="{StaticResource AlbumFlyoutTrackRowTemplate}"/>
 
                                         <Border Grid.Column="1" Width="10" Background="{StaticResource SurfaceDeep-brush}" Margin="0,2"/>
 
-                                        <ItemsControl Grid.Column="2" ItemsSource="{Binding TracksColumn2}" AlternationCount="2">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Padding="{StaticResource TrackRowPadding-thk}" Cursor="Hand"
-                                                            MouseLeftButtonDown="FlyoutTrack_MouseLeftButtonDown"
-                                                            ContextMenu="{StaticResource AlbumTrackContextMenu}">
-                                                        <Border.Style>
-                                                            <Style TargetType="Border">
-                                                                <Setter Property="Background" Value="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource AlternatingRowBrushConverter}, ConverterParameter=invert}"/>
-                                                                <Style.Triggers>
-                                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                                        <Setter Property="Background" Value="{StaticResource ControlBackgroundAlt-brush}"/>
-                                                                    </Trigger>
-                                                                    <DataTrigger Value="True">
-                                                                        <DataTrigger.Binding>
-                                                                            <MultiBinding Converter="{StaticResource StringEqualsMultiConverter}">
-                                                                                <Binding Path="FilePath"/>
-                                                                                <Binding Path="SelectedFlyoutTrackFilePath" RelativeSource="{RelativeSource AncestorType={x:Type views:AlbumsView}}"/>
-                                                                            </MultiBinding>
-                                                                        </DataTrigger.Binding>
-                                                                        <Setter Property="Background" Value="{StaticResource Selected-brush}"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </Border.Style>
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="32"/>
-                                                                <ColumnDefinition Width="*"/>
-                                                                <ColumnDefinition Width="Auto"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <TextBlock Text="{Binding TrackNumber}"
-                                                                       Foreground="{StaticResource TextMuted-brush}"
-                                                                       FontSize="13"
-                                                                       VerticalAlignment="Center"/>
-                                                            <TextBlock Grid.Column="1"
-                                                                       Text="{Binding Title}"
-                                                                       Foreground="{StaticResource TextPrimary-brush}"
-                                                                       FontSize="13"
-                                                                       VerticalAlignment="Center"
-                                                                       TextTrimming="CharacterEllipsis"/>
-                                                            <TextBlock Grid.Column="2"
-                                                                       Text="{Binding Duration}"
-                                                                       Foreground="{StaticResource TextMuted-brush}"
-                                                                       FontSize="13"
-                                                                       VerticalAlignment="Center"
-                                                                       Margin="{StaticResource TrackDurationMargin-thk}"/>
-                                                        </Grid>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
+                                        <ItemsControl Grid.Column="2"
+                                                      ItemsSource="{Binding TracksColumn2}"
+                                                      AlternationCount="2"
+                                                      ItemTemplate="{StaticResource AlbumFlyoutTrackRowTemplate}"/>
                                     </Grid>
                                 </Grid>
                             </Grid>

@@ -4,7 +4,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Threading;
 using musicApp;
 using musicApp.Constants;
 using musicApp.Helpers;
@@ -13,18 +12,15 @@ namespace musicApp.Views;
 
 public partial class SearchPopupView : UserControl
 {
-    private const double MinSearchPopupHeight = 160;
-    private const double DefaultSearchPopupHeight = 575;
-    private const double MaxSearchPopupHeight = 850;
     private Song? _contextMenuSong;
     private int _heightAdjustGeneration;
 
     public SearchPopupView()
     {
         InitializeComponent();
-        PopupBorder.MinHeight = MinSearchPopupHeight;
-        PopupBorder.Height = DefaultSearchPopupHeight;
-        PopupBorder.MaxHeight = MaxSearchPopupHeight;
+        PopupBorder.MinHeight = UILayoutConstants.CompactPopupMinHeight;
+        PopupBorder.Height = UILayoutConstants.CompactPopupDefaultHeight;
+        PopupBorder.MaxHeight = UILayoutConstants.CompactPopupMaxHeight;
     }
 
     public SearchResults? Results
@@ -107,46 +103,13 @@ public partial class SearchPopupView : UserControl
     private void ScheduleAdjustHeightForSearch()
     {
         int gen = ++_heightAdjustGeneration;
-        _ = Dispatcher.BeginInvoke(new Action(() =>
-        {
-            if (gen != _heightAdjustGeneration)
-                return;
-            AdjustPopupHeightToResults();
-        }), DispatcherPriority.ContextIdle);
+        CompactPopupHeightHelper.ScheduleAdjust(Dispatcher, gen, () => _heightAdjustGeneration, AdjustPopupHeightToResults);
     }
 
     private void AdjustPopupHeightToResults()
     {
-        PopupBorder.Height = DefaultSearchPopupHeight;
-        SectionsPanel.InvalidateMeasure();
-        SearchScrollViewer.InvalidateMeasure();
-        UpdateLayout();
-        SearchScrollViewer.UpdateLayout();
-
-        double viewportHeight = SearchScrollViewer.ViewportHeight;
-        double actualBorderHeight = PopupBorder.ActualHeight;
-        if (viewportHeight <= 0 || actualBorderHeight <= 0)
-        {
-            PopupBorder.Height = DefaultSearchPopupHeight;
-            return;
-        }
-
-        double overhead = actualBorderHeight - viewportHeight;
-
-        double measureWidth = SearchScrollViewer.ViewportWidth;
-        if (measureWidth <= 0)
-            measureWidth = Math.Max(
-                PopupBorder.ActualWidth - UILayoutConstants.SearchPopupHorizontalContentPadding,
-                PopupBorder.MinWidth - UILayoutConstants.SearchPopupHorizontalContentPadding);
-
-        SectionsPanel.Measure(new Size(measureWidth, double.PositiveInfinity));
-        double contentHeight = Math.Max(SectionsPanel.DesiredSize.Height, SearchScrollViewer.ExtentHeight);
-
-        double desiredTotalHeight = contentHeight + overhead;
-
-        PopupBorder.Height = desiredTotalHeight >= DefaultSearchPopupHeight
-            ? DefaultSearchPopupHeight
-            : Math.Max(MinSearchPopupHeight, desiredTotalHeight);
+        CompactPopupHeightHelper.AdjustBorderHeightToContent(
+            PopupBorder, SearchScrollViewer, SectionsPanel, this);
     }
 
     private async System.Threading.Tasks.Task LoadAlbumArtWhenReadyAsync(
@@ -231,48 +194,32 @@ public partial class SearchPopupView : UserControl
     private void SearchContextMenu_Opened(object sender, RoutedEventArgs e)
     {
         _contextMenuSong = null;
-        if (sender is not ContextMenu menu || menu.PlacementTarget is not FrameworkElement target)
+        if (sender is not ContextMenu menu || menu.PlacementTarget is not DependencyObject placement)
             return;
-        if (target.DataContext is SongRowViewModel songRow)
-            _contextMenuSong = songRow.Song;
-        else if (target.DataContext is AlbumRowViewModel albumRow && albumRow.Album.Songs.Count > 0)
-            _contextMenuSong = albumRow.Album.Songs[0];
 
-        if (_contextMenuSong == null) return;
+        if (!TrackContextMenuHelper.TryResolveSong(placement, out var song) || song == null)
+            return;
 
-        var addToPlaylistItem = FindMenuItemByHeader(menu.Items, "Add to Playlist");
-        if (addToPlaylistItem != null)
-        {
-            var mainWindow = Application.Current?.MainWindow as MainWindow;
-            var playlists = mainWindow?.Playlists;
-            if (playlists != null)
-            {
-                while (addToPlaylistItem.Items.Count > 2)
-                    addToPlaylistItem.Items.RemoveAt(2);
-                foreach (var playlist in playlists)
-                {
-                    var mi = new MenuItem { Header = playlist.Name, Tag = playlist };
-                    mi.Click += SearchContextMenu_PlaylistSubmenuClick;
-                    addToPlaylistItem.Items.Add(mi);
-                }
-            }
-        }
+        _contextMenuSong = song;
 
-        var showInQueueItem = FindMenuItemByHeader(menu.Items, "Show in Queue");
-        if (showInQueueItem != null)
-        {
-            var mainWindow = Application.Current?.MainWindow as MainWindow;
-            bool isInQueue = _contextMenuSong != null && mainWindow?.IsTrackInQueue(_contextMenuSong) == true;
-            showInQueueItem.Visibility = isInQueue ? Visibility.Visible : Visibility.Collapsed;
-        }
-    }
+        var addToPlaylistItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Add to Playlist");
+        var mainWindow = Application.Current?.MainWindow as MainWindow;
+        var playlists = mainWindow?.Playlists;
+        if (addToPlaylistItem != null && playlists != null)
+            TrackContextMenuHelper.RebuildAddToPlaylistChildren(addToPlaylistItem, playlists, SearchContextMenu_PlaylistSubmenuClick);
 
-    private static MenuItem? FindMenuItemByHeader(ItemCollection items, string header)
-    {
-        foreach (var item in items)
-            if (item is MenuItem mi && mi.Header?.ToString() == header)
-                return mi;
-        return null;
+        var showInArtistsItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Show in Artists");
+        var showInSongsItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Show in Songs");
+        var showInAlbumsItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Show in Albums");
+        var showInQueueItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Show in Queue");
+        bool isInQueue = mainWindow?.IsTrackInQueue(_contextMenuSong) == true;
+        TrackContextMenuHelper.ApplyShowInMenuVisibility(
+            contextMenuViewName: null,
+            showInArtistsItem,
+            showInSongsItem,
+            showInAlbumsItem,
+            showInQueueItem,
+            isInQueue);
     }
 
     private void SearchContextMenu_PlaylistSubmenuClick(object sender, RoutedEventArgs e)
@@ -299,21 +246,10 @@ public partial class SearchPopupView : UserControl
     {
         var currentHeight = !double.IsNaN(PopupBorder.Height) ? PopupBorder.Height : PopupBorder.ActualHeight;
         if (currentHeight <= 0)
-            currentHeight = MinSearchPopupHeight;
+            currentHeight = UILayoutConstants.CompactPopupMinHeight;
 
-        var maxHeight = GetAvailableMaxHeight();
-        var newHeight = Math.Clamp(currentHeight + e.VerticalChange, MinSearchPopupHeight, maxHeight);
+        var maxHeight = CompactPopupHeightHelper.GetAvailableMaxHeight(this);
+        var newHeight = Math.Clamp(currentHeight + e.VerticalChange, UILayoutConstants.CompactPopupMinHeight, maxHeight);
         PopupBorder.Height = newHeight;
-    }
-
-    private double GetAvailableMaxHeight()
-    {
-        var hostWindow = Window.GetWindow(this);
-        if (hostWindow == null || hostWindow.ActualHeight <= 0)
-            return MaxSearchPopupHeight;
-
-        // Leave space so popup does not extend beyond the app window.
-        var windowLimitedMax = hostWindow.ActualHeight - UILayoutConstants.SearchPopupWindowVerticalOverhead;
-        return Math.Clamp(windowLimitedMax, MinSearchPopupHeight, MaxSearchPopupHeight);
     }
 }

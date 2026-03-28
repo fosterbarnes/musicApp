@@ -28,12 +28,31 @@ public static class UILayoutConstants
     /// <summary>Logical width/height of the Artwork tab inner square; Viewbox scales it to fit the window.</summary>
     public const double InfoMetadataArtworkViewboxLogicalExtent = 512;
 
-    // Search popup layout
-    public const double SearchPopupHorizontalContentPadding = 24;
-    public const double SearchPopupWindowVerticalOverhead = 140;
+    // Compact popups (search, queue popout): shared geometry
+    public const double CompactPopupMinHeight = 160;
+    public const double CompactPopupDefaultHeight = 575;
+    public const double CompactPopupMaxHeight = 850;
+    public const double CompactPopupHorizontalContentPadding = 24;
+    public const double CompactPopupWindowVerticalOverhead = 140;
+
+    /// <summary>Alias retained for older call sites; same as <see cref="CompactPopupHorizontalContentPadding"/>.</summary>
+    public const double SearchPopupHorizontalContentPadding = CompactPopupHorizontalContentPadding;
+
+    /// <summary>Alias retained for older call sites; same as <see cref="CompactPopupWindowVerticalOverhead"/>.</summary>
+    public const double SearchPopupWindowVerticalOverhead = CompactPopupWindowVerticalOverhead;
+
+    /// <summary>Negative = shift search results popup left relative to default bottom placement.</summary>
+    public const double SearchPopupHorizontalOffsetNudge = -24;
+
+    /// <summary><see cref="System.Windows.Controls.Primitives.Popup.VerticalOffset"/> for title-bar queue popout (<c>Placement=Bottom</c>).</summary>
+    public const double CompactPopupTitleBarVerticalOffset = 20;
+
+    /// <summary>Search popout sits 2px higher than <see cref="CompactPopupTitleBarVerticalOffset"/>.</summary>
+    public const double SearchPopupTitleBarVerticalOffset = CompactPopupTitleBarVerticalOffset - 2;
 
     // Track list layout
     public const double TrackListMinimumColumnWidth = 50.0;
+    public const double TrackListQueueOrderColumnMinWidth = 26.0;
 
     // Albums view layout
     public const double AlbumTrackMetaRowHeight = 40.0;

@@ -1,37 +1,28 @@
-musicApp v0.1.3 frederickRats
+v0.1.4 release (tummyExpert)
 
-Albums:
-- Improve load times
-- VASTLY improve overall snappyness
-- Fix issue where album thumbnails would only start loading when scrolled to and/or visible
-- Load entire album list instead of loading in blocks
-- Add loading animation
-- Attempt to fix issue where we lose our place in the list after performing some actions (not completely fixed)
+Recently Added:
+- Cousin of albums view, sorted by most recently added, with some extra ui elements
 
-Info (Right-click > Info):
-- Add individual album art downloader
+Queue Button:
+- Add code-behind for queue button
+- Copy search popout's homework, and use a simpler version of it to represent the current queue
 
-Settings > Library:
-- Add a button to scan all songs for missing album artwork
-- Re-arrange library management buttons
+Search Button:
+- Adjust vertical position
+- Add "^" window decoration
 
-Backend/Boring Stuff
-- Improve song scan speed:
-	- Keep track of CPU/RAM usage & overhead
-	- Ramp scan speed up/down based on available resources
-	- Break scan into chunks, assign a dynamic amount of workers to scan through chunks
-	- 42% faster on my local machine
+Queue:
+- Attempt to fix queue by re-thinking how it should work. Reworked how queue works with Artists, Albums, Songs, & Playlists, prefrerring clearing the queue when we switch views or context
+- Fix song selection/playback not working correctly when interacting with queue view
+- Fix shuffle not working correctly
+- Add remove from queue, move up, and move down buttons
+- Add queue order to grid view
 
-- Remember which tab(view) was open when quitting. Open it on re-launch
-- Change default sidebar width to use minimum
-- Address minor build warnings
-- Fix issue where musicApp would be sent to the back of open windows when closing some dialogs/windows
-- If there is an existing fruit related software artwork cache, scan it and embed artwork to each song
-	
-Scripts:
-- Show dotnet ouptut in run script
+Backend/Boring Stuff:
+- Remember in-app volume setting when closing/re-opening
 
-Installer: 
-- Update window title
-- Overwrite current musicApp install instead of adding a new entry to list of installed programs
-- Download and install .NET 8.0 Desktop Runtime automatically
+UI:
+- Change vertical position of queue/search popouts
+
+Website:
+- Start testing some stuff

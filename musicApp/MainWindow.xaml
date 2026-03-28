@@ -8,6 +8,7 @@
         xmlns:titleBar="clr-namespace:musicApp.TitleBarPlus"
         xmlns:converters="clr-namespace:musicApp.Converters"
         xmlns:views="clr-namespace:musicApp.Views"
+        xmlns:ui="clr-namespace:musicApp.Constants"
         mc:Ignorable="d"
         Title="musicApp" Height="767" Width="1245"
         Background="{StaticResource AppBackground-brush}"
@@ -61,8 +62,18 @@
             <Popup x:Name="searchPopup"
                    StaysOpen="False"
                    Placement="Bottom"
+                   VerticalOffset="{x:Static ui:UILayoutConstants.SearchPopupTitleBarVerticalOffset}"
+                   HorizontalOffset="{x:Static ui:UILayoutConstants.SearchPopupHorizontalOffsetNudge}"
                    AllowsTransparency="True">
                 <views:SearchPopupView x:Name="searchPopupView"/>
+            </Popup>
+
+            <Popup x:Name="queuePopup"
+                   StaysOpen="False"
+                   Placement="Bottom"
+                   VerticalOffset="{x:Static ui:UILayoutConstants.CompactPopupTitleBarVerticalOffset}"
+                   AllowsTransparency="True">
+                <views:QueuePopupView x:Name="queuePopupView"/>
             </Popup>
 
             <!-- ===========================================
@@ -145,6 +156,15 @@
 
                         <!-- Separator -->
                         <Separator Margin="{StaticResource SeparatorVerticalGap-thk}" Background="{StaticResource BorderDefault-brush}"/>
+
+                        <Button x:Name="btnRecentlyAdded" 
+                                Style="{StaticResource SidebarNavigationButton}"
+                                Click="BtnRecentlyAdded_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="LibraryAdd" VerticalAlignment="Center" Margin="{StaticResource Right10-thk}"/>
+                                <TextBlock Text="Recently Added" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
 
                         <Button x:Name="btnRecentlyPlayed" 
                                 Style="{StaticResource SidebarNavigationButton}"
