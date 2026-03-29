@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Windows.Controls;
+using musicApp;
 
 namespace musicApp.Views
 {
@@ -20,7 +22,7 @@ namespace musicApp.Views
         public event EventHandler<Song>? AddToQueueRequested;
         public event EventHandler<Song>? InfoRequested;
         public event EventHandler<Song>? ShowInExplorerRequested;
-        public event EventHandler<Song>? RemoveFromLibraryRequested;
+        public event EventHandler<IReadOnlyList<Song>>? RemoveFromLibraryRequested;
         public event EventHandler<Song>? DeleteRequested;
 
         protected void WireTrackList()
@@ -31,7 +33,7 @@ namespace musicApp.Views
             TrackList.AddToQueueRequested         += (s, t) => AddToQueueRequested?.Invoke(this, t);
             TrackList.InfoRequested               += (s, t) => InfoRequested?.Invoke(this, t);
             TrackList.ShowInExplorerRequested     += (s, t) => ShowInExplorerRequested?.Invoke(this, t);
-            TrackList.RemoveFromLibraryRequested  += (s, t) => RemoveFromLibraryRequested?.Invoke(this, t);
+            TrackList.RemoveFromLibraryRequested  += (s, tracks) => RemoveFromLibraryRequested?.Invoke(this, tracks);
             TrackList.DeleteRequested             += (s, t) => DeleteRequested?.Invoke(this, t);
         }
 

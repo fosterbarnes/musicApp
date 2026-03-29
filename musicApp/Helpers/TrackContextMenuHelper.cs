@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using musicApp;
 using musicApp.Views;
 
@@ -17,6 +18,50 @@ internal static class TrackContextMenuHelper
                 return mi;
         }
         return null;
+    }
+
+    public static bool TryGetSingleSelectedSong(ListView? listView, out Song? song)
+    {
+        song = null;
+        if (listView == null || listView.SelectedItems.Count != 1)
+            return false;
+        if (listView.SelectedItem is Song s)
+        {
+            song = s;
+            return true;
+        }
+        return false;
+    }
+
+    public static bool TryGetSelectedSongs(ListView? listView, out List<Song> songs)
+    {
+        songs = new List<Song>();
+        if (listView == null || listView.SelectedItems.Count == 0)
+            return false;
+        foreach (var item in listView.SelectedItems)
+        {
+            if (item is Song s)
+                songs.Add(s);
+        }
+        return songs.Count > 0;
+    }
+
+    public static bool TryFindTrackListView(ListView? listView, out TrackListView trackListView)
+    {
+        trackListView = null!;
+        if (listView == null)
+            return false;
+        DependencyObject? parent = listView;
+        while (parent != null)
+        {
+            if (parent is TrackListView tl)
+            {
+                trackListView = tl;
+                return true;
+            }
+            parent = VisualTreeHelper.GetParent(parent);
+        }
+        return false;
     }
 
     public static bool TryResolveSong(DependencyObject? placementTarget, out Song? song)

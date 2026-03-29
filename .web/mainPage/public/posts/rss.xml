@@ -1,0 +1,137 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+        
+    
+
+    
+        
+
+        
+            
+        
+    
+
+
+
+
+<?xml version="1.0" encoding="utf-8"?>
+
+<rss version="2.0"  xml:lang="en-us"  xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        
+
+        
+
+        
+            <language>en-us</language>
+        
+
+        
+            <lastBuildDate>Sat, 28 Mar 2026 21:50:12 EDT</lastBuildDate>
+        
+
+        
+            <link>http://localhost:1313/posts/</link>
+        
+
+        
+            <atom:link href="http://localhost:1313/posts/rss.xml" hreflang="en-us" rel="self" type="application/rss+xml"/>
+        
+
+        
+            
+
+            <atom:link href="http://localhost:1313/posts/" hreflang="en-us" rel="alternate" type="text/html"/>
+        
+            
+
+            <atom:link href="http://localhost:1313/posts/rss.xml" hreflang="en-us" rel="alternate" type="application/rss+xml"/>
+        
+
+        
+
+        
+
+        
+            <title>Posts · musicApp</title>
+        
+
+        
+
+        
+            
+                <item>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+
+                    
+
+                    
+
+                    
+
+                    
+
+                    
+                    
+                    
+
+                    
+
+                    
+                        <description><![CDATA[<p>A lightweight desktop music player for Windows</p>]]></description>
+                    
+
+                    
+                        <guid isPermaLink="false">tag:localhost:1313,2026-03-28:/posts/home/</guid>
+                    
+
+                    
+                        <link>http://localhost:1313/posts/home/</link>
+                    
+
+                    
+                        
+
+                        
+
+                        <atom:link href="http://localhost:1313/posts/home/" hreflang="en-us" rel="alternate" type="text/html"/>
+                    
+
+                    
+
+                    
+                        <pubDate>Sat, 28 Mar 2026 21:50:12 EDT</pubDate>
+                    
+
+                    
+                        <title>Home</title>
+                    
+                </item>
+            
+        
+    </channel>
+</rss>

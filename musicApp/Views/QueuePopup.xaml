@@ -121,6 +121,7 @@
                                                               IsNowPlaying="{Binding IsNowPlaying}"
                                                               IsSelected="{Binding IsSelected}"
                                                               MouseLeftButtonDown="QueueSongItem_MouseLeftButtonDown"
+                                                              PreviewMouseRightButtonDown="QueueSongItem_PreviewMouseRightButtonDown"
                                                               MouseDoubleClick="QueueSongItem_MouseDoubleClick"
                                                               ContextMenu="{StaticResource QueueTrackContextMenu}"/>
                                         <Border Grid.Row="1"

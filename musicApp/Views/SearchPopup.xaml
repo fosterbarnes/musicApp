@@ -153,7 +153,9 @@
                                                       Artist="{Binding Artist}"
                                                       AlbumArtSource="{Binding AlbumArtSource}"
                                                       IsNowPlaying="{Binding IsNowPlaying}"
+                                                      IsSelected="{Binding IsSelected}"
                                                       MouseLeftButtonDown="SongItem_MouseLeftButtonDown"
+                                                      PreviewMouseRightButtonDown="SongItem_PreviewMouseRightButtonDown"
                                                       ContextMenu="{StaticResource SearchResultContextMenu}"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

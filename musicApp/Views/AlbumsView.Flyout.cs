@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using musicApp;
 using musicApp.Constants;
@@ -14,6 +15,82 @@ namespace musicApp.Views
 {
     public partial class AlbumsView
     {
+        public static string FlyoutSelectionKeyForSong(Song s)
+        {
+            if (!string.IsNullOrWhiteSpace(s.FilePath))
+                return "p:" + s.FilePath;
+            return "m:" + (s.Title ?? "") + "|" + (s.Artist ?? "") + "|" + (s.Album ?? "");
+        }
+
+        public bool IsFlyoutTrackSelected(Song? song)
+        {
+            if (song == null)
+                return false;
+            return _flyoutSelectedKeys.Contains(FlyoutSelectionKeyForSong(song));
+        }
+
+        private void BumpFlyoutSelectionRevision() =>
+            SetValue(FlyoutSelectionRevisionProperty, (int)GetValue(FlyoutSelectionRevisionProperty) + 1);
+
+        private void ClearFlyoutTrackSelection()
+        {
+            _flyoutSelectedKeys.Clear();
+            _flyoutAnchorIndex = -1;
+            SelectedFlyoutTrackFilePath = null;
+            BumpFlyoutSelectionRevision();
+        }
+
+        private void ApplyProgrammaticFlyoutSelection(string? filePath)
+        {
+            _flyoutSelectedKeys.Clear();
+            _flyoutAnchorIndex = -1;
+            SelectedFlyoutTrackFilePath = filePath;
+            if (!string.IsNullOrWhiteSpace(filePath) && _currentFlyout?.Tracks != null)
+            {
+                var list = _currentFlyout.Tracks;
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var t = list[i];
+                    if (!string.IsNullOrWhiteSpace(t.FilePath) &&
+                        string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _flyoutSelectedKeys.Add(FlyoutSelectionKeyForSong(t));
+                        _flyoutAnchorIndex = i;
+                        break;
+                    }
+                }
+            }
+            BumpFlyoutSelectionRevision();
+        }
+
+        private void SetFlyoutPrimaryTrack(Song track) =>
+            SelectedFlyoutTrackFilePath = string.IsNullOrWhiteSpace(track.FilePath) ? null : track.FilePath;
+
+        private int FindFlyoutTrackIndex(Song track)
+        {
+            if (_currentFlyout?.Tracks == null)
+                return -1;
+            var list = _currentFlyout.Tracks;
+            var key = FlyoutSelectionKeyForSong(track);
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (string.Equals(FlyoutSelectionKeyForSong(list[i]), key, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+            return -1;
+        }
+
+        private void FilterFlyoutSelectionToCurrentTracks()
+        {
+            if (_currentFlyout?.Tracks == null || _flyoutSelectedKeys.Count == 0)
+                return;
+            var valid = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var t in _currentFlyout.Tracks)
+                valid.Add(FlyoutSelectionKeyForSong(t));
+            _flyoutSelectedKeys.RemoveWhere(k => !valid.Contains(k));
+            BumpFlyoutSelectionRevision();
+        }
+
         private void EnqueueFlyoutFullSizeArtLoad(AlbumFlyoutItem flyout, Song repForFull, AlbumGridItem? requireSelectedAlbum)
         {
             var flyoutRef = flyout;
@@ -51,6 +128,7 @@ namespace musicApp.Views
             flyout.TracksColumn2 = flyout.Tracks.Skip(half).ToList();
             flyout.AlbumMetadata = AlbumMetadataText.BuildAlbumSummary(flyout.Tracks);
             FlyoutPanelHeight = CalculateFlyoutHeight(flyout.Tracks.Count);
+            FilterFlyoutSelectionToCurrentTracks();
         }
 
         private void PatchOpenFlyoutForGroup(string albumTitle, string albumArtistKey)
@@ -78,6 +156,8 @@ namespace musicApp.Views
 
         private void ShowAlbumDetail(AlbumGridItem album, bool bringFlyoutIntoView = true)
         {
+            ClearFlyoutTrackSelection();
+
             if (_currentFlyout != null)
             {
                 _albumItems.Remove(_currentFlyout);
@@ -147,7 +227,7 @@ namespace musicApp.Views
                 _currentFlyout = null;
             }
 
-            SelectedFlyoutTrackFilePath = null;
+            ClearFlyoutTrackSelection();
         }
 
         private void RefreshOpenFlyoutLayout()
@@ -206,36 +286,96 @@ namespace musicApp.Views
             return FlyoutHeight + (overflowRows * FlyoutTrackRowHeight);
         }
 
-        private void FlyoutTrack_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void FlyoutTrack_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if ((sender as FrameworkElement)?.DataContext is Song track)
-            {
-                SelectedFlyoutTrackFilePath = string.IsNullOrWhiteSpace(track.FilePath) ? null : track.FilePath;
+            if ((sender as FrameworkElement)?.DataContext is not Song track || _currentFlyout == null)
+                return;
 
-                if (e.ClickCount == 2)
-                {
-                    PlayTrackRequested?.Invoke(this, track);
-                    e.Handled = true;
-                }
+            if (e.ClickCount == 2)
+            {
+                SetFlyoutPrimaryTrack(track);
+                PlayTrackRequested?.Invoke(this, track);
+                e.Handled = true;
+                return;
             }
+
+            var tracks = _currentFlyout.Tracks;
+            int idx = FindFlyoutTrackIndex(track);
+            if (idx < 0)
+                return;
+
+            var mods = Keyboard.Modifiers;
+            if ((mods & ModifierKeys.Shift) != 0)
+            {
+                int anchor = _flyoutAnchorIndex >= 0 ? _flyoutAnchorIndex : idx;
+                int lo = Math.Min(anchor, idx);
+                int hi = Math.Max(anchor, idx);
+                _flyoutSelectedKeys.Clear();
+                for (int i = lo; i <= hi && i < tracks.Count; i++)
+                    _flyoutSelectedKeys.Add(FlyoutSelectionKeyForSong(tracks[i]));
+                SetFlyoutPrimaryTrack(track);
+                BumpFlyoutSelectionRevision();
+                return;
+            }
+
+            if ((mods & ModifierKeys.Control) != 0)
+            {
+                var key = FlyoutSelectionKeyForSong(track);
+                if (!_flyoutSelectedKeys.Remove(key))
+                    _flyoutSelectedKeys.Add(key);
+                _flyoutAnchorIndex = idx;
+                SetFlyoutPrimaryTrack(track);
+                BumpFlyoutSelectionRevision();
+                return;
+            }
+
+            _flyoutSelectedKeys.Clear();
+            _flyoutSelectedKeys.Add(FlyoutSelectionKeyForSong(track));
+            _flyoutAnchorIndex = idx;
+            SetFlyoutPrimaryTrack(track);
+            BumpFlyoutSelectionRevision();
         }
 
-        private void FlyoutArtist_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void FlyoutTrack_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not Song track)
+                return;
+            if (_flyoutSelectedKeys.Count > 1 && _flyoutSelectedKeys.Contains(FlyoutSelectionKeyForSong(track)))
+                e.Handled = true;
+        }
+
+        private void FlyoutArtist_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (_currentFlyout != null && !string.IsNullOrWhiteSpace(_currentFlyout.Artist))
                 ArtistNavigationRequested?.Invoke(this, _currentFlyout.Artist);
         }
 
-        private void FlyoutGenre_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void FlyoutGenre_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (_currentFlyout != null && !string.IsNullOrWhiteSpace(_currentFlyout.Genre))
                 GenreNavigationRequested?.Invoke(this, _currentFlyout.Genre);
+        }
+
+        private List<Song> GetFlyoutSelectedSongs()
+        {
+            var list = new List<Song>();
+            if (_currentFlyout?.Tracks == null || _flyoutSelectedKeys.Count == 0)
+                return list;
+            foreach (var t in _currentFlyout.Tracks)
+            {
+                if (t != null && _flyoutSelectedKeys.Contains(FlyoutSelectionKeyForSong(t)))
+                    list.Add(t);
+            }
+            return list;
         }
 
         private void AlbumTrackContextMenu_Opened(object sender, RoutedEventArgs e)
         {
             _contextMenuSong = null;
             if (sender is not ContextMenu menu || menu.PlacementTarget is not DependencyObject placement)
+                return;
+
+            if (_flyoutSelectedKeys.Count > 1)
                 return;
 
             if (TrackContextMenuHelper.TryResolveSong(placement, out var track) && track != null)
@@ -276,7 +416,14 @@ namespace musicApp.Views
         private void AlbumContextMenu_ShowInQueueClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInQueueRequested?.Invoke(this, _contextMenuSong); }
         private void AlbumContextMenu_InfoClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) InfoRequested?.Invoke(this, _contextMenuSong); }
         private void AlbumContextMenu_ShowInExplorerClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInExplorerRequested?.Invoke(this, _contextMenuSong); }
-        private void AlbumContextMenu_RemoveFromLibraryClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) RemoveFromLibraryRequested?.Invoke(this, _contextMenuSong); }
+        private void AlbumContextMenu_RemoveFromLibraryClick(object sender, RoutedEventArgs e)
+        {
+            var songs = GetFlyoutSelectedSongs();
+            if (songs.Count == 0 && _contextMenuSong != null)
+                songs.Add(_contextMenuSong);
+            if (songs.Count == 0) return;
+            RemoveFromLibraryRequested?.Invoke(this, songs);
+        }
         private void AlbumContextMenu_DeleteClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) DeleteRequested?.Invoke(this, _contextMenuSong); }
 
         private int GetRowEndIndex(int albumIndex)
@@ -359,10 +506,7 @@ namespace musicApp.Views
                 if (_selectedAlbum == item)
                     CloseAlbumDetail();
                 else
-                {
-                    SelectedFlyoutTrackFilePath = null;
                     ShowAlbumDetail(item);
-                }
             }
         }
     }

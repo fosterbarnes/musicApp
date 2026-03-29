@@ -1,28 +1,28 @@
-v0.1.4 release (tummyExpert)
+v0.1.5 release (shaqSpeedrunner)
 
-Recently Added:
-- Cousin of albums view, sorted by most recently added, with some extra ui elements
+Main Window:
+- Add ability to select multiple items in a track view
+- Change selection color to #523e6e
+- Show "..." when text gets cut off by the next column in grid view
+- Alternate colors in grid views
+- Shorten row height of grid items 
 
-Queue Button:
-- Add code-behind for queue button
-- Copy search popout's homework, and use a simpler version of it to represent the current queue
+Albums:
+- Fix broken loading logic that would sometimes cause multiple refreshes of albums view
+- Fix broken loading animation
+- Fix issue with reliably getting to album items from 'right click > show in albums'
 
-Search Button:
-- Adjust vertical position
-- Add "^" window decoration
+Backend/Boring stuff:
+- Fix issue that would sometimes result in album art getting cut off
 
-Queue:
-- Attempt to fix queue by re-thinking how it should work. Reworked how queue works with Artists, Albums, Songs, & Playlists, prefrerring clearing the queue when we switch views or context
-- Fix song selection/playback not working correctly when interacting with queue view
-- Fix shuffle not working correctly
-- Add remove from queue, move up, and move down buttons
-- Add queue order to grid view
-
-Backend/Boring Stuff:
-- Remember in-app volume setting when closing/re-opening
-
-UI:
-- Change vertical position of queue/search popouts
+Installer:
+- Autodetect pre-existing installs of .NET 8.0 desktop runtime
 
 Website:
-- Start testing some stuff
+- Create barebones main page using hugo
+
+Scripts:
+- Add codeCount script to count total lines of code with scc
+
+README.md:
+- Keep track of code line count

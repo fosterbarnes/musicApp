@@ -393,10 +393,17 @@ public static class AlbumArtRemoteFetcher
                 Phase = "Saving"
             });
 
+            if (!AlbumArtImageNormalizer.TryNormalizeForEmbed(pic, out var normalizedPic))
+            {
+                list.Add(new AlbumArtBatchItemResult
+                    { FilePath = path, Ok = false, ErrorMessage = "Image validation/normalization failed." });
+                continue;
+            }
+
             var playbackSnap = releasePlaybackForPath(path);
             try
             {
-                if (!TrackMetadataSaver.TrySaveEmbeddedCoverOnly(path, pic, fetch.MusicBrainzReleaseId, out var err))
+                if (!TrackMetadataSaver.TrySaveEmbeddedCoverOnly(path, normalizedPic, fetch.MusicBrainzReleaseId, out var err))
                 {
                     list.Add(new AlbumArtBatchItemResult { FilePath = path, Ok = false, ErrorMessage = err ?? "Save failed." });
                 }

@@ -47,14 +47,12 @@ namespace musicApp.Views
             set => SetValue(ItemsSourceProperty, value);
         }
 
-        /// <summary>When true, single-click plays the track (e.g. Recently Played, Artists, Genres). When false, only double-click plays (Songs, Queue).</summary>
         public bool SingleClickPlays
         {
             get => (bool)GetValue(SingleClickPlaysProperty);
             set => SetValue(SingleClickPlaysProperty, value);
         }
 
-        /// <summary>Optional context-menu view identity override for host views that reuse a common TrackList ViewName.</summary>
         public string ContextMenuViewName
         {
             get => (string)GetValue(ContextMenuViewNameProperty);
@@ -82,7 +80,7 @@ namespace musicApp.Views
         public event EventHandler<Song>? ShowInAlbumsRequested;
         public event EventHandler<Song>? ShowInQueueRequested;
         public event EventHandler<Song>? ShowInExplorerRequested;
-        public event EventHandler<Song>? RemoveFromLibraryRequested;
+        public event EventHandler<IReadOnlyList<Song>>? RemoveFromLibraryRequested;
         public event EventHandler<Song>? DeleteRequested;
 
         public Song? SelectedTrack => lstTracks.SelectedItem as Song;
@@ -93,10 +91,7 @@ namespace musicApp.Views
             {
                 lstTracks.Items.Refresh();
             }
-            catch
-            {
-                // ignore
-            }
+            catch { }
         }
 
         public void ScrollToSong(Song song)
@@ -105,7 +100,6 @@ namespace musicApp.Views
             lstTracks.ScrollIntoView(song);
         }
 
-        /// <summary>When set (e.g. by PlaylistsView), the track context menu shows "Remove from Playlist" and it removes the track from this playlist.</summary>
         public Playlist? CurrentPlaylist { get; set; }
 
         private readonly HashSet<GridViewColumnHeader> _wiredHeaders = new();
@@ -135,6 +129,8 @@ namespace musicApp.Views
             lstTracks.PreviewMouseLeftButtonUp += LstTracks_PreviewMouseLeftButtonUp;
             lstTracks.DragOver += LstTracks_DragOver;
             lstTracks.Drop += LstTracks_Drop;
+            lstTracks.AddHandler(UIElement.PreviewMouseRightButtonDownEvent,
+                new MouseButtonEventHandler(LstTracks_PreviewMouseRightButtonDown));
             SetupColumnWidthTracking();
             ApplyAllowRowReorderToListView();
         }
@@ -188,7 +184,9 @@ namespace musicApp.Views
             var listView = sender as ListView;
             var contextMenu = listView?.ContextMenu;
             if (contextMenu?.Items == null) return;
-            var selectedSong = listView?.SelectedItem as Song;
+            Song? selectedSong = null;
+            if (listView != null && TrackContextMenuHelper.TryGetSingleSelectedSong(listView, out var one))
+                selectedSong = one;
             var addToPlaylistItem = TrackContextMenuHelper.FindMenuItemByHeader(contextMenu.Items, "Add to Playlist");
             var mainWindow = Application.Current?.MainWindow as MainWindow;
             var playlists = mainWindow?.Playlists;
@@ -215,7 +213,7 @@ namespace musicApp.Views
             var addToPlaylistParent = menuItem.Parent as MenuItem;
             var contextMenu = addToPlaylistParent?.Parent as ContextMenu;
             var listView = contextMenu?.PlacementTarget as ListView;
-            if (listView?.SelectedItem is not Song song)
+            if (!TrackContextMenuHelper.TryGetSingleSelectedSong(listView, out var song) || song == null)
                 return;
             AddTrackToPlaylistRequested?.Invoke(this, (song, playlist));
         }
@@ -312,6 +310,8 @@ namespace musicApp.Views
                     var dataTemplate = new DataTemplate();
                     var textBlockFactory = new FrameworkElementFactory(typeof(TextBlock));
                     textBlockFactory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+                    textBlockFactory.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+                    textBlockFactory.SetValue(TextBlock.TextWrappingProperty, TextWrapping.NoWrap);
                     if (columnName == "#")
                     {
                         var orderBinding = new Binding
@@ -741,10 +741,7 @@ namespace musicApp.Views
             {
                 DragDrop.DoDragDrop(lstTracks, data, DragDropEffects.Move);
             }
-            catch
-            {
-                // ignore
-            }
+            catch { }
             finally
             {
                 HideRowReorderInsertLine();
@@ -799,8 +796,21 @@ namespace musicApp.Views
         private void LstTracks_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!SingleClickPlays) return;
+            if (lstTracks.SelectedItems.Count != 1) return;
+            var mods = Keyboard.Modifiers;
+            if ((mods & ModifierKeys.Control) != 0 || (mods & ModifierKeys.Shift) != 0)
+                return;
             if (lstTracks.SelectedItem is Song track)
                 PlayTrackRequested?.Invoke(this, track);
+        }
+
+        private void LstTracks_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (lstTracks.SelectedItems.Count <= 1)
+                return;
+            var item = FindVisualAncestor<ListViewItem>(e.OriginalSource as DependencyObject);
+            if (item != null && item.IsSelected)
+                e.Handled = true;
         }
 
         private void LstTracks_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -875,10 +885,11 @@ namespace musicApp.Views
                 ShowInExplorerRequested?.Invoke(this, song);
         }
 
-        public void RequestRemoveFromLibrary(Song song)
+        public void RequestRemoveFromLibrary(IReadOnlyList<Song> songs)
         {
-            if (song != null)
-                RemoveFromLibraryRequested?.Invoke(this, song);
+            if (songs == null || songs.Count == 0)
+                return;
+            RemoveFromLibraryRequested?.Invoke(this, songs);
         }
 
         public void RequestDelete(Song song)

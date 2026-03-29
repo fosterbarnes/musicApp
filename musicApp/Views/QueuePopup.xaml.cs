@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -15,6 +16,7 @@ public partial class QueuePopupView : UserControl
 {
     private Song? _contextMenuSong;
     private int _heightAdjustGeneration;
+    private int _queueAnchorIndex = -1;
 
     public QueuePopupView()
     {
@@ -39,7 +41,7 @@ public partial class QueuePopupView : UserControl
         if (d is not QueuePopupView view)
             return;
 
-        Song? previouslySelected = GetSelectedSongFromItemsSource(view);
+        var previouslySelected = GetSelectedSongsFromItemsSource(view);
 
         var rows = new ObservableCollection<SongRowViewModel>();
         if (e.NewValue is IEnumerable enumerable)
@@ -57,49 +59,58 @@ public partial class QueuePopupView : UserControl
         }
 
         view.QueueItemsList.ItemsSource = rows;
-        ApplySelectionAfterRebuild(rows, previouslySelected);
+        ApplySelectionAfterRebuild(view, rows, previouslySelected);
         bool any = rows.Count > 0;
         view.EmptyQueueText.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
         view.ScheduleAdjustHeight();
         _ = view.LoadSongRowArtAsync(rows);
     }
 
-    private static Song? GetSelectedSongFromItemsSource(QueuePopupView view)
+    private static List<Song> GetSelectedSongsFromItemsSource(QueuePopupView view)
     {
+        var list = new List<Song>();
         if (view.QueueItemsList.ItemsSource is not IEnumerable en)
-            return null;
+            return list;
         foreach (var item in en)
         {
             if (item is SongRowViewModel vm && vm.IsSelected)
-                return vm.Song;
+                list.Add(vm.Song);
         }
-        return null;
+        return list;
     }
 
-    private static void ApplySelectionAfterRebuild(ObservableCollection<SongRowViewModel> rows, Song? selectedSong)
+    private static bool QueueSongMatches(Song row, Song sel)
+    {
+        if (ReferenceEquals(row, sel))
+            return true;
+        if (!string.IsNullOrWhiteSpace(sel.FilePath) &&
+            !string.IsNullOrWhiteSpace(row.FilePath) &&
+            string.Equals(row.FilePath, sel.FilePath, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return string.Equals(row.Title, sel.Title, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(row.Artist, sel.Artist, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(row.Album, sel.Album, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void ApplySelectionAfterRebuild(QueuePopupView view, ObservableCollection<SongRowViewModel> rows, IReadOnlyList<Song> selectedSongs)
     {
         foreach (var r in rows)
             r.IsSelected = false;
-        if (selectedSong == null)
+        view._queueAnchorIndex = -1;
+        if (selectedSongs == null || selectedSongs.Count == 0)
             return;
-        foreach (var r in rows)
-        {
-            if (ReferenceEquals(r.Song, selectedSong))
-            {
-                r.IsSelected = true;
-                return;
-            }
-        }
 
-        if (string.IsNullOrWhiteSpace(selectedSong.FilePath))
-            return;
-        foreach (var r in rows)
+        for (int i = 0; i < rows.Count; i++)
         {
-            if (!string.IsNullOrWhiteSpace(r.Song.FilePath) &&
-                string.Equals(selectedSong.FilePath, r.Song.FilePath, StringComparison.OrdinalIgnoreCase))
+            var row = rows[i];
+            foreach (var sel in selectedSongs)
             {
-                r.IsSelected = true;
-                return;
+                if (!QueueSongMatches(row.Song, sel))
+                    continue;
+                row.IsSelected = true;
+                if (view._queueAnchorIndex < 0)
+                    view._queueAnchorIndex = i;
+                break;
             }
         }
     }
@@ -145,9 +156,10 @@ public partial class QueuePopupView : UserControl
     public event EventHandler<Song>? ShowInAlbumsRequested;
     public event EventHandler<Song>? ShowInQueueRequested;
     public event EventHandler<Song>? ShowInExplorerRequested;
-    public event EventHandler<Song>? RemoveFromLibraryRequested;
+    public event EventHandler<IReadOnlyList<Song>>? RemoveFromLibraryRequested;
     public event EventHandler<Song>? DeleteRequested;
 
+    /// <summary>First selected row index in list order; toolbar uses one index when multiple rows are selected.</summary>
     public int GetSelectedViewIndex()
     {
         if (QueueItemsList.ItemsSource is not IEnumerable en)
@@ -162,24 +174,77 @@ public partial class QueuePopupView : UserControl
         return -1;
     }
 
-    private void ApplyRowSelection(SongRowViewModel selected)
+    private void ApplyQueuePointerSelection(SongRowViewModel clicked)
+    {
+        if (QueueItemsList.ItemsSource is not ObservableCollection<SongRowViewModel> rows)
+            return;
+        int idx = rows.IndexOf(clicked);
+        if (idx < 0)
+            return;
+
+        var mods = Keyboard.Modifiers;
+        if ((mods & ModifierKeys.Shift) != 0)
+        {
+            int anchor = _queueAnchorIndex >= 0 ? _queueAnchorIndex : idx;
+            int lo = Math.Min(anchor, idx);
+            int hi = Math.Max(anchor, idx);
+            for (int i = 0; i < rows.Count; i++)
+                rows[i].IsSelected = i >= lo && i <= hi;
+        }
+        else if ((mods & ModifierKeys.Control) != 0)
+        {
+            clicked.IsSelected = !clicked.IsSelected;
+            _queueAnchorIndex = idx;
+        }
+        else
+        {
+            foreach (var r in rows)
+                r.IsSelected = ReferenceEquals(r, clicked);
+            _queueAnchorIndex = idx;
+        }
+    }
+
+    private int CountSelectedQueueRows()
     {
         if (QueueItemsList.ItemsSource is not IEnumerable en)
-            return;
+            return 0;
+        int n = 0;
         foreach (var item in en)
         {
-            if (item is SongRowViewModel vm)
-                vm.IsSelected = ReferenceEquals(vm, selected);
+            if (item is SongRowViewModel vm && vm.IsSelected)
+                n++;
         }
+        return n;
+    }
+
+    private List<Song> GetSelectedQueueSongs()
+    {
+        var list = new List<Song>();
+        if (QueueItemsList.ItemsSource is not IEnumerable en)
+            return list;
+        foreach (var item in en)
+        {
+            if (item is SongRowViewModel vm && vm.IsSelected && vm.Song != null)
+                list.Add(vm.Song);
+        }
+        return list;
     }
 
     private void QueueSongItem_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is FrameworkElement el && el.DataContext is SongRowViewModel row)
         {
-            ApplyRowSelection(row);
+            ApplyQueuePointerSelection(row);
             e.Handled = true;
         }
+    }
+
+    private void QueueSongItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement el || el.DataContext is not SongRowViewModel row)
+            return;
+        if (CountSelectedQueueRows() > 1 && row.IsSelected)
+            e.Handled = true;
     }
 
     private void QueueSongItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -204,6 +269,9 @@ public partial class QueuePopupView : UserControl
     {
         _contextMenuSong = null;
         if (sender is not ContextMenu menu || menu.PlacementTarget is not DependencyObject placement)
+            return;
+
+        if (CountSelectedQueueRows() > 1)
             return;
 
         if (!TrackContextMenuHelper.TryResolveSong(placement, out var song) || song == null)
@@ -249,7 +317,14 @@ public partial class QueuePopupView : UserControl
     private void QueueContextMenu_ShowInAlbumsClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInAlbumsRequested?.Invoke(this, _contextMenuSong); }
     private void QueueContextMenu_ShowInQueueClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInQueueRequested?.Invoke(this, _contextMenuSong); }
     private void QueueContextMenu_ShowInExplorerClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInExplorerRequested?.Invoke(this, _contextMenuSong); }
-    private void QueueContextMenu_RemoveFromLibraryClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) RemoveFromLibraryRequested?.Invoke(this, _contextMenuSong); }
+    private void QueueContextMenu_RemoveFromLibraryClick(object sender, RoutedEventArgs e)
+    {
+        var songs = GetSelectedQueueSongs();
+        if (songs.Count == 0 && _contextMenuSong != null)
+            songs.Add(_contextMenuSong);
+        if (songs.Count == 0) return;
+        RemoveFromLibraryRequested?.Invoke(this, songs);
+    }
     private void QueueContextMenu_DeleteClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) DeleteRequested?.Invoke(this, _contextMenuSong); }
 
     private void ResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)

@@ -1,14 +1,12 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using musicApp;
+using musicApp.Helpers;
 
 namespace musicApp.Views
 {
     public partial class TrackContextMenu : ResourceDictionary
     {
-        // Dynamic playlist submenu and "Show in *" visibility live on TrackListView.ContextMenu_Opening (TrackContextMenuHelper).
-
         private void AddToPlaylistMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (TryGetTrackListView(sender, out var view, out var song))
@@ -65,8 +63,14 @@ namespace musicApp.Views
 
         private void RemoveFromLibraryMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            if (TryGetTrackListView(sender, out var view, out var song))
-                view.RequestRemoveFromLibrary(song);
+            if (sender is not MenuItem menuItem)
+                return;
+            var contextMenu = menuItem.Parent as ContextMenu;
+            var listView = contextMenu?.PlacementTarget as ListView;
+            if (!TrackContextMenuHelper.TryGetSelectedSongs(listView, out var songs) ||
+                !TrackContextMenuHelper.TryFindTrackListView(listView, out var view))
+                return;
+            view.RequestRemoveFromLibrary(songs);
         }
 
         private void DeleteMenuItem_Click(object sender, RoutedEventArgs e)
@@ -87,7 +91,6 @@ namespace musicApp.Views
                 view.RequestCreateNewPlaylistWithTrack(song);
         }
 
-        /// <summary>Gets the TrackListView and selected Song when the click is from a submenu item (e.g. "New Playlist" under "Add to Playlist").</summary>
         private static bool TryGetTrackListViewFromSubmenu(object eventSender, out TrackListView trackListView, out Song song)
         {
             trackListView = null!;
@@ -96,21 +99,7 @@ namespace musicApp.Views
                 return false;
             var parentItem = menuItem.Parent as MenuItem;
             var contextMenu = parentItem?.Parent as ContextMenu;
-            var listView = contextMenu?.PlacementTarget as ListView;
-            if (listView?.SelectedItem is not Song s)
-                return false;
-            var parent = VisualTreeHelper.GetParent(listView);
-            while (parent != null)
-            {
-                if (parent is TrackListView tl)
-                {
-                    trackListView = tl;
-                    song = s;
-                    return true;
-                }
-                parent = VisualTreeHelper.GetParent(parent);
-            }
-            return false;
+            return TryResolveFromContextMenu(contextMenu, out trackListView, out song);
         }
 
         private static bool TryGetTrackListView(object eventSender, out TrackListView trackListView, out Song song)
@@ -120,21 +109,21 @@ namespace musicApp.Views
             if (eventSender is not MenuItem menuItem)
                 return false;
             var contextMenu = menuItem.Parent as ContextMenu;
+            return TryResolveFromContextMenu(contextMenu, out trackListView, out song);
+        }
+
+        private static bool TryResolveFromContextMenu(ContextMenu? contextMenu, out TrackListView trackListView, out Song song)
+        {
+            trackListView = null!;
+            song = null!;
             var listView = contextMenu?.PlacementTarget as ListView;
-            if (listView?.SelectedItem is not Song s)
+            if (!TrackContextMenuHelper.TryGetSingleSelectedSong(listView, out var s) || s == null)
                 return false;
-            var parent = VisualTreeHelper.GetParent(listView);
-            while (parent != null)
-            {
-                if (parent is TrackListView tl)
-                {
-                    trackListView = tl;
-                    song = s;
-                    return true;
-                }
-                parent = VisualTreeHelper.GetParent(parent);
-            }
-            return false;
+            if (!TrackContextMenuHelper.TryFindTrackListView(listView, out var tl))
+                return false;
+            trackListView = tl;
+            song = s;
+            return true;
         }
     }
 }

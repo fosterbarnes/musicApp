@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Windows.Controls;
 
 namespace musicApp.Views
@@ -18,7 +19,7 @@ namespace musicApp.Views
             trackList.ShowInAlbumsRequested += (s, track) => ShowInAlbumsRequested?.Invoke(this, track);
             trackList.ShowInQueueRequested += (s, track) => ShowInQueueRequested?.Invoke(this, track);
             trackList.ShowInExplorerRequested += (s, track) => ShowInExplorerRequested?.Invoke(this, track);
-            trackList.RemoveFromLibraryRequested += (s, track) => RemoveFromLibraryRequested?.Invoke(this, track);
+            trackList.RemoveFromLibraryRequested += (s, tracks) => RemoveFromLibraryRequested?.Invoke(this, tracks);
             trackList.DeleteRequested += (s, track) => DeleteRequested?.Invoke(this, track);
         }
 
@@ -41,7 +42,7 @@ namespace musicApp.Views
         public event System.EventHandler<Song>? ShowInAlbumsRequested;
         public event System.EventHandler<Song>? ShowInQueueRequested;
         public event System.EventHandler<Song>? ShowInExplorerRequested;
-        public event System.EventHandler<Song>? RemoveFromLibraryRequested;
+        public event System.EventHandler<IReadOnlyList<Song>>? RemoveFromLibraryRequested;
         public event System.EventHandler<Song>? DeleteRequested;
 
         public void RebuildColumns() => trackList.RebuildColumns();

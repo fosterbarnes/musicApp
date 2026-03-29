@@ -12,6 +12,7 @@
         <converters:HalfWidthConverter x:Key="HalfWidthConverter"/>
         <converters:AlternatingRowBrushConverter x:Key="AlternatingRowBrushConverter"/>
         <converters:StringEqualsMultiConverter x:Key="StringEqualsMultiConverter"/>
+        <views:FlyoutTrackSelectedConverter x:Key="FlyoutTrackSelectedConverter"/>
         <ContextMenu x:Key="AlbumTrackContextMenu"
                      Style="{StaticResource TrackContextMenuStyle}"
                      Opened="AlbumTrackContextMenu_Opened">
@@ -67,6 +68,7 @@
         <DataTemplate x:Key="AlbumFlyoutTrackRowTemplate">
             <Border Padding="{StaticResource TrackRowPadding-thk}" Cursor="Hand"
                     MouseLeftButtonDown="FlyoutTrack_MouseLeftButtonDown"
+                    PreviewMouseRightButtonDown="FlyoutTrack_PreviewMouseRightButtonDown"
                     ContextMenu="{StaticResource AlbumTrackContextMenu}">
                 <Border.Style>
                     <Style TargetType="Border">
@@ -77,12 +79,13 @@
                             </Trigger>
                             <DataTrigger Value="True">
                                 <DataTrigger.Binding>
-                                    <MultiBinding Converter="{StaticResource StringEqualsMultiConverter}">
-                                        <Binding Path="FilePath"/>
-                                        <Binding Path="SelectedFlyoutTrackFilePath" RelativeSource="{RelativeSource AncestorType={x:Type views:AlbumsView}}"/>
+                                    <MultiBinding Converter="{StaticResource FlyoutTrackSelectedConverter}">
+                                        <Binding />
+                                        <Binding RelativeSource="{RelativeSource AncestorType={x:Type views:AlbumsView}}"/>
+                                        <Binding Path="FlyoutSelectionRevision" RelativeSource="{RelativeSource AncestorType={x:Type views:AlbumsView}}"/>
                                     </MultiBinding>
                                 </DataTrigger.Binding>
-                                <Setter Property="Background" Value="{StaticResource Selected-brush}"/>
+                                <Setter Property="Background" Value="{StaticResource TrackRowSelection-brush}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -404,16 +407,16 @@
         <Grid x:Name="LoadingIndicator" Grid.Row="0" Grid.RowSpan="2" Visibility="Collapsed"
               HorizontalAlignment="Center" VerticalAlignment="Center">
             <StackPanel Orientation="Horizontal">
-                <Ellipse x:Name="LoadDot0" Width="10" Height="10" Fill="#523e6e" Margin="4,0">
+                <Ellipse x:Name="LoadDot0" Width="10" Height="10" Fill="#523e6e" Margin="4,0" CacheMode="BitmapCache">
                     <Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform>
                 </Ellipse>
-                <Ellipse x:Name="LoadDot1" Width="10" Height="10" Fill="#523e6e" Margin="4,0">
+                <Ellipse x:Name="LoadDot1" Width="10" Height="10" Fill="#523e6e" Margin="4,0" CacheMode="BitmapCache">
                     <Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform>
                 </Ellipse>
-                <Ellipse x:Name="LoadDot2" Width="10" Height="10" Fill="#523e6e" Margin="4,0">
+                <Ellipse x:Name="LoadDot2" Width="10" Height="10" Fill="#523e6e" Margin="4,0" CacheMode="BitmapCache">
                     <Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform>
                 </Ellipse>
-                <Ellipse x:Name="LoadDot3" Width="10" Height="10" Fill="#523e6e" Margin="4,0">
+                <Ellipse x:Name="LoadDot3" Width="10" Height="10" Fill="#523e6e" Margin="4,0" CacheMode="BitmapCache">
                     <Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform>
                 </Ellipse>
             </StackPanel>

@@ -9,6 +9,10 @@
     <SolidColorBrush x:Key="PrimaryHueMidBrush" Color="{StaticResource MainAccentColor}"/>
     <SolidColorBrush x:Key="PrimaryHueMidForegroundBrush" Color="{StaticResource MainTextColor}"/>
 
+    <Style TargetType="CheckBox" BasedOn="{StaticResource MaterialDesignCheckBox}">
+        <Setter Property="materialDesign:RippleAssist.IsDisabled" Value="True"/>
+    </Style>
+
     <!-- Minimum vertical scrollbar thumb height is half this value (e.g. 80 → 40px min). -->
     <sys:Double x:Key="{x:Static SystemParameters.VerticalScrollBarButtonHeightKey}">80</sys:Double>
 
@@ -212,7 +216,7 @@
     <!-- ===========================================
          CONVERTERS
          =========================================== -->
-    
+
     <!-- Converter to calculate slider fill width -->
     <converters:SliderValueToWidthConverter x:Key="SliderValueToWidthConverter"/>
     <converters:SliderValueToWidthMultiConverter x:Key="SliderValueToWidthMultiConverter"/>
@@ -220,7 +224,7 @@
     <!-- ===========================================
          MEDIA CONTROL STYLES
          =========================================== -->
-    
+
     <!-- Custom Button Style for Media Controls -->
     <Style x:Key="CustomMediaButton" TargetType="Button">
         <Setter Property="Background" Value="Transparent"/>
@@ -252,7 +256,7 @@
     <!-- ===========================================
          VOLUME CONTROL STYLES
          =========================================== -->
-    
+
     <!-- Custom Volume Slider Style -->
     <Style x:Key="CustomVolumeSlider" TargetType="Slider">
         <Setter Property="Template">
@@ -301,7 +305,7 @@
     <!-- ===========================================
          WINDOW CONTROL STYLES
          =========================================== -->
-    
+
     <!-- Window Control Button Style -->
     <Style x:Key="WindowControlButton" TargetType="Button">
         <Setter Property="Width" Value="36"/>
@@ -340,7 +344,7 @@
     <!-- ===========================================
          SIDEBAR NAVIGATION STYLES
          =========================================== -->
-    
+
     <!-- Sidebar Navigation Button Style -->
     <Style x:Key="SidebarNavigationButton" TargetType="Button">
         <Setter Property="Background" Value="Transparent"/>
@@ -396,7 +400,7 @@
     <!-- ===========================================
          GRIDSPLITTER STYLES
          =========================================== -->
-    
+
     <!-- Custom GridSplitter Style -->
     <Style x:Key="CustomGridSplitter" TargetType="GridSplitter">
         <Setter Property="Background" Value="Transparent"/>
@@ -418,7 +422,7 @@
     <!-- ===========================================
          LISTVIEW AND GRIDVIEW STYLES
          =========================================== -->
-    
+
     <!-- Custom GridView Header Style to reduce height -->
     <Style x:Key="CompactGridViewHeaderStyle" TargetType="GridViewColumnHeader">
         <Setter Property="Height" Value="20"/>
@@ -503,6 +507,36 @@
             </Trigger>
             <Trigger Property="IsSelected" Value="True">
                 <Setter Property="Background" Value="{StaticResource Selected-brush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="TrackGridListViewItemStyle" TargetType="ListViewItem">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListViewItem">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <GridViewRowPresenter VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="ItemsControl.AlternationIndex" Value="1">
+                <Setter Property="Background" Value="#242424"/>
+            </Trigger>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource Hover-brush}"/>
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="{StaticResource TrackRowSelection-brush}"/>
             </Trigger>
         </Style.Triggers>
     </Style>

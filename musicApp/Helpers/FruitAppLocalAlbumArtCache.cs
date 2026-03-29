@@ -521,17 +521,23 @@ public static class FruitAppLocalAlbumArtCache
             if (data[i] != 0xFF || data[i + 1] != 0xD8 || data[i + 2] != 0xFF)
                 continue;
 
+            // Find the LAST FF D9 (EOI) for this SOI so embedded EXIF
+            // thumbnails with their own SOI/EOI don't truncate the image.
+            int lastEoi = -1;
             for (int j = i + 2; j < data.Length - 1; j++)
             {
-                if (data[j] != 0xFF || data[j + 1] != 0xD9)
-                    continue;
-                int len = j - i + 2;
+                if (data[j] == 0xFF && data[j + 1] == 0xD9)
+                    lastEoi = j;
+            }
+
+            if (lastEoi >= 0)
+            {
+                int len = lastEoi - i + 2;
                 if (len > bestLen)
                 {
                     bestLen = len;
                     bestStart = i;
                 }
-                break;
             }
         }
 
@@ -552,17 +558,36 @@ public static class FruitAppLocalAlbumArtCache
         return false;
     }
 
+    /// <summary>
+    /// Walks PNG chunks by length/type instead of scanning for "IEND" bytes
+    /// (which can false-match inside compressed IDAT data).
+    /// </summary>
     private static bool TryFindPngIendEnd(ReadOnlySpan<byte> data, int pngStart, out int endInclusive)
     {
         endInclusive = 0;
         ReadOnlySpan<byte> iend = "IEND"u8;
-        for (int i = pngStart + 8; i < data.Length - 8; i++)
+
+        // PNG: 8-byte signature, then chunks of [4-byte length][4-byte type][length bytes data][4-byte CRC]
+        int cursor = pngStart + 8;
+        while (cursor + 12 <= data.Length)
         {
-            if (data[i] != iend[0]) continue;
-            if (!data.Slice(i, 4).SequenceEqual(iend)) continue;
-            endInclusive = i + 4 + 4 - 1;
-            return endInclusive < data.Length;
+            uint chunkLen = ReadBEUInt32(data.Slice(cursor));
+            var chunkType = data.Slice(cursor + 4, 4);
+
+            // 4 (length) + 4 (type) + chunkLen (data) + 4 (CRC)
+            long chunkTotal = 4L + 4L + chunkLen + 4L;
+            if (chunkTotal > int.MaxValue || cursor + chunkTotal > data.Length)
+                return false;
+
+            if (chunkType.SequenceEqual(iend))
+            {
+                endInclusive = cursor + (int)chunkTotal - 1;
+                return endInclusive < data.Length;
+            }
+
+            cursor += (int)chunkTotal;
         }
+
         return false;
     }
 

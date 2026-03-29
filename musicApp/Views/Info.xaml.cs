@@ -697,10 +697,18 @@ public partial class InfoMetadataView : Window
                 progress,
                 CancellationToken.None).ConfigureAwait(true);
 
-            if (!fetch.Ok || fetch.ImageBytes is not { Length: > 0 } pic)
+            if (!fetch.Ok || fetch.ImageBytes is not { Length: > 0 } fetchedPic)
             {
                 MessageDialog.Show(Owner, "Download artwork",
                     fetch.ErrorMessage ?? "Could not download artwork.",
+                    MessageDialog.Buttons.Ok);
+                return;
+            }
+
+            if (!AlbumArtImageNormalizer.TryNormalizeForEmbed(fetchedPic, out var pic))
+            {
+                MessageDialog.Show(Owner, "Download artwork",
+                    "Downloaded image failed validation (corrupt or unsupported format).",
                     MessageDialog.Buttons.Ok);
                 return;
             }

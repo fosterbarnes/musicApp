@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -14,6 +15,7 @@ public partial class SearchPopupView : UserControl
 {
     private Song? _contextMenuSong;
     private int _heightAdjustGeneration;
+    private int _searchSongAnchorIndex = -1;
 
     public SearchPopupView()
     {
@@ -44,7 +46,9 @@ public partial class SearchPopupView : UserControl
         var artistRows = new ObservableCollection<ArtistRowViewModel>(
             results.Artists.Select(a => new ArtistRowViewModel(a)));
         var songRows = new ObservableCollection<SongRowViewModel>(
-            results.Songs.Select(s => new SongRowViewModel(s)));
+            results.Songs.Select(s => new SongRowViewModel(s) { IsSelected = false }));
+
+        view._searchSongAnchorIndex = -1;
 
         view.AlbumsList.ItemsSource = albumRows;
         view.ArtistsList.ItemsSource = artistRows;
@@ -161,16 +165,83 @@ public partial class SearchPopupView : UserControl
     public event EventHandler<Song>? ShowInAlbumsRequested;
     public event EventHandler<Song>? ShowInQueueRequested;
     public event EventHandler<Song>? ShowInExplorerRequested;
-    public event EventHandler<Song>? RemoveFromLibraryRequested;
+    public event EventHandler<IReadOnlyList<Song>>? RemoveFromLibraryRequested;
     public event EventHandler<Song>? DeleteRequested;
+
+    private void ApplySearchSongPointerSelection(SongRowViewModel clicked)
+    {
+        if (SongsList.ItemsSource is not ObservableCollection<SongRowViewModel> rows)
+            return;
+        int idx = rows.IndexOf(clicked);
+        if (idx < 0)
+            return;
+
+        var mods = Keyboard.Modifiers;
+        if ((mods & ModifierKeys.Shift) != 0)
+        {
+            int anchor = _searchSongAnchorIndex >= 0 ? _searchSongAnchorIndex : idx;
+            int lo = Math.Min(anchor, idx);
+            int hi = Math.Max(anchor, idx);
+            for (int i = 0; i < rows.Count; i++)
+                rows[i].IsSelected = i >= lo && i <= hi;
+        }
+        else if ((mods & ModifierKeys.Control) != 0)
+        {
+            clicked.IsSelected = !clicked.IsSelected;
+            _searchSongAnchorIndex = idx;
+        }
+        else
+        {
+            foreach (var r in rows)
+                r.IsSelected = ReferenceEquals(r, clicked);
+            _searchSongAnchorIndex = idx;
+        }
+    }
+
+    private int CountSelectedSearchSongs()
+    {
+        if (SongsList.ItemsSource is not System.Collections.IEnumerable en)
+            return 0;
+        int n = 0;
+        foreach (var item in en)
+        {
+            if (item is SongRowViewModel vm && vm.IsSelected)
+                n++;
+        }
+        return n;
+    }
+
+    private List<Song> GetSelectedSearchSongs()
+    {
+        var list = new List<Song>();
+        if (SongsList.ItemsSource is not System.Collections.IEnumerable en)
+            return list;
+        foreach (var item in en)
+        {
+            if (item is SongRowViewModel vm && vm.IsSelected && vm.Song != null)
+                list.Add(vm.Song);
+        }
+        return list;
+    }
 
     private void SongItem_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is FrameworkElement el && el.DataContext is SongRowViewModel row)
         {
-            SongSelected?.Invoke(this, row.Song);
+            ApplySearchSongPointerSelection(row);
+            var mods = Keyboard.Modifiers;
+            if ((mods & ModifierKeys.Control) == 0 && (mods & ModifierKeys.Shift) == 0)
+                SongSelected?.Invoke(this, row.Song);
             e.Handled = true;
         }
+    }
+
+    private void SongItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement el || el.DataContext is not SongRowViewModel row)
+            return;
+        if (CountSelectedSearchSongs() > 1 && row.IsSelected)
+            e.Handled = true;
     }
 
     private void ArtistItem_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -196,6 +267,12 @@ public partial class SearchPopupView : UserControl
         _contextMenuSong = null;
         if (sender is not ContextMenu menu || menu.PlacementTarget is not DependencyObject placement)
             return;
+
+        if (placement is FrameworkElement fe && fe.DataContext is SongRowViewModel)
+        {
+            if (CountSelectedSearchSongs() > 1)
+                return;
+        }
 
         if (!TrackContextMenuHelper.TryResolveSong(placement, out var song) || song == null)
             return;
@@ -239,7 +316,14 @@ public partial class SearchPopupView : UserControl
     private void SearchContextMenu_ShowInAlbumsClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInAlbumsRequested?.Invoke(this, _contextMenuSong); }
     private void SearchContextMenu_ShowInQueueClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInQueueRequested?.Invoke(this, _contextMenuSong); }
     private void SearchContextMenu_ShowInExplorerClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInExplorerRequested?.Invoke(this, _contextMenuSong); }
-    private void SearchContextMenu_RemoveFromLibraryClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) RemoveFromLibraryRequested?.Invoke(this, _contextMenuSong); }
+    private void SearchContextMenu_RemoveFromLibraryClick(object sender, RoutedEventArgs e)
+    {
+        var songs = GetSelectedSearchSongs();
+        if (songs.Count == 0 && _contextMenuSong != null)
+            songs.Add(_contextMenuSong);
+        if (songs.Count == 0) return;
+        RemoveFromLibraryRequested?.Invoke(this, songs);
+    }
     private void SearchContextMenu_DeleteClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) DeleteRequested?.Invoke(this, _contextMenuSong); }
 
     private void ResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)

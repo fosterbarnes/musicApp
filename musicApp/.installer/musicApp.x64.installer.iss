@@ -10,6 +10,7 @@
 #define DotNetPrereqUrl "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/8.0.25/windowsdesktop-runtime-8.0.25-win-x64.exe"
 #define DotNetPrereqFile "windowsdesktop-runtime-8.0.25-win-x64.exe"
 #define DotNetPrereqVersion "8.0.25"
+#define DotNetPrereqRegArch "x64"
 
 [Setup]
 AppId={{114D67E2-45A7-4EC9-9A07-C33BD16FC619}
@@ -71,11 +72,11 @@ procedure InitializeWizard();
 begin
   InitDotNetPrereqPages;
   WizardForm.LicenseAcceptedRadio.Checked := True;
+  DotNetPrereqDeselectRuntimeTaskIfSatisfied;
 end;
 
 procedure CurPageChanged(CurPageID: Integer);
 begin
-  if CurPageID = wpInstalling then
-    DotNetPrereqApplyGaugeColors;
+  DotNetPrereqOnCurPageChanged(CurPageID);
 end;
 

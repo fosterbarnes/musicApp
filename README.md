@@ -36,13 +36,15 @@
 
 musicApp is in early development, bugs are expected.
 
-If you want to use it, [download the latest release](https://github.com/fosterbarnes/musicApp/releases/download/v0.1.4/musicApp-v0.1.4-tummyExpert-portable.zip), unzip, then run MusicApp.exe
+If you want to use it, [download the latest release](https://github.com/fosterbarnes/musicApp/releases/download/v0.1.5/musicApp-v0.1.5-shaqSpeedrunner-portable.zip), unzip, then run MusicApp.exe
 
 ## Progress
 
 ![Progress Bar](https://progress-bars.entcheneric.com/bar.svg?progress=75&backgroundColor=%23212121&height=40&width=800&borderRadius=10&striped=false&animated=false&gradientAnimated=false&animationSpeed=1&stripeAnimationSpeed=1&gradientAnimationSpeed=1&initialAnimationSpeed=1&color=%23705399)  
 **124 / 166 tasks complete (74.7%)**
 [Tasks.md](https://github.com/fosterbarnes/musicApp/blob/main/.md/Tasks.md#main-window)
+
+[50,930](https://github.com/fosterbarnes/musicApp/blob/main/.md/scc.txt) lines of code and counting...
 
 # General Usage Info
 

@@ -1,0 +1,42 @@
+baseURL = 'https://musicapp.info/'
+locale = 'en-us'
+title = 'musicApp'
+
+[markup.highlight]
+noclasses = false
+style = "github"
+
+[[module.imports]]
+path = "github.com/willfaught/paige"
+
+# Site-wide Paige CSS (home page front matter [paige] style would override this key).
+[params.paige]
+style = """
+#paige-site-title { font-size: 3.5rem !important; line-height: 1.2 !important; }
+#paige-page-content .paige-shortcode-icon { display: block; text-align: center; }
+"""
+
+# Line under the site title, above the menu (Markdown OK). See Paige README [paige.site].
+[params.paige.site]
+description = "lightweight desktop music player for Windows"
+disable_credit = true
+
+[params.paige.pages]
+disable_authors = true
+disable_date = true
+disable_keywords = true
+disable_next = false
+disable_prev = false
+disable_reading_time = true
+disable_series = true
+disable_toc = true
+disable_word_count = true
+
+[params.paige.subpages]
+disable_authors = true
+disable_date = true
+disable_keywords = true
+disable_reading_time = true
+disable_series = true
+disable_summary = true
+disable_word_count = true

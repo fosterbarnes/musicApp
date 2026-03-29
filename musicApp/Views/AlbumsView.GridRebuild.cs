@@ -48,14 +48,31 @@ namespace musicApp.Views
         public event EventHandler<Song>? ShowInSongsRequested;
         public event EventHandler<Song>? ShowInQueueRequested;
         public event EventHandler<Song>? ShowInExplorerRequested;
-        public event EventHandler<Song>? RemoveFromLibraryRequested;
+        public event EventHandler<IReadOnlyList<Song>>? RemoveFromLibraryRequested;
         public event EventHandler<Song>? DeleteRequested;
         public event EventHandler<string>? ArtistNavigationRequested;
         public event EventHandler<string>? GenreNavigationRequested;
 
         public void RebuildColumns() { }
 
+        public bool IsGridCurrentFor(AlbumsBrowseMode mode, IEnumerable? source)
+        {
+            return !_isRebuilding
+                && _albumItems.Count > 0
+                && BrowseMode == mode
+                && mode == _lastGridBuildBrowseMode
+                && ReferenceEquals(_itemsSource, source);
+        }
+
         public void RefreshAlbumGridFromLibrary() => _ = RebuildAlbumItemsAsync(preserveViewState: true);
+
+        public void SetBrowseModeAndSource(AlbumsBrowseMode mode, IEnumerable? source)
+        {
+            _suppressBrowseModeRebuild = true;
+            try { BrowseMode = mode; }
+            finally { _suppressBrowseModeRebuild = false; }
+            ItemsSource = source;
+        }
 
         public bool TryRefreshAlbumGroupInPlace(Song track)
         {
@@ -113,8 +130,11 @@ namespace musicApp.Views
             if (string.IsNullOrWhiteSpace(albumName))
                 return;
 
-            if (string.IsNullOrWhiteSpace(selectedTrackFilePath))
-                SelectedFlyoutTrackFilePath = null;
+            if (_isRebuilding)
+            {
+                _pendingAlbumSelection = (albumName, artistName, openDetails, selectedTrackFilePath);
+                return;
+            }
 
             var item = FindAlbumItem(albumName, artistName);
             if (item == null)
@@ -126,7 +146,7 @@ namespace musicApp.Views
             _pendingAlbumSelection = null;
             SelectAlbumItem(item, openDetails, bringTargetIntoView: true);
 
-            SelectedFlyoutTrackFilePath = selectedTrackFilePath;
+            ApplyProgrammaticFlyoutSelection(string.IsNullOrWhiteSpace(selectedTrackFilePath) ? null : selectedTrackFilePath);
         }
 
         private void ApplyMergedAlbumSelection(
@@ -135,9 +155,6 @@ namespace musicApp.Views
         {
             if (string.IsNullOrWhiteSpace(p.albumName))
                 return;
-
-            if (string.IsNullOrWhiteSpace(p.selectedTrackFilePath))
-                SelectedFlyoutTrackFilePath = null;
 
             var item = FindAlbumItem(p.albumName, p.artistName);
             if (item == null)
@@ -148,7 +165,7 @@ namespace musicApp.Views
 
             _pendingAlbumSelection = null;
             SelectAlbumItem(item, p.openDetails, bringTargetIntoView);
-            SelectedFlyoutTrackFilePath = p.selectedTrackFilePath;
+            ApplyProgrammaticFlyoutSelection(string.IsNullOrWhiteSpace(p.selectedTrackFilePath) ? null : p.selectedTrackFilePath);
         }
 
         private AlbumGridItem? FindAlbumItem(string albumName, string? artistName)
@@ -454,6 +471,8 @@ namespace musicApp.Views
 
         private async Task RebuildAlbumItemsAsync(bool preserveViewState = true)
         {
+            _isRebuilding = true;
+
             (double? scrollRatio, double? scrollOffsetPixels, var mergedPending) = Dispatcher.CheckAccess()
                 ? CaptureRebuildRestoreStateAndCloseFlyout(preserveViewState)
                 : await Dispatcher.InvokeAsync(() => CaptureRebuildRestoreStateAndCloseFlyout(preserveViewState)).Task.ConfigureAwait(false);
@@ -464,10 +483,14 @@ namespace musicApp.Views
             _rebuildCts = new CancellationTokenSource();
             var ct = _rebuildCts.Token;
 
-            ShowLoadingIndicator();
+            if (_albumItems.Count == 0)
+                ShowLoadingIndicatorImmediate();
+            else
+                ShowLoadingIndicatorDeferred();
 
             if (_itemsSource is not IEnumerable<Song> songsRef)
             {
+                _isRebuilding = false;
                 HideLoadingIndicator();
                 return;
             }
@@ -503,12 +526,14 @@ namespace musicApp.Views
             }
             catch (OperationCanceledException)
             {
+                _isRebuilding = false;
                 HideLoadingIndicator();
                 return;
             }
 
             if (ct.IsCancellationRequested)
             {
+                _isRebuilding = false;
                 HideLoadingIndicator();
                 return;
             }
@@ -519,6 +544,7 @@ namespace musicApp.Views
                 {
                     _albumItems.Clear();
                     _lastGridBuildBrowseMode = browseMode;
+                    _isRebuilding = false;
                     HideLoadingIndicator();
                 }, DispatcherPriority.Loaded).Task.ConfigureAwait(false);
                 return;
@@ -556,6 +582,7 @@ namespace musicApp.Views
                     }
                     catch (OperationCanceledException)
                     {
+                        _isRebuilding = false;
                         HideLoadingIndicator();
                         return;
                     }
@@ -596,11 +623,15 @@ namespace musicApp.Views
                             _albumItems.Add(rows[j]);
 
                         if (isFirstUiBatch && endLocal > iLocal)
+                        {
+                            HideLoadingIndicator();
                             _ = LoadVisibleAlbumArtAsync();
+                        }
                     }, priority).Task.ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
+                    _isRebuilding = false;
                     HideLoadingIndicator();
                     return;
                 }
@@ -616,6 +647,7 @@ namespace musicApp.Views
                     try { await Task.Delay(5, ct).ConfigureAwait(false); }
                     catch (OperationCanceledException)
                     {
+                        _isRebuilding = false;
                         HideLoadingIndicator();
                         return;
                     }
@@ -632,13 +664,23 @@ namespace musicApp.Views
                     AlbumScrollViewer?.UpdateLayout();
                     SyncSectionHeaderWidth();
 
-                    if (mergedPending.HasValue)
+                    bool restoredExternalSelection = false;
+                    if (_pendingAlbumSelection.HasValue)
+                    {
+                        var ps = _pendingAlbumSelection.Value;
+                        _pendingAlbumSelection = null;
+                        ApplyMergedAlbumSelection(ps, bringTargetIntoView: true);
+                        restoredExternalSelection = true;
+                    }
+                    else if (mergedPending.HasValue)
+                    {
                         ApplyMergedAlbumSelection(mergedPending.Value, bringTargetIntoView: false);
+                    }
 
                     AlbumGrid.UpdateLayout();
                     AlbumScrollViewer?.UpdateLayout();
 
-                    if (preserveViewState && AlbumScrollViewer != null)
+                    if (!restoredExternalSelection && preserveViewState && AlbumScrollViewer != null)
                     {
                         double y;
                         if (scrollOffsetPixels.HasValue)
@@ -656,6 +698,7 @@ namespace musicApp.Views
                     }
 
                     _lastGridBuildBrowseMode = browseMode;
+                    _isRebuilding = false;
                     KickViewportAlbumArtNow();
                     HideLoadingIndicator();
                 }, DispatcherPriority.Loaded).Task.ConfigureAwait(false);

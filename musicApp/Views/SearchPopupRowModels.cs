@@ -4,7 +4,6 @@ using System.Windows.Media.Imaging;
 
 namespace musicApp.Views;
 
-/// <summary>Display row for album in search popup. Text shown immediately; AlbumArtSource populated async.</summary>
 public sealed class AlbumRowViewModel : INotifyPropertyChanged
 {
     private BitmapImage? _albumArtSource;
@@ -26,7 +25,6 @@ public sealed class AlbumRowViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
-/// <summary>Display row for song in search popup. Text shown immediately; AlbumArtSource populated async.</summary>
 public sealed class SongRowViewModel : INotifyPropertyChanged
 {
     private BitmapImage? _albumArtSource;
@@ -62,7 +60,6 @@ public sealed class SongRowViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
-/// <summary>Display row for artist in search popup. AlbumArtSource populated async.</summary>
 public sealed class ArtistRowViewModel : INotifyPropertyChanged
 {
     private BitmapImage? _albumArtSource;

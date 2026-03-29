@@ -435,7 +435,13 @@ namespace musicApp
                             return;
                         }
 
-                        var picCopy = (byte[])job.Pic.Clone();
+                        if (!AlbumArtImageNormalizer.TryNormalizeForEmbed(job.Pic, out var normalizedPic))
+                        {
+                            Interlocked.Increment(ref failed);
+                            return;
+                        }
+
+                        var picCopy = (byte[])normalizedPic.Clone();
                         var release = await Dispatcher.InvokeAsync(
                             () => ReleasePlaybackForMetadataWrite(path),
                             DispatcherPriority.Normal,
@@ -644,7 +650,13 @@ namespace musicApp
                             return;
                         }
 
-                        var picCopy = (byte[])pic.Clone();
+                        if (!AlbumArtImageNormalizer.TryNormalizeForEmbed(pic, out var normalizedPic))
+                        {
+                            Interlocked.Increment(ref failed);
+                            return;
+                        }
+
+                        var picCopy = (byte[])normalizedPic.Clone();
                         var release = await Dispatcher.InvokeAsync(
                             () => ReleasePlaybackForMetadataWrite(path),
                             DispatcherPriority.Normal,

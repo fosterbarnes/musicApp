@@ -43,15 +43,43 @@ namespace musicApp.Views
             _prefetchArtCts = null;
         }
 
-        private void ShowLoadingIndicator()
+        private void ShowLoadingIndicatorImmediate()
         {
-            if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(ShowLoadingIndicator); return; }
+            _loadingIndicatorDelayCts?.Cancel();
+            if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(ShowLoadingIndicatorImmediate); return; }
             LoadingIndicator.Visibility = Visibility.Visible;
             StartBounceAnimation();
         }
 
+        private void ShowLoadingIndicatorDeferred(int delayMs = 200)
+        {
+            _loadingIndicatorDelayCts?.Cancel();
+            _loadingIndicatorDelayCts = new CancellationTokenSource();
+            var ct = _loadingIndicatorDelayCts.Token;
+            _ = ShowLoadingIndicatorAfterDelayAsync(delayMs, ct);
+        }
+
+        private async Task ShowLoadingIndicatorAfterDelayAsync(int delayMs, CancellationToken ct)
+        {
+            try
+            {
+                await Task.Delay(delayMs, ct).ConfigureAwait(false);
+                if (!ct.IsCancellationRequested)
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        if (!ct.IsCancellationRequested)
+                        {
+                            LoadingIndicator.Visibility = Visibility.Visible;
+                            StartBounceAnimation();
+                        }
+                    });
+            }
+            catch (OperationCanceledException) { }
+        }
+
         private void HideLoadingIndicator()
         {
+            _loadingIndicatorDelayCts?.Cancel();
             if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(HideLoadingIndicator); return; }
             StopBounceAnimation();
             LoadingIndicator.Visibility = Visibility.Collapsed;

@@ -16,7 +16,7 @@
                         <Setter Property="Background" Value="{StaticResource Hover-brush}"/>
                     </Trigger>
                     <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
-                        <Setter Property="Background" Value="{StaticResource Selected-brush}"/>
+                        <Setter Property="Background" Value="{StaticResource TrackRowSelection-brush}"/>
                     </DataTrigger>
                     <DataTrigger Binding="{Binding IsNowPlaying, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
                         <Setter Property="Background" Value="{StaticResource ThemeBrand-brush}"/>

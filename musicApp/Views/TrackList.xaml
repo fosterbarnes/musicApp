@@ -14,6 +14,9 @@
     </UserControl.Resources>
     <Grid>
         <ListView x:Name="lstTracks"
+                  SelectionMode="Extended"
+                  AlternationCount="2"
+                  ItemContainerStyle="{StaticResource TrackGridListViewItemStyle}"
                   ScrollViewer.HorizontalScrollBarVisibility="Hidden"
                   Background="Transparent"
                   BorderThickness="0"

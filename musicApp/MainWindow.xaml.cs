@@ -1243,11 +1243,9 @@ namespace musicApp
         private void SearchPopupView_AlbumSelected(object? sender, AlbumSearchItem album)
         {
             searchPopup.IsOpen = false;
-            if (albumsViewControl != null)
-                albumsViewControl.BrowseMode = AlbumsBrowseMode.AllAlbums;
             ShowAlbumsView(bindFullLibrary: false);
             if (albumsViewControl != null && album.Songs.Count > 0)
-                albumsViewControl.ItemsSource = album.Songs;
+                albumsViewControl.SetBrowseModeAndSource(AlbumsBrowseMode.AllAlbums, album.Songs);
         }
 
         private void TitleBarPlayer_ArtistNavigationRequested(object? sender, string artistName)
@@ -2129,16 +2127,31 @@ namespace musicApp
         }
 
         /// <summary>
-        /// Removes the track from the musicApp library (in-memory and persisted). Does not delete the file.
+        /// Removes the track(s) from the musicApp library (in-memory and persisted). Does not delete files.
         /// </summary>
-        private async void OnRemoveFromLibraryRequested(object? sender, Song track)
+        private async void OnRemoveFromLibraryRequested(object? sender, IReadOnlyList<Song> tracks)
         {
-            if (!IsValidTrackWithPath(track))
+            if (tracks == null || tracks.Count == 0)
                 return;
-            var result = MessageDialog.Show(this, "Remove from Library", $"Remove \"{track.Title}\" from the library? The file will stay on your computer.", MessageDialog.Buttons.YesNo);
+            var distinct = tracks
+                .Where(IsValidTrackWithPath)
+                .GroupBy(t =>
+                {
+                    var n = LibraryPathHelper.TryNormalizePath(t.FilePath);
+                    return string.IsNullOrEmpty(n) ? t.FilePath : n;
+                }, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+            if (distinct.Count == 0)
+                return;
+
+            string message = distinct.Count == 1
+                ? $"Remove \"{distinct[0].Title}\" from the library? The file will stay on your computer."
+                : $"Remove {distinct.Count} tracks from the library? The files will stay on your computer.";
+            var result = MessageDialog.Show(this, "Remove from Library", message, MessageDialog.Buttons.YesNo);
             if (result != true)
                 return;
-            await RemoveTrackFromLibraryAsync(track);
+            await RemoveTracksFromLibraryAsync(distinct);
         }
 
         /// <summary>
@@ -2168,14 +2181,26 @@ namespace musicApp
         /// <summary>
         /// Removes a track from all in-memory collections, playlists, and persisted caches. Stops playback if this track is current.
         /// </summary>
-        private async Task RemoveTrackFromLibraryAsync(Song track)
+        private Task RemoveTrackFromLibraryAsync(Song track)
         {
             if (track == null)
+                return Task.CompletedTask;
+            return RemoveTracksFromLibraryAsync(new List<Song> { track });
+        }
+
+        private async Task RemoveTracksFromLibraryAsync(IReadOnlyList<Song> tracks)
+        {
+            if (tracks == null || tracks.Count == 0)
                 return;
 
-            var path = track.FilePath;
+            var pathSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var t in tracks)
+            {
+                if (t?.FilePath != null)
+                    pathSet.Add(t.FilePath);
+            }
 
-            if (currentTrack != null && string.Equals(currentTrack.FilePath, path, StringComparison.OrdinalIgnoreCase))
+            if (currentTrack != null && pathSet.Contains(currentTrack.FilePath))
             {
                 CleanupAudioObjects();
                 currentTrack = null;
@@ -2185,13 +2210,17 @@ namespace musicApp
                 titleBarPlayer.SetTrackInfo("No track selected", "", "");
             }
 
-            RemoveTrackFromCollections(track, includeShuffled: true);
+            foreach (var track in tracks)
+            {
+                if (track != null)
+                    RemoveTrackFromCollections(track, includeShuffled: true);
+            }
 
             foreach (var playlist in playlists)
             {
-                var toRemove = playlist.Tracks.FirstOrDefault(t => string.Equals(t.FilePath, path, StringComparison.OrdinalIgnoreCase));
-                if (toRemove != null)
-                    playlist.RemoveTrack(toRemove);
+                var toRemove = playlist.Tracks.Where(t => pathSet.Contains(t.FilePath)).ToList();
+                foreach (var t in toRemove)
+                    playlist.RemoveTrack(t);
             }
 
             var libraryCache = await libraryManager.LoadLibraryCacheAsync();

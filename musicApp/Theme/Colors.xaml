@@ -35,6 +35,7 @@
     <SolidColorBrush x:Key="AccentPrimary-brush" Color="#705399"/>
     <SolidColorBrush x:Key="AccentHover-brush" Color="#856CAA"/>
     <SolidColorBrush x:Key="SidebarNavActiveBackground-brush" Color="{StaticResource ThemeColor}"/>
+    <SolidColorBrush x:Key="TrackRowSelection-brush" Color="#523e6e"/>
     <SolidColorBrush x:Key="SidebarNavActivePressed-brush" Color="#5A4370"/>
     <SolidColorBrush x:Key="TextSelection-brush" Color="#c0c0c0"/>
     <SolidColorBrush x:Key="Danger-brush" Color="#E81123"/>

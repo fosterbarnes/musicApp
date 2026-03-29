@@ -142,9 +142,12 @@ namespace musicApp
         private void ShowAlbumsView(bool bindFullLibrary = true)
         {
             if (albumsViewControl != null)
-                albumsViewControl.BrowseMode = AlbumsBrowseMode.AllAlbums;
-            if (bindFullLibrary && albumsViewControl != null)
-                albumsViewControl.ItemsSource = allTracks;
+            {
+                if (bindFullLibrary && !albumsViewControl.IsGridCurrentFor(AlbumsBrowseMode.AllAlbums, allTracks))
+                    albumsViewControl.SetBrowseModeAndSource(AlbumsBrowseMode.AllAlbums, allTracks);
+                else if (!bindFullLibrary)
+                    albumsViewControl.BrowseMode = AlbumsBrowseMode.AllAlbums;
+            }
             contentHost.Content = albumsViewControl;
             SetSidebarNavActive(btnAlbums);
         }
@@ -153,8 +156,8 @@ namespace musicApp
         {
             if (albumsViewControl == null)
                 return;
-            albumsViewControl.BrowseMode = AlbumsBrowseMode.RecentlyAdded;
-            albumsViewControl.ItemsSource = allTracks;
+            if (!albumsViewControl.IsGridCurrentFor(AlbumsBrowseMode.RecentlyAdded, allTracks))
+                albumsViewControl.SetBrowseModeAndSource(AlbumsBrowseMode.RecentlyAdded, allTracks);
             contentHost.Content = albumsViewControl;
             SetSidebarNavActive(btnRecentlyAdded);
         }

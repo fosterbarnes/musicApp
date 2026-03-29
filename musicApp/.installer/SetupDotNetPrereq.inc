@@ -1,6 +1,182 @@
 var
   DotNetDownloadPage: TDownloadWizardPage;
   DotNetInstallPage: TOutputMarqueeProgressWizardPage;
+  DotNetDesktopRuntimeDetectDone: Boolean;
+  DotNetDesktopRuntimeDetectHaveMin: Boolean;
+
+function LeadingInt(const S: String): Integer;
+var
+  I: Integer;
+  N: String;
+begin
+  N := '';
+  for I := 1 to Length(S) do
+  begin
+    if (S[I] >= '0') and (S[I] <= '9') then
+      N := N + S[I]
+    else
+      Break;
+  end;
+  if N = '' then
+    Result := 0
+  else
+    Result := StrToIntDef(N, 0);
+end;
+
+function TakeFirstSegment(var S: String): Integer;
+var
+  P: Integer;
+  Part: String;
+begin
+  P := Pos('.', S);
+  if P > 0 then
+  begin
+    Part := Copy(S, 1, P - 1);
+    Delete(S, 1, P);
+  end
+  else
+  begin
+    Part := S;
+    S := '';
+  end;
+  Result := LeadingInt(Part);
+end;
+
+function DotNetVersionAtLeast(const InstalledVer, MinVer: String): Boolean;
+var
+  IA, IB: Integer;
+  SA, SB: String;
+begin
+  SA := InstalledVer;
+  SB := MinVer;
+  repeat
+    IA := TakeFirstSegment(SA);
+    IB := TakeFirstSegment(SB);
+    if IA > IB then
+    begin
+      Result := True;
+      Exit;
+    end;
+    if IA < IB then
+    begin
+      Result := False;
+      Exit;
+    end;
+  until (SA = '') and (SB = '');
+  Result := True;
+end;
+
+function DotNetRegNamesMeetMin(
+  const Names: TArrayOfString; const MinVer: String): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 0 to GetArrayLength(Names) - 1 do
+    if (Names[I] <> '') and DotNetVersionAtLeast(Names[I], MinVer) then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
+function HasMinWindowsDesktopRuntimeScanKey(
+  Root: Integer; const SubKey, MinVer: String): Boolean;
+var
+  Names: TArrayOfString;
+begin
+  Result := False;
+  if (SubKey = '') or not RegKeyExists(Root, SubKey) then
+    Exit;
+  if RegGetSubkeyNames(Root, SubKey, Names) and
+     DotNetRegNamesMeetMin(Names, MinVer) then
+  begin
+    Result := True;
+    Exit;
+  end;
+  if RegGetValueNames(Root, SubKey, Names) then
+    Result := DotNetRegNamesMeetMin(Names, MinVer);
+end;
+
+function HasMinWindowsDesktopRuntimeScanTree(
+  Root: Integer; const BasePath, MinVer: String): Boolean;
+begin
+  Result := HasMinWindowsDesktopRuntimeScanKey(Root, BasePath, MinVer);
+  if Result then
+    Exit;
+  Result :=
+    HasMinWindowsDesktopRuntimeScanKey(
+      Root, BasePath + '\InstalledVersions', MinVer);
+end;
+
+function HasMinWindowsDesktopRuntimeImpl: Boolean;
+var
+  MinVer: String;
+  Paths: TArrayOfString;
+  Roots: TArrayOfInteger;
+  IPath, IRoot: Integer;
+begin
+  Result := False;
+  MinVer := '{#DotNetPrereqVersion}';
+  SetArrayLength(Paths, 2);
+  Paths[0] :=
+    'SOFTWARE\dotnet\Setup\InstalledVersions\{#DotNetPrereqRegArch}\sharedfx\Microsoft.WindowsDesktop.App';
+  Paths[1] :=
+    'SOFTWARE\WOW6432Node\dotnet\Setup\InstalledVersions\{#DotNetPrereqRegArch}\sharedfx\Microsoft.WindowsDesktop.App';
+  if IsWin64 then
+  begin
+    SetArrayLength(Roots, 3);
+    Roots[0] := HKEY_LOCAL_MACHINE;
+    Roots[1] := HKLM64;
+    Roots[2] := HKLM32;
+  end
+  else
+  begin
+    SetArrayLength(Roots, 1);
+    Roots[0] := HKEY_LOCAL_MACHINE;
+  end;
+  for IRoot := 0 to GetArrayLength(Roots) - 1 do
+    for IPath := 0 to GetArrayLength(Paths) - 1 do
+      if HasMinWindowsDesktopRuntimeScanTree(Roots[IRoot], Paths[IPath], MinVer) then
+      begin
+        Result := True;
+        Exit;
+      end;
+end;
+
+function HasMinWindowsDesktopRuntime: Boolean;
+begin
+  if not DotNetDesktopRuntimeDetectDone then
+  begin
+    DotNetDesktopRuntimeDetectHaveMin := HasMinWindowsDesktopRuntimeImpl;
+    DotNetDesktopRuntimeDetectDone := True;
+  end;
+  Result := DotNetDesktopRuntimeDetectHaveMin;
+end;
+
+procedure DotNetPrereqDeselectRuntimeTaskIfSatisfied;
+begin
+  if not HasMinWindowsDesktopRuntime then
+    Exit;
+  WizardSelectTasks('!dotnetdesktop8');
+end;
+
+procedure DotNetPrereqApplyGaugeColors;
+begin
+  if (WizardForm <> nil) and (WizardForm.ProgressGauge.Handle <> 0) then
+  begin
+    SendMessage(WizardForm.ProgressGauge.Handle, PBM_SETBKCOLOR, 0, ProgressBarBgColor);
+    SendMessage(WizardForm.ProgressGauge.Handle, PBM_SETBARCOLOR, 0, ProgressBarFillColor);
+  end;
+end;
+
+procedure DotNetPrereqOnCurPageChanged(CurPageID: Integer);
+begin
+  if (CurPageID = wpSelectTasks) or (CurPageID = wpReady) then
+    DotNetPrereqDeselectRuntimeTaskIfSatisfied
+  else if CurPageID = wpInstalling then
+    DotNetPrereqApplyGaugeColors;
+end;
 
 procedure InitDotNetPrereqPages;
 begin
@@ -12,15 +188,6 @@ begin
   DotNetInstallPage := CreateOutputMarqueeProgressPage(
     'Microsoft .NET 8 Desktop Runtime',
     'Running the Microsoft installer — please wait.');
-end;
-
-procedure DotNetPrereqApplyGaugeColors;
-begin
-  if (WizardForm <> nil) and (WizardForm.ProgressGauge.Handle <> 0) then
-  begin
-    SendMessage(WizardForm.ProgressGauge.Handle, PBM_SETBKCOLOR, 0, ProgressBarBgColor);
-    SendMessage(WizardForm.ProgressGauge.Handle, PBM_SETBARCOLOR, 0, ProgressBarFillColor);
-  end;
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;

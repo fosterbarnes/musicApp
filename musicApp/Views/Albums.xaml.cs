@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading;
 using System.Windows;
@@ -150,6 +151,15 @@ namespace musicApp.Views
             set => SetValue(SelectedFlyoutTrackFilePathProperty, value);
         }
 
+        public static readonly DependencyProperty FlyoutSelectionRevisionProperty =
+            DependencyProperty.Register(
+                nameof(FlyoutSelectionRevision),
+                typeof(int),
+                typeof(AlbumsView),
+                new PropertyMetadata(0));
+
+        public int FlyoutSelectionRevision => (int)GetValue(FlyoutSelectionRevisionProperty);
+
         public static readonly DependencyProperty BrowseModeProperty =
             DependencyProperty.Register(
                 nameof(BrowseMode),
@@ -181,7 +191,7 @@ namespace musicApp.Views
             if (d is AlbumsView view)
             {
                 view.UpdateSortBarVisibility();
-                if (view.IsLoaded)
+                if (view.IsLoaded && !view._suppressBrowseModeRebuild)
                     _ = view.RebuildAlbumItemsAsync(preserveViewState: true);
             }
         }
@@ -242,12 +252,16 @@ namespace musicApp.Views
         private CancellationTokenSource? _rebuildCts;
         private CancellationTokenSource? _viewportArtCts;
         private CancellationTokenSource? _prefetchArtCts;
+        private CancellationTokenSource? _loadingIndicatorDelayCts;
         private Song? _contextMenuSong;
 
         private (string albumName, string? artistName, bool openDetails, string? selectedTrackFilePath)? _pendingAlbumSelection;
         private readonly DispatcherTimer _artLoadDebounce;
         private readonly DispatcherTimer _flyoutResizeDebounce;
         private readonly DispatcherTimer _resizeAnchorDebounce;
+
+        private readonly HashSet<string> _flyoutSelectedKeys = new(StringComparer.OrdinalIgnoreCase);
+        private int _flyoutAnchorIndex = -1;
 
         private AlbumGridItem? _selectedAlbum;
         private AlbumFlyoutItem? _currentFlyout;
@@ -259,6 +273,8 @@ namespace musicApp.Views
         private double _dragTargetSize;
         private ScaleTransform? _dragScaleTransform;
         private AlbumsBrowseMode _lastGridBuildBrowseMode = AlbumsBrowseMode.AllAlbums;
+        private bool _isRebuilding;
+        private bool _suppressBrowseModeRebuild;
 
         public AlbumsView()
         {
@@ -333,6 +349,9 @@ namespace musicApp.Views
                 _prefetchArtCts?.Cancel();
                 _prefetchArtCts?.Dispose();
                 _prefetchArtCts = null;
+                _loadingIndicatorDelayCts?.Cancel();
+                _loadingIndicatorDelayCts?.Dispose();
+                _loadingIndicatorDelayCts = null;
                 _artLoadDebounce.Stop();
                 _flyoutResizeDebounce.Stop();
                 _resizeAnchorDebounce.Stop();
