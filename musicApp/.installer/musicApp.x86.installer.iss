@@ -1,7 +1,11 @@
 #define AppName "musicApp"
 #define AppDisplayName "musicApp (x86)"
+#ifndef AppVersion
 #define AppVersion "0.1.2"
+#endif
+#ifndef AppVersionTag
 #define AppVersionTag "frederickRats"
+#endif
 #define AppPublisher "fosterbarnes"
 #define AppURL "https://github.com/fosterbarnes/musicApp"
 #define ExeName "musicApp.exe"
