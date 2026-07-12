@@ -69,6 +69,19 @@ namespace musicApp
             AppPaths.EnsureAppDataDirectory();
         }
 
+        // Write to a temp file, then atomically swap it in. A crash mid-save can
+        // never corrupt the existing cache; the old file stays last-known-good.
+        private static async Task SaveJsonAtomicAsync<T>(
+            string path, T value, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
+        {
+            var tempPath = path + ".tmp";
+            using (var stream = File.Create(tempPath))
+            {
+                await JsonSerializer.SerializeAsync(stream, value, typeInfo);
+            }
+            File.Move(tempPath, path, overwrite: true);
+        }
+
         #region Library Cache Management
 
         public async Task<LibraryCache> LoadLibraryCacheAsync()
@@ -94,9 +107,7 @@ namespace musicApp
         {
             try
             {
-                using var stream = File.Create(LibraryCacheFilePath);
-                await JsonSerializer.SerializeAsync(
-                    stream, cache, LibraryJsonContext.Default.LibraryCache);
+                await SaveJsonAtomicAsync(LibraryCacheFilePath, cache, LibraryJsonContext.Default.LibraryCache);
             }
             catch (Exception ex)
             {
@@ -131,9 +142,7 @@ namespace musicApp
         {
             try
             {
-                using var stream = File.Create(RecentlyPlayedFilePath);
-                await JsonSerializer.SerializeAsync(
-                    stream, recentlyPlayed, LibraryJsonContext.Default.RecentlyPlayedCache);
+                await SaveJsonAtomicAsync(RecentlyPlayedFilePath, recentlyPlayed, LibraryJsonContext.Default.RecentlyPlayedCache);
             }
             catch (Exception ex)
             {
@@ -187,9 +196,7 @@ namespace musicApp
             try
             {
                 ApplyMusicFolderNormalization(folders);
-                using var stream = File.Create(LibraryFoldersFilePath);
-                await JsonSerializer.SerializeAsync(
-                    stream, folders, LibraryJsonContext.Default.LibraryFolders);
+                await SaveJsonAtomicAsync(LibraryFoldersFilePath, folders, LibraryJsonContext.Default.LibraryFolders);
             }
             catch (Exception ex)
             {
@@ -224,9 +231,7 @@ namespace musicApp
         {
             try
             {
-                using var stream = File.Create(PlaylistsFilePath);
-                await JsonSerializer.SerializeAsync(
-                    stream, playlists, LibraryJsonContext.Default.PlaylistsCache);
+                await SaveJsonAtomicAsync(PlaylistsFilePath, playlists, LibraryJsonContext.Default.PlaylistsCache);
             }
             catch (Exception ex)
             {

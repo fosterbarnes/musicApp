@@ -15,7 +15,8 @@
         WindowStyle="None"
         AllowsTransparency="False"
         ResizeMode="CanResize"
-        MinWidth="1000" MinHeight="500">
+        MinWidth="1000" MinHeight="500"
+        PreviewKeyDown="MainWindow_PreviewKeyDown">
 
     <!-- Remove white bar on top of window-->
     <WindowChrome.WindowChrome>

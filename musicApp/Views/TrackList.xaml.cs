@@ -130,6 +130,7 @@ namespace musicApp.Views
         public TrackListView()
         {
             InitializeComponent();
+            ScrollWheelDampingHelper.Attach(lstTracks);
             TrackListColumnConfig.Initialize();
             Loaded += TrackListView_Loaded;
             lstTracks.SelectionChanged += LstTracks_SelectionChanged;

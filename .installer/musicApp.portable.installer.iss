@@ -11,14 +11,14 @@
 #define ExeName "musicApp.exe"
 
 #define DotNetPrereqMultiArch
-#define DotNetPrereqVersion "8.0.25"
+#define DotNetPrereqVersion "10.0.10"
 ; WPF -> Windows Desktop bundle, not core-only dotnet-runtime-*.
-#define DotNetPrereqUrlX86 "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/8.0.25/windowsdesktop-runtime-8.0.25-win-x86.exe"
-#define DotNetPrereqFileX86 "windowsdesktop-runtime-8.0.25-win-x86.exe"
-#define DotNetPrereqUrlX64 "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/8.0.25/windowsdesktop-runtime-8.0.25-win-x64.exe"
-#define DotNetPrereqFileX64 "windowsdesktop-runtime-8.0.25-win-x64.exe"
-#define DotNetPrereqUrlArm64 "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/8.0.25/windowsdesktop-runtime-8.0.25-win-arm64.exe"
-#define DotNetPrereqFileArm64 "windowsdesktop-runtime-8.0.25-win-arm64.exe"
+#define DotNetPrereqUrlX86 "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/10.0.10/windowsdesktop-runtime-10.0.10-win-x86.exe"
+#define DotNetPrereqFileX86 "windowsdesktop-runtime-10.0.10-win-x86.exe"
+#define DotNetPrereqUrlX64 "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/10.0.10/windowsdesktop-runtime-10.0.10-win-x64.exe"
+#define DotNetPrereqFileX64 "windowsdesktop-runtime-10.0.10-win-x64.exe"
+#define DotNetPrereqUrlArm64 "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/10.0.10/windowsdesktop-runtime-10.0.10-win-arm64.exe"
+#define DotNetPrereqFileArm64 "windowsdesktop-runtime-10.0.10-win-arm64.exe"
 
 [Setup]
 AppId={{F1A2B3C4-D5E6-4F7A-8B9C-0D1E2F3A4B5C}
@@ -55,7 +55,7 @@ CreateStartMenuIcon=Create Start Menu shortcut
 [Tasks]
 Name: "desktopicon"; Description: "Create Desktop shortcut"; GroupDescription: "{cm:AdditionalIcons}"
 Name: "startmenuicon"; Description: "{cm:CreateStartMenuIcon}"; GroupDescription: "{cm:AdditionalIcons}"
-Name: "dotnetdesktop8"; Description: ".NET 8.0 Desktop Runtime"; GroupDescription: "Install Dependencies"
+Name: "dotnetdesktop10"; Description: ".NET 10.0 Desktop Runtime"; GroupDescription: "Install Dependencies"
 
 [Files]
 Source: "C:\Users\Foster\Documents\GitHub\musicApp\musicApp\bin\portable\Release\net10.0-windows\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

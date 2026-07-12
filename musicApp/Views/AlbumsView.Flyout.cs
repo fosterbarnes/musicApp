@@ -251,9 +251,45 @@ namespace musicApp.Views
 
             Dispatcher.InvokeAsync(() =>
             {
-                var container = AlbumGrid.ItemContainerGenerator.ContainerFromItem(flyout) as FrameworkElement;
-                container?.BringIntoView();
-            }, DispatcherPriority.Background);
+                BringFlyoutFullyIntoView(flyout);
+            }, DispatcherPriority.Loaded);
+        }
+
+        private void BringFlyoutFullyIntoView(AlbumFlyoutItem flyout)
+        {
+            if (AlbumScrollViewer == null || flyout == null)
+                return;
+
+            AlbumGrid.UpdateLayout();
+            var container = AlbumGrid.ItemContainerGenerator.ContainerFromItem(flyout) as FrameworkElement;
+            if (container == null)
+                return;
+
+            try
+            {
+                var transform = container.TransformToAncestor(AlbumScrollViewer);
+                var top = transform.Transform(new Point(0, 0)).Y;
+                var bottom = top + container.ActualHeight;
+                var viewport = AlbumScrollViewer.ViewportHeight;
+                var offset = AlbumScrollViewer.VerticalOffset;
+
+                if (bottom > viewport)
+                {
+                    var target = offset + (bottom - viewport) + 8;
+                    target = Math.Min(Math.Max(0, target), AlbumScrollViewer.ScrollableHeight);
+                    AlbumScrollViewer.ScrollToVerticalOffset(target);
+                }
+                else if (top < 0)
+                {
+                    var target = offset + top - 8;
+                    target = Math.Min(Math.Max(0, target), AlbumScrollViewer.ScrollableHeight);
+                    AlbumScrollViewer.ScrollToVerticalOffset(target);
+                }
+            }
+            catch
+            {
+                container.BringIntoView();
+            }
         }
 
         private void CloseAlbumDetail()

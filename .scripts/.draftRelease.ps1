@@ -96,6 +96,6 @@ $downloadsTable = @"
 $finalReleaseNotes = $downloadsTable + $releaseNotes
 
 git tag $tagName && git push origin $tagName
-& gh release create $tagName "$finalPortable" "$finalX64" "$finalX86" "$finalArm" --title "$releaseName" --notes "$finalReleaseNotes" --prerelease
+& gh release create $tagName "$finalPortable" "$finalX64" "$finalX86" "$finalArm" --title "$releaseName" --notes "$finalReleaseNotes" --latest
 
 Remove-Item -Path $finalPortable, $finalX64, $finalX86, $finalArm, $portableZip -Recurse -Force -ErrorAction SilentlyContinue

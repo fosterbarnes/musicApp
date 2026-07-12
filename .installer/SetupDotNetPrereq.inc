@@ -173,7 +173,7 @@ procedure DotNetPrereqDeselectRuntimeTaskIfSatisfied;
 begin
   if not HasMinWindowsDesktopRuntime then
     Exit;
-  WizardSelectTasks('!dotnetdesktop8');
+  WizardSelectTasks('!dotnetdesktop10');
 end;
 
 procedure DotNetPrereqApplyGaugeColors;
@@ -196,13 +196,13 @@ end;
 procedure InitDotNetPrereqPages;
 begin
   DotNetDownloadPage := CreateDownloadPage(
-    'Microsoft .NET 8 Desktop Runtime',
+    'Microsoft .NET 10 Desktop Runtime',
     'Downloading the official installer from Microsoft.',
     nil);
   DotNetDownloadPage.ShowBaseNameInsteadOfUrl := True;
   DotNetInstallPage := CreateOutputMarqueeProgressPage(
-    'Microsoft .NET 8 Desktop Runtime',
-    'Running the Microsoft installer — please wait.');
+    'Microsoft .NET 10 Desktop Runtime',
+    'Running the Microsoft installer - please wait.');
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -217,7 +217,7 @@ begin
   NeedsRestart := False;
   InstallParams := '/install /passive /norestart';
 
-  if not WizardIsTaskSelected('dotnetdesktop8') then
+  if not WizardIsTaskSelected('dotnetdesktop10') then
     Exit;
 
 #ifdef DotNetPrereqMultiArch
@@ -268,8 +268,8 @@ begin
     ExePath := ExpandConstant('{tmp}\') + PrereqFile;
   except
     Result :=
-      'Could not download the Microsoft .NET 8 Desktop Runtime installer.' + #13#10#13#10 +
-      'Check your connection and try again, or install .NET 8 from https://dotnet.microsoft.com/download/dotnet/8.0';
+      'Could not download the Microsoft .NET 10 Desktop Runtime installer.' + #13#10#13#10 +
+      'Check your connection and try again, or install .NET 10 from https://dotnet.microsoft.com/download/dotnet/10.0';
     Exit;
   end;
 
@@ -291,7 +291,7 @@ begin
     try
       DotNetInstallPage.SetText(
         'Running Microsoft .NET Desktop Runtime {#DotNetPrereqVersion} setup.',
-        PrereqFile + ' — a separate Microsoft window may also appear.');
+        PrereqFile + ' - a separate Microsoft window may also appear.');
       DotNetInstallPage.Animate;
       if not Exec(ExePath, InstallParams, '', SW_SHOW, ewWaitUntilTerminated, ExitCode) then
         Result := 'Could not start the Microsoft .NET Desktop Runtime installer.';
@@ -312,5 +312,5 @@ begin
 
   Result :=
     'Microsoft .NET Desktop Runtime setup exited with code ' + IntToStr(ExitCode) + '.' + #13#10#13#10 +
-    'Install .NET 8 from https://dotnet.microsoft.com/download/dotnet/8.0, then run this setup again.';
+    'Install .NET 10 from https://dotnet.microsoft.com/download/dotnet/10.0, then run this setup again.';
 end;

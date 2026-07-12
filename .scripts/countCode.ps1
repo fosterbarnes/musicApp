@@ -21,9 +21,7 @@ $excludeExts = @(
     'copyright', 'yaml', 'yml', 'csproj', 'vbproj'
 ) -join ','
 
-$excludeFiles = @(
-    'yapBot.json', 'LICENSE'
-)
+$excludeFiles = @( 'yapBot.json', 'LICENSE' )
 $sccArgs = @('.', '--no-size', '--no-complexity', '--no-cocomo', '--ci', '--exclude-ext', $excludeExts)
 foreach ($f in $excludeFiles) { $sccArgs += @('--exclude-file', $f) }
 & scc @sccArgs | Out-File -FilePath $sccTxt -Encoding utf8

@@ -84,14 +84,15 @@ namespace musicApp
             PushMiniPlayerTrack(track);
         }
 
-        private void StopPlayback()
+        private void StopPlayback(bool clearQueue = true)
         {
             isManuallyStopping = true;
 
             try
             {
                 CleanupAudioObjects();
-                ClearContextualPlaybackQueue();
+                if (clearQueue)
+                    ClearContextualPlaybackQueue();
             }
             finally
             {

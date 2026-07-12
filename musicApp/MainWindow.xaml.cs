@@ -129,12 +129,38 @@ namespace musicApp
         private const string MainViewRecentlyAdded = "RecentlyAdded";
         private const string MainViewGenres = "Genres";
 
+        // Single owner of the status bar progress UI; see StatusProgressCoordinator.
+        private StatusProgressCoordinator statusProgress = null!;
+        // Active library-update pipeline phase (scan + artwork); reported into by
+        // LoadMusicFromFolderAsync and MaybeRunPostScanSystemArtworkCacheAsync.
+        private StatusProgressCoordinator.Phase? _libraryPipelinePhase;
+
         // ===========================================
         // CONSTRUCTOR AND INITIALIZATION
         // ===========================================
         public MainWindow()
         {
             InitializeComponent();
+
+            statusProgress = new StatusProgressCoordinator(
+                Dispatcher,
+                textPrefix: () => $"{allTracks.Count} songs",
+                setText: t => { if (statusBarText != null) statusBarText.Text = t; },
+                showBarFraction: f =>
+                {
+                    if (progressBarFill == null || progressBarBackground == null) return;
+                    progressBarFill.Visibility = Visibility.Visible;
+                    progressBarFill.Width = Math.Max(0, progressBarBackground.ActualWidth * f);
+                },
+                hideBarAndRestoreIdle: () =>
+                {
+                    if (progressBarFill != null)
+                    {
+                        progressBarFill.Visibility = Visibility.Collapsed;
+                        progressBarFill.Width = 0;
+                    }
+                    UpdateStatusBar();
+                });
 
             _localHotkeys = new Hotkey.LocalHotkeys(this);
             _globalHotkeys = new Hotkey.GlobalHotkeys(this);
@@ -436,7 +462,9 @@ namespace musicApp
         }
 
         /// <summary>
-        /// Loads music from previously saved folders
+        /// Loads music from previously saved folders. Cache-first: always restores the last
+        /// known good library from library.json so content paints instantly, then reconciles
+        /// with the disk in the background (new/changed/removed files only).
         /// </summary>
         private async Task LoadMusicFromSavedFoldersAsync(LibraryManager.LibraryCache? libraryCache = null)
         {
@@ -449,27 +477,185 @@ namespace musicApp
 
             libraryCache ??= await libraryManager.LoadLibraryCacheAsync();
 
-            var anyFolderDiskScan = false;
-            foreach (var folderPath in musicFolders)
-            {
-                if (Directory.Exists(folderPath))
-                {
-                    bool hasNewFiles = await libraryManager.HasNewFilesInFolderAsync(folderPath, libraryFolders);
+            var existingFolders = musicFolders.Where(Directory.Exists).ToList();
+            foreach (var folderPath in existingFolders)
+                await LoadMusicFromCacheAsync(folderPath, libraryCache);
 
-                    if (hasNewFiles)
+            // Reconcile with disk after the UI has painted; never blocks startup.
+            _ = Dispatcher.InvokeAsync(
+                () => _ = ReconcileLibraryFoldersWithDiskAsync(existingFolders, libraryCache),
+                DispatcherPriority.ApplicationIdle);
+        }
+
+        /// <summary>
+        /// Diffs the music folders on disk against the in-memory library and only tag-reads
+        /// files that are new or whose size/mtime changed. Removes tracks whose files vanished.
+        /// Runs after startup paint; a no-change reconcile touches no UI at all.
+        /// </summary>
+        private async Task ReconcileLibraryFoldersWithDiskAsync(
+            List<string> musicFolders, LibraryManager.LibraryCache? libraryCache)
+        {
+            try
+            {
+                var priorByPath = BuildPriorLibraryTrackMap(libraryCache);
+                var supportedExtensions = new[] { ".mp3", ".wav", ".flac", ".m4a", ".aac" };
+
+                var currentByPath = new Dictionary<string, Song>(StringComparer.OrdinalIgnoreCase);
+                foreach (var t in allTracks)
+                {
+                    var n = LibraryPathHelper.TryNormalizePath(t?.FilePath);
+                    if (n != null)
+                        currentByPath[n] = t!;
+                }
+
+                var (newFiles, changedTracks, removedTracks) = await Task.Run(() =>
+                {
+                    var diskPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    var added = new List<string>();
+                    var changed = new List<Song>();
+
+                    foreach (var folderPath in musicFolders)
                     {
-                        await LoadMusicFromFolderAsync(folderPath, true, false);
-                        anyFolderDiskScan = true;
+                        foreach (var file in Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories))
+                        {
+                            if (!supportedExtensions.Contains(Path.GetExtension(file).ToLower()))
+                                continue;
+                            var norm = LibraryPathHelper.TryNormalizePath(file);
+                            if (norm == null || !diskPaths.Add(norm))
+                                continue;
+
+                            if (!currentByPath.TryGetValue(norm, out var known))
+                            {
+                                added.Add(file);
+                                continue;
+                            }
+
+                            var fi = new FileInfo(file);
+                            if (fi.Length != known.FileSize ||
+                                (fi.LastWriteTime - known.DateModified).Duration() > TimeSpan.FromSeconds(2))
+                            {
+                                changed.Add(known);
+                            }
+                        }
                     }
-                    else
+
+                    var removed = currentByPath
+                        .Where(kv => !diskPaths.Contains(kv.Key)
+                            && musicFolders.Any(f => LibraryPathHelper.IsFileUnderMusicFolder(kv.Value.FilePath, f)))
+                        .Select(kv => kv.Value)
+                        .ToList();
+
+                    return (added, changed, removed);
+                });
+
+                var nothingChanged = newFiles.Count == 0 && changedTracks.Count == 0 && removedTracks.Count == 0;
+                foreach (var folderPath in musicFolders)
+                    await libraryManager.UpdateFolderScanTimeAsync(folderPath);
+                if (nothingChanged)
+                    return;
+
+                var needsArtPass = newFiles.Count > 0 || changedTracks.Count > 0;
+                _libraryPipelinePhase = needsArtPass
+                    ? statusProgress.Begin(100, ("updating library", 0.7), ("album artwork", 0.3))
+                    : statusProgress.Begin(100, ("updating library", 1.0));
+
+                try
+                {
+                    var loadedNew = new List<Song>();
+                    if (needsArtPass)
                     {
-                        await LoadMusicFromCacheAsync(folderPath, libraryCache);
+                        var reconcileTotal = newFiles.Count + changedTracks.Count;
+                        var reconcileDone = 0;
+                        void ReportReconcile() =>
+                            _libraryPipelinePhase?.Report(0, Interlocked.Increment(ref reconcileDone), reconcileTotal);
+
+                        var dop = Math.Max(2, Environment.ProcessorCount / 2);
+                        await Task.Run(() =>
+                        {
+                            var options = new ParallelOptions { MaxDegreeOfParallelism = dop };
+                            Parallel.ForEach(changedTracks, options, t =>
+                            {
+                                TrackMetadataLoader.ReloadTagFieldsFromFile(t);
+                                ReportReconcile();
+                            });
+                            Parallel.ForEach(newFiles, options, file =>
+                            {
+                                try
+                                {
+                                    if (!TryRegisterLibraryPath(file))
+                                        return;
+                                    var key = LibraryPathHelper.TryNormalizePath(file);
+                                    Song? prior = null;
+                                    if (key != null)
+                                        priorByPath.TryGetValue(key, out prior);
+                                    var track = TrackMetadataLoader.LoadSong(file, prior);
+                                    if (track == null)
+                                    {
+                                        ReleaseRegisteredLibraryPath(file);
+                                        return;
+                                    }
+                                    lock (loadedNew)
+                                        loadedNew.Add(track);
+                                }
+                                finally
+                                {
+                                    ReportReconcile();
+                                }
+                            });
+                        });
                     }
+
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        foreach (var track in removedTracks)
+                            RemoveTrackFromCollections(track, includeShuffled: true);
+                        foreach (var track in loadedNew)
+                        {
+                            allTracks.Add(track);
+                            filteredTracks.Add(track);
+                        }
+                    });
+
+                    await SortLibraryTracksByPathForScanAsync();
+                    await UpdateLibraryCacheAsync();
+                    UpdateShuffledTracks();
+
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        UpdateUI();
+                        UpdateStatusBar();
+                    });
+
+                    if (needsArtPass)
+                        await MaybeRunPostScanSystemArtworkCacheAsync();
+                }
+                finally
+                {
+                    _libraryPipelinePhase?.Dispose();
+                    _libraryPipelinePhase = null;
                 }
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Library reconcile failed: {ex.Message}");
+            }
+        }
 
-            if (anyFolderDiskScan)
-                await MaybeRunPostScanSystemArtworkCacheAsync();
+        private static Dictionary<string, Song> BuildPriorLibraryTrackMap(LibraryManager.LibraryCache? libraryCache)
+        {
+            var map = new Dictionary<string, Song>(StringComparer.OrdinalIgnoreCase);
+            if (libraryCache?.Tracks == null)
+                return map;
+
+            foreach (var t in libraryCache.Tracks)
+            {
+                var n = LibraryPathHelper.TryNormalizePath(t?.FilePath);
+                if (n == null)
+                    continue;
+                map[n] = t!;
+            }
+
+            return map;
         }
 
         /// <summary>
@@ -755,6 +941,12 @@ namespace musicApp
         {
             try
             {
+                if (!string.IsNullOrEmpty(_queueUndoStatusMessage) && statusBarText != null)
+                {
+                    statusBarText.Text = _queueUndoStatusMessage;
+                    return;
+                }
+
                 if (statusBarText == null || allTracks == null || allTracks.Count == 0)
                 {
                     if (statusBarText != null)
@@ -816,59 +1008,24 @@ namespace musicApp
             }
         }
 
-        private void UpdateStatusBarScanningLight(int processedFiles, int totalFiles)
-        {
-            if (statusBarText == null)
-                return;
-            statusBarText.Text = $"{allTracks.Count} songs, scanning files {processedFiles}/{totalFiles}…";
-        }
-
-        private void UpdateStatusBarPostScanAlbumWork(int done, int total)
-        {
-            if (statusBarText == null || total <= 0)
-                return;
-            statusBarText.Text = $"{allTracks.Count} songs, system artwork {done}/{total}…";
-            if (progressBarBackground != null && progressBarFill != null)
-            {
-                progressBarFill.Visibility = Visibility.Visible;
-                progressBarFill.Width = progressBarBackground.ActualWidth * (done / (double)total);
-            }
-        }
-
+        // Text-only: the progress bar belongs to StatusProgressCoordinator. Grid hydration
+        // is quiet background work; while a coordinator phase is active it owns the text too.
         private void UpdateStatusBarAlbumGridRebuild(AlbumsGridRebuildPhase phase, int done, int total, int songCount)
         {
-            if (statusBarText == null)
+            if (statusBarText == null || statusProgress.IsActive)
                 return;
 
             switch (phase)
             {
                 case AlbumsGridRebuildPhase.Grouping:
-                    if (progressBarFill != null)
-                    {
-                        progressBarFill.Visibility = Visibility.Collapsed;
-                        progressBarFill.Width = 0;
-                    }
                     statusBarText.Text = $"{songCount} songs, grouping albums…";
                     break;
                 case AlbumsGridRebuildPhase.LoadingArtwork:
-                    if (total <= 0)
-                        statusBarText.Text = $"{songCount} songs, loading artwork…";
-                    else
-                        statusBarText.Text = $"{songCount} songs, loading artwork {done}/{total}…";
-                    if (progressBarBackground != null && progressBarFill != null && total > 0)
-                    {
-                        progressBarFill.Visibility = Visibility.Visible;
-                        var w = progressBarBackground.ActualWidth;
-                        if (w > 0)
-                            progressBarFill.Width = w * (done / (double)total);
-                    }
+                    statusBarText.Text = total <= 0
+                        ? $"{songCount} songs, loading artwork…"
+                        : $"{songCount} songs, loading artwork {done}/{total}…";
                     break;
                 case AlbumsGridRebuildPhase.Complete:
-                    if (progressBarFill != null)
-                    {
-                        progressBarFill.Visibility = Visibility.Collapsed;
-                        progressBarFill.Width = 0;
-                    }
                     UpdateStatusBar();
                     break;
             }
@@ -1121,6 +1278,7 @@ namespace musicApp
             PushMiniPlayerTrack(currentTrack);
             w.SetAudioObjects(waveOut, audioFileReader);
             w.SetQueue(BuildQueueView(UILayoutConstants.CompactQueueListMaxItems));
+            w.SetQueueUndoAvailable(CanUndoPreviousQueue());
         }
 
         private void RefreshAfterMetadataEdit(Song updatedTrack)
@@ -1353,8 +1511,19 @@ namespace musicApp
 
         private void TitleBarPlayer_AlbumNavigationRequested(object? sender, string albumName)
         {
+            if (string.IsNullOrWhiteSpace(albumName))
+                return;
+
             ShowAlbumsView();
-            albumsViewControl?.ScrollToAlbum(albumName);
+            if (currentTrack != null &&
+                !string.IsNullOrWhiteSpace(currentTrack.Album) &&
+                string.Equals(currentTrack.Album.Trim(), albumName.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                albumsViewControl?.SelectAlbum(currentTrack);
+                return;
+            }
+
+            albumsViewControl?.SelectAlbum(albumName, null, openDetails: true);
         }
 
         private void AlbumsView_ArtistNavigationRequested(object? sender, string artistName)
@@ -2227,7 +2396,7 @@ namespace musicApp
             if (!IsValidTrackWithPath(track))
                 return;
 
-            var session = GetOrPromoteContextualSessionForQueueEdit();
+            var session = GetOrPromoteContextualSessionForQueueEdit(track);
             if (session == null)
                 return;
 
@@ -2238,11 +2407,9 @@ namespace musicApp
                 RemoveFromSessionOrderedFullSkippingCurrent(track);
                 RemoveFromShuffledFutureSkippingHead(track);
 
-                if (playNext)
+                if (playNext && currentTrack != null)
                 {
-                    int curIdx = currentTrack != null
-                        ? SongIdentity.IndexOf(session, currentTrack)
-                        : -1;
+                    int curIdx = SongIdentity.IndexOf(session, currentTrack);
                     int insertIdx = curIdx + 1;
                     if (insertIdx < 0 || insertIdx > session.Count)
                         insertIdx = session.Count;
@@ -2659,6 +2826,18 @@ namespace musicApp
                         }
                     }
                 }
+                else if (currentTrack == null && contextualPlaybackFuture != null)
+                {
+                    for (int i = 0; i < currentQueue.Count; i++)
+                    {
+                        if (maxItems.HasValue && queueView.Count >= maxItems.Value)
+                            break;
+
+                        var track = currentQueue[i];
+                        if (track != null && !string.IsNullOrEmpty(track.FilePath))
+                            queueView.Add(track);
+                    }
+                }
 
                 return queueView;
             }
@@ -2673,10 +2852,28 @@ namespace musicApp
 
         #region Music Management
 
-        private async Task LoadMusicFromFolderAsync(string folderPath, bool saveToSettings = false, bool runPostScanSystemArtworkIfEnabled = false)
+        private async Task LoadMusicFromFolderAsync(
+            string folderPath,
+            bool saveToSettings = false,
+            bool runPostScanSystemArtworkIfEnabled = false,
+            IReadOnlyDictionary<string, Song>? priorLibraryByPath = null)
         {
             try
             {
+                var priorMap = priorLibraryByPath;
+                if (priorMap == null || priorMap.Count == 0)
+                {
+                    var built = new Dictionary<string, Song>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var t in allTracks)
+                    {
+                        var n = LibraryPathHelper.TryNormalizePath(t?.FilePath);
+                        if (n == null)
+                            continue;
+                        built[n] = t!;
+                    }
+                    priorMap = built;
+                }
+
                 var supportedExtensions = new[] { ".mp3", ".wav", ".flac", ".m4a", ".aac" };
                 var musicFiles = await Task.Run(() =>
                 {
@@ -2685,13 +2882,13 @@ namespace musicApp
                         .ToList();
                 });
 
-                if (musicFiles.Count > 0)
+                // Own the pipeline phase unless an outer flow (rescan/reconcile) already does.
+                var ownsPipeline = _libraryPipelinePhase == null && musicFiles.Count > 0;
+                if (ownsPipeline)
                 {
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        progressBarFill.Width = 0;
-                        progressBarFill.Visibility = Visibility.Visible;
-                    });
+                    _libraryPipelinePhase = runPostScanSystemArtworkIfEnabled
+                        ? statusProgress.Begin(100, ("scanning files", 0.7), ("album artwork", 0.3))
+                        : statusProgress.Begin(100, ("scanning files", 1.0));
                 }
 
                 int processedCount = 0;
@@ -2727,13 +2924,7 @@ namespace musicApp
 
                     var done = Volatile.Read(ref processedCount);
                     if (musicFiles.Count > 0)
-                    {
-                        double progressPercent = done / (double)musicFiles.Count;
-                        progressBarFill.Width = progressBarBackground.ActualWidth * progressPercent;
-                    }
-
-                    if (progressBarFill.Visibility == Visibility.Visible)
-                        UpdateStatusBarScanningLight(done, musicFiles.Count);
+                        _libraryPipelinePhase?.Report(0, done, musicFiles.Count);
                 }
 
                 var uiPublishTimer = new DispatcherTimer(DispatcherPriority.Background)
@@ -2774,7 +2965,12 @@ namespace musicApp
                             {
                                 if (TryRegisterLibraryPath(file))
                                 {
-                                    track = TrackMetadataLoader.LoadSong(file);
+                                    Song? prior = null;
+                                    var key = LibraryPathHelper.TryNormalizePath(file);
+                                    if (key != null)
+                                        priorMap.TryGetValue(key, out prior);
+
+                                    track = TrackMetadataLoader.LoadSong(file, prior);
                                     if (track == null)
                                         ReleaseRegisteredLibraryPath(file);
                                 }
@@ -2827,28 +3023,23 @@ namespace musicApp
                 await Dispatcher.InvokeAsync(() =>
                 {
                     UpdateUI();
-                    if (musicFiles.Count > 0)
-                    {
-                        if (!runPostScanSystemArtworkIfEnabled)
-                        {
-                            progressBarFill.Visibility = Visibility.Collapsed;
-                            progressBarFill.Width = 0;
-                            StartThumbnailCacheBackfillIfNeeded();
-                        }
-                        UpdateStatusBar();
-                    }
+                    if (musicFiles.Count > 0 && !runPostScanSystemArtworkIfEnabled)
+                        StartThumbnailCacheBackfillIfNeeded();
                 });
 
                 if (runPostScanSystemArtworkIfEnabled)
                     await MaybeRunPostScanSystemArtworkCacheAsync().ConfigureAwait(true);
+
+                if (ownsPipeline)
+                {
+                    _libraryPipelinePhase?.Dispose();
+                    _libraryPipelinePhase = null;
+                }
             }
             catch (Exception ex)
             {
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    progressBarFill.Visibility = Visibility.Collapsed;
-                    progressBarFill.Width = 0;
-                });
+                _libraryPipelinePhase?.Dispose();
+                _libraryPipelinePhase = null;
                 MessageDialog.Show(this, "Error", $"Error loading music folder: {ex.Message}", MessageDialog.Buttons.Ok);
             }
         }
@@ -2931,7 +3122,7 @@ namespace musicApp
 
                 try
                 {
-                    StopPlayback();
+                    StopPlayback(clearQueue: false);
                 }
                 catch (Exception stopEx)
                 {
@@ -2987,7 +3178,7 @@ namespace musicApp
 
                 try
                 {
-                    StopPlayback();
+                    StopPlayback(clearQueue: false);
                 }
                 catch (Exception stopEx)
                 {
@@ -3107,13 +3298,39 @@ namespace musicApp
                     Debug.WriteLine($"Error saving settings on close: {ex.Message}");
                 }
 
-                StopPlayback();
+                try
+                {
+                    StopPlayback(clearQueue: false);
+                }
+                finally
+                {
+                    _shutdownCloseFinalized = true;
+                    try { await Dispatcher.InvokeAsync(() => Close()); }
+                    catch { /* ignore */ }
+                }
             }
-            finally
+            catch (Exception ex)
             {
+                Debug.WriteLine($"FinishShutdownAsync: {ex.Message}");
                 _shutdownCloseFinalized = true;
                 try { await Dispatcher.InvokeAsync(() => Close()); }
                 catch { /* ignore */ }
+            }
+        }
+
+        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Z &&
+                (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control &&
+                (Keyboard.Modifiers & ModifierKeys.Alt) == 0)
+            {
+                if (Keyboard.FocusedElement is TextBox || Keyboard.FocusedElement is Slider)
+                    return;
+
+                if (TryRestorePreviousQueue())
+                {
+                    e.Handled = true;
+                }
             }
         }
     }

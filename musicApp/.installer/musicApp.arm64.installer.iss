@@ -11,9 +11,9 @@
 #define ExeName "musicApp.exe"
 
 ; WPF -> Windows Desktop bundle, not core-only dotnet-runtime-*.
-#define DotNetPrereqUrl "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/8.0.25/windowsdesktop-runtime-8.0.25-win-arm64.exe"
-#define DotNetPrereqFile "windowsdesktop-runtime-8.0.25-win-arm64.exe"
-#define DotNetPrereqVersion "8.0.25"
+#define DotNetPrereqUrl "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/10.0.10/windowsdesktop-runtime-10.0.10-win-arm64.exe"
+#define DotNetPrereqFile "windowsdesktop-runtime-10.0.10-win-arm64.exe"
+#define DotNetPrereqVersion "10.0.10"
 #define DotNetPrereqRegArch "arm64"
 
 [Setup]
@@ -51,7 +51,7 @@ CreateStartMenuIcon=Create Start Menu shortcut
 [Tasks]
 Name: "desktopicon"; Description: "Create Desktop shortcut"; GroupDescription: "{cm:AdditionalIcons}"
 Name: "startmenuicon"; Description: "{cm:CreateStartMenuIcon}"; GroupDescription: "{cm:AdditionalIcons}"
-Name: "dotnetdesktop8"; Description: ".NET 8.0 Desktop Runtime"; GroupDescription: "Install Dependencies"
+Name: "dotnetdesktop10"; Description: ".NET 10.0 Desktop Runtime"; GroupDescription: "Install Dependencies"
 
 [Files]
 Source: "C:\Users\Foster\Documents\GitHub\musicApp\musicApp\bin\arm64\Release\net10.0-windows\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

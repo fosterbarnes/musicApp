@@ -61,6 +61,7 @@ public partial class MiniPlayerWindow : Window
     public event EventHandler? PlayPauseRequested;
     public event EventHandler? PreviousTrackRequested;
     public event EventHandler? NextTrackRequested;
+    public event EventHandler? QueueUndoRequested;
     public event EventHandler? PlaybackPositionCommitted;
     public event EventHandler<Song>? SongPlayRequested;
     public event EventHandler? QueueRemoveRequested;
@@ -77,6 +78,8 @@ public partial class MiniPlayerWindow : Window
     public event EventHandler<Song>? ShowInExplorerRequested;
     public event EventHandler<IReadOnlyList<Song>>? RemoveFromLibraryRequested;
     public event EventHandler<Song>? DeleteRequested;
+    public event EventHandler<string>? ArtistNavigationRequested;
+    public event EventHandler<string>? AlbumNavigationRequested;
 
     public int GetAlbumArtTargetPixelSize()
     {
@@ -98,8 +101,34 @@ public partial class MiniPlayerWindow : Window
     public void SetTrackInfo(string title, string artist, string? album = null, ImageSource? albumArt = null)
     {
         txtCurrentTrack.Text = string.IsNullOrWhiteSpace(title) ? "No track selected" : title;
-        txtArtistAlbum.Text = PlaybackDisplayText.FormatArtistAlbum(artist, album);
+
+        var a = artist?.Trim() ?? "";
+        var al = album?.Trim() ?? "";
+        txtCurrentArtist.Text = a;
+        txtCurrentAlbum.Text = al;
+        txtDashSeparator.Visibility = !string.IsNullOrEmpty(a) && !string.IsNullOrEmpty(al)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
         imgAlbumArt.Source = albumArt;
+    }
+
+    private void TxtCurrentArtist_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var artist = txtCurrentArtist.Text?.Trim();
+        if (string.IsNullOrEmpty(artist))
+            return;
+        ArtistNavigationRequested?.Invoke(this, artist);
+        e.Handled = true;
+    }
+
+    private void TxtCurrentAlbum_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var album = txtCurrentAlbum.Text?.Trim();
+        if (string.IsNullOrEmpty(album))
+            return;
+        AlbumNavigationRequested?.Invoke(this, album);
+        e.Handled = true;
     }
 
     public void SetAudioObjects(IWavePlayer? waveOut, AudioFileReader? audioFileReader)
@@ -149,6 +178,11 @@ public partial class MiniPlayerWindow : Window
     public Song? GetPrimarySelectedSong() => UpcomingQueue.GetPrimarySelectedSong();
     public void SetQueue(IEnumerable? tracks) => UpcomingQueue.SetQueue(tracks);
 
+    public void SetQueueUndoAvailable(bool available)
+    {
+        btnQueueUndo.Visibility = available ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void ArtHost_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         if (ArtHost.ActualWidth > 0)
@@ -187,6 +221,8 @@ public partial class MiniPlayerWindow : Window
         PreviousTrackRequested?.Invoke(this, EventArgs.Empty);
     private void BtnNext_Click(object sender, RoutedEventArgs e) =>
         NextTrackRequested?.Invoke(this, EventArgs.Empty);
+    private void BtnQueueUndo_Click(object sender, RoutedEventArgs e) =>
+        QueueUndoRequested?.Invoke(this, EventArgs.Empty);
 
     private void SeekBarTrack_SizeChanged(object sender, SizeChangedEventArgs e)
     {

@@ -97,11 +97,46 @@
                            FontSize="15"
                            FontWeight="SemiBold"
                            TextTrimming="CharacterEllipsis"/>
-                <TextBlock x:Name="txtArtistAlbum"
-                           Foreground="{StaticResource TextTertiary-brush}"
-                           FontSize="12"
-                           TextTrimming="CharacterEllipsis"
-                           Margin="0,2,0,0"/>
+                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                    <TextBlock x:Name="txtCurrentArtist"
+                               Foreground="{StaticResource TextTertiary-brush}"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               Cursor="Hand"
+                               MouseLeftButtonDown="TxtCurrentArtist_MouseLeftButtonDown">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="TextDecorations" Value="Underline"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock x:Name="txtDashSeparator"
+                               Text=" - "
+                               Foreground="{StaticResource TextTertiary-brush}"
+                               FontSize="12"
+                               Margin="4,0"
+                               Visibility="Collapsed"/>
+                    <TextBlock x:Name="txtCurrentAlbum"
+                               Foreground="{StaticResource TextTertiary-brush}"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               Cursor="Hand"
+                               MouseLeftButtonDown="TxtCurrentAlbum_MouseLeftButtonDown">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="TextDecorations" Value="Underline"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
             </StackPanel>
 
             <Grid Grid.Row="2" Margin="12,4,12,0" Height="20">
@@ -153,38 +188,62 @@
                            Margin="8,0,0,0"/>
             </Grid>
 
-            <StackPanel Grid.Row="3"
-                        Orientation="Horizontal"
+            <Grid Grid.Row="3"
+                  Margin="12,6,12,8"
+                  Height="44">
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <Button Style="{DynamicResource MaterialDesignToolButton}"
+                            materialDesign:RippleAssist.IsDisabled="True"
+                            Width="40" Height="40"
+                            VerticalAlignment="Center"
+                            Click="BtnPrevious_Click"
+                            ToolTip="Previous">
+                        <materialDesign:PackIcon Kind="SkipPrevious" Width="28" Height="28"
+                                                 Foreground="{StaticResource TextPrimary-brush}"/>
+                    </Button>
+                    <Button Style="{DynamicResource MaterialDesignToolButton}"
+                            materialDesign:RippleAssist.IsDisabled="True"
+                            Width="44" Height="44"
+                            Margin="8,0"
+                            VerticalAlignment="Center"
+                            Click="BtnPlayPause_Click"
+                            ToolTip="Play/Pause">
+                        <materialDesign:PackIcon x:Name="iconPlayPause"
+                                                 Kind="Play"
+                                                 Width="32" Height="32"
+                                                 Foreground="{StaticResource TextPrimary-brush}"/>
+                    </Button>
+                    <Button Style="{DynamicResource MaterialDesignToolButton}"
+                            materialDesign:RippleAssist.IsDisabled="True"
+                            Width="40" Height="40"
+                            VerticalAlignment="Center"
+                            Click="BtnNext_Click"
+                            ToolTip="Next">
+                        <materialDesign:PackIcon Kind="SkipNext" Width="28" Height="28"
+                                                 Foreground="{StaticResource TextPrimary-brush}"/>
+                    </Button>
+                </StackPanel>
+                <Button x:Name="btnQueueUndo"
+                        Style="{DynamicResource MaterialDesignToolButton}"
+                        materialDesign:RippleAssist.IsDisabled="True"
+                        Width="28" Height="28"
+                        Margin="0,-2,0,0"
                         HorizontalAlignment="Center"
-                        Margin="12,6,12,8">
-                <Button Style="{DynamicResource MaterialDesignToolButton}"
-                        materialDesign:RippleAssist.IsDisabled="True"
-                        Width="40" Height="40"
-                        Click="BtnPrevious_Click"
-                        ToolTip="Previous">
-                    <materialDesign:PackIcon Kind="SkipPrevious" Width="28" Height="28"
-                                             Foreground="{StaticResource TextPrimary-brush}"/>
+                        VerticalAlignment="Center"
+                        Click="BtnQueueUndo_Click"
+                        ToolTip="Restore previous queue"
+                        Visibility="Collapsed">
+                    <Button.RenderTransform>
+                        <TranslateTransform X="-95"/>
+                    </Button.RenderTransform>
+                    <Viewbox Width="12" Height="12">
+                        <Path Fill="{StaticResource TextPrimary-brush}"
+                              Data="M20 13.5C20 17.09 17.09 20 13.5 20H6V18H13.5C16 18 18 16 18 13.5S16 9 13.5 9H7.83L10.91 12.09L9.5 13.5L4 8L9.5 2.5L10.92 3.91L7.83 7H13.5C17.09 7 20 9.91 20 13.5Z"/>
+                    </Viewbox>
                 </Button>
-                <Button Style="{DynamicResource MaterialDesignToolButton}"
-                        materialDesign:RippleAssist.IsDisabled="True"
-                        Width="44" Height="44"
-                        Margin="8,0"
-                        Click="BtnPlayPause_Click"
-                        ToolTip="Play/Pause">
-                    <materialDesign:PackIcon x:Name="iconPlayPause"
-                                             Kind="Play"
-                                             Width="32" Height="32"
-                                             Foreground="{StaticResource TextPrimary-brush}"/>
-                </Button>
-                <Button Style="{DynamicResource MaterialDesignToolButton}"
-                        materialDesign:RippleAssist.IsDisabled="True"
-                        Width="40" Height="40"
-                        Click="BtnNext_Click"
-                        ToolTip="Next">
-                    <materialDesign:PackIcon Kind="SkipNext" Width="28" Height="28"
-                                             Foreground="{StaticResource TextPrimary-brush}"/>
-                </Button>
-            </StackPanel>
+            </Grid>
 
             <views:CompactUpcomingQueueList x:Name="UpcomingQueue" Grid.Row="4"/>
         </Grid>

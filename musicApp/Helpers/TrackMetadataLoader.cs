@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using ATL;
 using musicApp;
 using NAudio.Wave;
@@ -11,7 +12,7 @@ namespace musicApp.Helpers;
 
 public static class TrackMetadataLoader
 {
-    public static Song? LoadSong(string filePath)
+    public static Song? LoadSong(string filePath, Song? preserveLibraryFieldsFrom = null)
     {
         try
         {
@@ -26,7 +27,10 @@ public static class TrackMetadataLoader
                 TrackNumber = 0,
                 Year = 0,
                 Genre = "",
-                DateAdded = DateTime.Now
+                DateAdded = preserveLibraryFieldsFrom?.DateAdded ?? DateTime.Now,
+                PlayCount = preserveLibraryFieldsFrom?.PlayCount ?? 0,
+                LastPlayed = preserveLibraryFieldsFrom?.LastPlayed ?? DateTime.MinValue,
+                IsFavorite = preserveLibraryFieldsFrom?.IsFavorite ?? false
             };
 
             PopulateFileType(track, filePath);
@@ -381,5 +385,49 @@ public static class TrackMetadataLoader
         }
 
         return false;
+    }
+}
+
+public static class LyricsMetadataHelper
+{
+    public static string ExtractDisplayText(Track atlTrack)
+    {
+        if (atlTrack?.Lyrics == null || atlTrack.Lyrics.Count == 0)
+            return "";
+        return ExtractDisplayText(atlTrack.Lyrics);
+    }
+
+    public static string ExtractDisplayText(IList<LyricsInfo>? lyrics)
+    {
+        if (lyrics == null || lyrics.Count == 0)
+            return "";
+
+        var sb = new StringBuilder();
+        foreach (var li in lyrics)
+        {
+            if (li == null || !li.Exists())
+                continue;
+
+            string part;
+            if (!string.IsNullOrWhiteSpace(li.UnsynchronizedLyrics))
+            {
+                part = li.UnsynchronizedLyrics.TrimEnd();
+            }
+            else if (li.SynchronizedLyrics != null && li.SynchronizedLyrics.Count > 0)
+            {
+                part = li.FormatSynch();
+            }
+            else
+                continue;
+
+            if (string.IsNullOrWhiteSpace(part))
+                continue;
+
+            if (sb.Length > 0)
+                sb.Append("\n\n");
+            sb.Append(part);
+        }
+
+        return sb.ToString();
     }
 }

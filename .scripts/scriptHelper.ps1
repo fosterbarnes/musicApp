@@ -289,9 +289,7 @@ function Get-FeatureTreeNodeLines {
 
     $out = [System.Collections.Generic.List[string]]::new()
 
-    if ($Node.Level -gt 0) {
-        [void]$out.Add($SourceFeatureLines[$Node.HeaderIndex])
-    }
+    if ($Node.Level -gt 0) { [void]$out.Add($SourceFeatureLines[$Node.HeaderIndex]) }
 
     $upd = [string[]]$Node.UpdatedDirectContentLines
     if ($upd.Length -gt 0) { [void]$out.AddRange($upd) }

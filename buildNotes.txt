@@ -1,14 +1,10 @@
-v0.3.0 release (boobiliesCrepe)
+v0.3.1 release (capitalUzi)
 
-- Update to .NET 10
-- Add miniplayer pop-out window
-- Align queue flyout design and UI with miniplayer
-- Add a Buy Me a Coffee link in Settings -> About
-- Add a 'Show donation links' checkbox in Settings -> Theme/UI (turn it off if you don’t want to see it)
-- Settings -> General Import/Export actually works now (backs up and restores your settings as a .json file)
-
-Fixes:
-- Fix some queue flyout menu issues
-- Fix 'Show in Songs' / 'Jump to song' not selecting the right track in Recently Played and Playlists
-- Fix Artists/Genres picking the wrong song when titles match
-- Fix playback restart glitches after editing a playing song’s tags
+- Fix 'Add to Queue' not working if there's no running queue
+- Re-scanning library no longer resets 'recently added' dates play count, or favorite status
+- Miniplayer artist & album are clickable
+- Fix issue where selecting "Go to album" wouldn't always place the item on screen
+- Add undo button to miniplayer for when the queue gets reset. Restores previous queue state
+- Play errors or missing files no longer wipe the whole queue
+- Mouse wheel & trackpad scrolling speed dialed down
+- Fix 'excessive loading' on app startup for lack of a better term

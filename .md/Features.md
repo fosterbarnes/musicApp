@@ -124,10 +124,6 @@
 - Scrollable grid view with each shortcut as an item in the list
 
 ### Theme/UI
-- Color, with options to create, import or export profiles (dropdown)
-- Spacing, with options to create, import or export profiles (dropdown)
-- Size, with options to create, import or export profiles (dropdown)
-- List size, with options to create, import or export profiles (dropdown)
 - Toggle donation links (tick-box)
 
 ### About

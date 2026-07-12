@@ -202,7 +202,7 @@ namespace musicApp.Views
             {
                 view.UpdateSortBarVisibility();
                 if (view.IsLoaded && !view._suppressBrowseModeRebuild)
-                    _ = view.RebuildAlbumItemsAsync(preserveViewState: true);
+                    view.ScheduleGridRebuild();
             }
         }
 
@@ -291,6 +291,7 @@ namespace musicApp.Views
         public AlbumsView()
         {
             InitializeComponent();
+            ScrollWheelDampingHelper.Attach(AlbumScrollViewer);
             emptyLibraryOverlay.AddMusicFolderRequested += (_, __) => AddMusicFolderRequested?.Invoke(this, EventArgs.Empty);
             AlbumGrid.ItemsSource = _albumItems;
 

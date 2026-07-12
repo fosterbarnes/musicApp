@@ -25,6 +25,7 @@ public partial class CompactUpcomingQueueList : UserControl
     public CompactUpcomingQueueList()
     {
         InitializeComponent();
+        ScrollWheelDampingHelper.Attach(QueueScrollViewer);
         Unloaded += (_, _) =>
         {
             _queueArtCts?.Cancel();

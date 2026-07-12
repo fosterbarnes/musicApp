@@ -36,7 +36,7 @@ Launch menu on startup:
 
 Run Options:
   q, quit, exit                         Stop the app and exit the script
-  r, restart                            Restart the app
+  r, restart, ￪                         Restart the app
 "@
 }
 
@@ -87,9 +87,10 @@ while ($keepRunning) {
         -NoNewWindow `
         -PassThru
 
-    Write-Host "musicApp is running. Type 'q' to stop, 'r' to restart."
+    Write-Host "musicApp is running. Type 'q' to stop, 'r' or '￪' to restart."
 
     $restartRequested = $false
+    $lineBuffer = ''
 
     while (-not $proc.HasExited) {
         Start-Sleep -Milliseconds 50
@@ -98,18 +99,42 @@ while ($keepRunning) {
         } catch {
             continue
         }
-        $userInput = Read-Host
-        if ($userInput -in @('q', 'quit', 'exit')) {
-            Write-Host 'Stopping musicApp and exiting script...'
-            Stop-Process -Name 'musicApp' -Force -ErrorAction SilentlyContinue
-            $keepRunning = $false
-            break
-        }
-        if ($userInput -in @('r', 'restart')) {
+
+        $key = [Console]::ReadKey($true)
+        if ($key.Key -eq [ConsoleKey]::UpArrow) {
             Write-Host 'Restarting musicApp...'
             Stop-Process -Name 'musicApp' -Force -ErrorAction SilentlyContinue
             $restartRequested = $true
             break
+        }
+        if ($key.Key -eq [ConsoleKey]::Enter) {
+            Write-Host ''
+            $userInput = $lineBuffer.Trim()
+            $lineBuffer = ''
+            if ($userInput -in @('q', 'quit', 'exit')) {
+                Write-Host 'Stopping musicApp and exiting script...'
+                Stop-Process -Name 'musicApp' -Force -ErrorAction SilentlyContinue
+                $keepRunning = $false
+                break
+            }
+            if ($userInput -in @('r', 'restart')) {
+                Write-Host 'Restarting musicApp...'
+                Stop-Process -Name 'musicApp' -Force -ErrorAction SilentlyContinue
+                $restartRequested = $true
+                break
+            }
+            continue
+        }
+        if ($key.Key -eq [ConsoleKey]::Backspace) {
+            if ($lineBuffer.Length -gt 0) {
+                $lineBuffer = $lineBuffer.Substring(0, $lineBuffer.Length - 1)
+                Write-Host "`b `b" -NoNewline
+            }
+            continue
+        }
+        if ($key.KeyChar -and -not [char]::IsControl($key.KeyChar)) {
+            $lineBuffer += $key.KeyChar
+            Write-Host -NoNewline $key.KeyChar
         }
     }
 

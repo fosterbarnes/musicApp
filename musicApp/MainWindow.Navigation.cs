@@ -111,6 +111,7 @@ namespace musicApp
             w.PlayPauseRequested += TitleBarPlayer_PlayPauseRequested;
             w.PreviousTrackRequested += TitleBarPlayer_PreviousTrackRequested;
             w.NextTrackRequested += TitleBarPlayer_NextTrackRequested;
+            w.QueueUndoRequested += (_, _) => TryRestorePreviousQueue();
             w.PlaybackPositionCommitted += OnTitleBarPlaybackPositionCommitted;
             w.SongPlayRequested += MiniPlayer_SongPlayRequested;
             w.QueueRemoveRequested += OnQueueToolbarRemoveRequested;
@@ -127,6 +128,8 @@ namespace musicApp
             w.ShowInExplorerRequested += OnShowInExplorerRequested;
             w.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
             w.DeleteRequested += OnDeleteRequested;
+            w.ArtistNavigationRequested += TitleBarPlayer_ArtistNavigationRequested;
+            w.AlbumNavigationRequested += TitleBarPlayer_AlbumNavigationRequested;
             w.Closed += (_, _) =>
             {
                 if (ReferenceEquals(_miniPlayerWindow, w))

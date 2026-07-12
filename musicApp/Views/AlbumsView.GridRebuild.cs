@@ -52,8 +52,27 @@ namespace musicApp.Views
                 }
 
                 UpdateEmptyLibraryOverlay();
-                _ = RebuildAlbumItemsAsync(preserveViewState: true);
+                ScheduleGridRebuild();
             }
+        }
+
+        // Startup and scans fire several rebuild requests back to back; each one used to
+        // cancel and restart the full grouping. Collapse bursts into a single rebuild.
+        private DispatcherTimer? _rebuildCoalesceTimer;
+
+        private void ScheduleGridRebuild()
+        {
+            if (_rebuildCoalesceTimer == null)
+            {
+                _rebuildCoalesceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+                _rebuildCoalesceTimer.Tick += (_, __) =>
+                {
+                    _rebuildCoalesceTimer!.Stop();
+                    _ = RebuildAlbumItemsAsync(preserveViewState: true);
+                };
+            }
+            _rebuildCoalesceTimer.Stop();
+            _rebuildCoalesceTimer.Start();
         }
 
         public event EventHandler? AddMusicFolderRequested;
@@ -87,7 +106,7 @@ namespace musicApp.Views
                 && ReferenceEquals(_itemsSource, source);
         }
 
-        public void RefreshAlbumGridFromLibrary() => _ = RebuildAlbumItemsAsync(preserveViewState: true);
+        public void RefreshAlbumGridFromLibrary() => ScheduleGridRebuild();
 
         public void SetBrowseModeAndSource(AlbumsBrowseMode mode, IEnumerable? source)
         {
@@ -214,6 +233,10 @@ namespace musicApp.Views
                     ShowAlbumDetail(album, bringFlyoutIntoView: bringTargetIntoView);
                 else
                     RefreshOpenFlyoutLayout();
+
+                // Flyout BringIntoView already handles scroll; tile BringIntoView races and
+                // leaves the tall flyout below the viewport.
+                return;
             }
 
             if (!bringTargetIntoView)
@@ -643,7 +666,6 @@ namespace musicApp.Views
                 _isRebuilding = false;
                 return;
             }
-
             if (ct.IsCancellationRequested)
             {
                 _isRebuilding = false;

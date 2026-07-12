@@ -17,6 +17,20 @@ public partial class MainWindow
     private readonly HashSet<Song> userQueuedSongs = new();
     private List<string>? contextualShuffleWrapPathOrder;
 
+    private sealed class QueueUndoSnapshot
+    {
+        public List<Song> SessionOrder { get; set; } = new();
+        public List<Song> ShuffledFuture { get; set; } = new();
+        public List<Song> History { get; set; } = new();
+        public List<Song> UserQueued { get; set; } = new();
+        public List<Song> Upcoming { get; set; } = new();
+        public List<string>? WrapPaths { get; set; }
+        public Song? Current { get; set; }
+    }
+
+    private QueueUndoSnapshot? _queueUndoSnapshot;
+    private string? _queueUndoStatusMessage;
+
     private static void FisherYatesRange(IList<Song> list, int loInclusive, int hiInclusive, Random? rnd = null)
     {
         if (list == null || loInclusive >= hiInclusive)
@@ -343,7 +357,7 @@ public partial class MainWindow
 
         SetActivePlaybackFuture(selected);
         if (contextualPlaybackFuture == null || contextualPlaybackFuture.Count == 0)
-            ClearContextualPlaybackQueue();
+            ClearContextualPlaybackQueue(offerUndo: false);
     }
 
     private void TryInitializeContextFromPlayTrack(object? requestSource, Song selectedTrack)
@@ -423,7 +437,7 @@ public partial class MainWindow
         if (!isMatch())
             return;
 
-        ClearContextualPlaybackQueue();
+        ClearContextualPlaybackQueue(offerUndo: true);
         var ordered = buildOrder();
         if (ordered.Count == 0)
             return;
@@ -438,13 +452,31 @@ public partial class MainWindow
     /// <summary>
     /// Returns the mutable contextual session list for queue edits, promoting the library
     /// playhead into a session when needed (preserves shuffle order when ON).
+    /// When idle, <paramref name="seedTrack"/> starts an empty user-queue session.
     /// </summary>
-    private List<Song>? GetOrPromoteContextualSessionForQueueEdit()
+    private List<Song>? GetOrPromoteContextualSessionForQueueEdit(Song? seedTrack = null)
     {
-        if (HasContextualPlaybackQueue() && contextualSessionOrderedFull != null)
+        if (contextualSessionOrderedFull != null &&
+            (HasContextualPlaybackQueue() || currentTrack == null))
             return contextualSessionOrderedFull;
 
-        if (currentTrack == null || filteredTracks == null || filteredTracks.Count == 0)
+        if (currentTrack == null)
+        {
+            if (seedTrack == null || string.IsNullOrWhiteSpace(seedTrack.FilePath))
+                return null;
+
+            ResetUserQueuedFlagsForCurrentSession();
+            contextualSessionOrderedFull = new List<Song>();
+            contextualPlaybackHistoryMru.Clear();
+            contextualShuffledFuture.Clear();
+            userQueuedSongs.Clear();
+            contextualShuffleWrapPathOrder = null;
+            contextualPlaybackFuture ??= new ObservableCollection<Song>();
+            contextualPlaybackFuture.Clear();
+            return contextualSessionOrderedFull;
+        }
+
+        if (filteredTracks == null || filteredTracks.Count == 0)
             return null;
 
         var natural = new List<Song>();
@@ -512,8 +544,16 @@ public partial class MainWindow
         }
     }
 
-    private void ClearContextualPlaybackQueue()
+    private void ClearContextualPlaybackQueue(bool offerUndo = true)
     {
+        bool hadContent =
+            (contextualSessionOrderedFull != null && contextualSessionOrderedFull.Count > 0) ||
+            (contextualPlaybackFuture != null && contextualPlaybackFuture.Count > 0) ||
+            userQueuedSongs.Count > 0;
+
+        if (offerUndo && hadContent)
+            CaptureQueueUndoSnapshot();
+
         ResetUserQueuedFlagsForCurrentSession();
         userQueuedSongs.Clear();
 
@@ -522,6 +562,147 @@ public partial class MainWindow
         contextualPlaybackHistoryMru.Clear();
         contextualSessionOrderedFull = null;
         contextualShuffleWrapPathOrder = null;
+
+        if (offerUndo && hadContent && _queueUndoSnapshot != null)
+            OfferQueueUndoPrompt();
+    }
+
+    private void CaptureQueueUndoSnapshot()
+    {
+        var snap = new QueueUndoSnapshot
+        {
+            Current = currentTrack,
+            WrapPaths = contextualShuffleWrapPathOrder != null
+                ? new List<string>(contextualShuffleWrapPathOrder)
+                : null
+        };
+
+        if (contextualSessionOrderedFull != null)
+            snap.SessionOrder.AddRange(contextualSessionOrderedFull.Where(t => t != null));
+        snap.ShuffledFuture.AddRange(contextualShuffledFuture.Where(t => t != null));
+        snap.History.AddRange(contextualPlaybackHistoryMru.Where(t => t != null));
+        snap.UserQueued.AddRange(userQueuedSongs.Where(t => t != null));
+
+        if (contextualPlaybackFuture != null)
+        {
+            for (int i = 1; i < contextualPlaybackFuture.Count; i++)
+            {
+                var t = contextualPlaybackFuture[i];
+                if (t != null)
+                    snap.Upcoming.Add(t);
+            }
+        }
+
+        _queueUndoSnapshot = snap;
+    }
+
+    private void OfferQueueUndoPrompt()
+    {
+        _queueUndoStatusMessage = "Previous queue available - Ctrl+Z or miniplayer";
+        if (statusBarText != null)
+            statusBarText.Text = _queueUndoStatusMessage;
+        UpdateMiniPlayerQueueUndoAvailability();
+    }
+
+    private void ClearQueueUndoOffer()
+    {
+        _queueUndoSnapshot = null;
+        _queueUndoStatusMessage = null;
+        UpdateMiniPlayerQueueUndoAvailability();
+    }
+
+    private bool CanUndoPreviousQueue() =>
+        _queueUndoSnapshot != null &&
+        (_queueUndoSnapshot.Upcoming.Count > 0 ||
+         _queueUndoSnapshot.SessionOrder.Count > 0 ||
+         _queueUndoSnapshot.ShuffledFuture.Count > 0);
+
+    private void UpdateMiniPlayerQueueUndoAvailability() =>
+        _miniPlayerWindow?.SetQueueUndoAvailable(CanUndoPreviousQueue());
+
+    /// <summary>
+    /// Restores the last replaced/cleared queue. Keeps the current track playing and only
+    /// puts the previous upcoming list after it. Idle (no current) does a full session restore.
+    /// </summary>
+    private bool TryRestorePreviousQueue()
+    {
+        var snap = _queueUndoSnapshot;
+        if (!CanUndoPreviousQueue() || snap == null)
+            return false;
+
+        _queueUndoSnapshot = null;
+        _queueUndoStatusMessage = null;
+
+        var upcoming = new List<Song>(snap.Upcoming);
+        var anchor = currentTrack;
+
+        if (anchor == null)
+        {
+            ResetUserQueuedFlagsForCurrentSession();
+            userQueuedSongs.Clear();
+
+            contextualSessionOrderedFull = snap.SessionOrder.Count > 0
+                ? new List<Song>(snap.SessionOrder)
+                : new List<Song>(snap.ShuffledFuture);
+            contextualShuffledFuture.Clear();
+            foreach (var t in snap.ShuffledFuture)
+                contextualShuffledFuture.Add(t);
+            contextualPlaybackHistoryMru.Clear();
+            foreach (var t in snap.History)
+                contextualPlaybackHistoryMru.Add(t);
+            contextualShuffleWrapPathOrder = snap.WrapPaths != null
+                ? new List<string>(snap.WrapPaths)
+                : null;
+
+            foreach (var t in snap.UserQueued)
+                MarkUserQueued(t);
+
+            SetActivePlaybackFuture(snap.Current ?? contextualSessionOrderedFull.FirstOrDefault());
+        }
+        else
+        {
+            for (int i = upcoming.Count - 1; i >= 0; i--)
+            {
+                if (SongIdentity.SamePath(upcoming[i], anchor))
+                    upcoming.RemoveAt(i);
+            }
+
+            ResetUserQueuedFlagsForCurrentSession();
+            userQueuedSongs.Clear();
+
+            contextualSessionOrderedFull = new List<Song> { anchor };
+            foreach (var t in upcoming)
+                contextualSessionOrderedFull.Add(t);
+
+            contextualPlaybackHistoryMru.Clear();
+            contextualShuffledFuture.Clear();
+            contextualShuffleWrapPathOrder = null;
+
+            if (titleBarPlayer.IsShuffleEnabled)
+            {
+                contextualShuffledFuture.Add(anchor);
+                foreach (var t in upcoming)
+                    contextualShuffledFuture.Add(t);
+                CaptureContextualShuffleWrapPathOrder();
+            }
+
+            foreach (var t in snap.UserQueued)
+            {
+                if (t == null || SongIdentity.SamePath(t, anchor))
+                    continue;
+                if (SongIdentity.IndexOf(upcoming, t) < 0)
+                    continue;
+                MarkUserQueued(t);
+            }
+
+            SetActivePlaybackFuture(anchor);
+        }
+
+        UpdateQueueView();
+        RefreshVisibleViews();
+        UpdateMiniPlayerQueueUndoAvailability();
+        UpdateStatusBar();
+        return true;
     }
 
     /// <summary>

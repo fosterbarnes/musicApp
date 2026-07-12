@@ -169,9 +169,10 @@ namespace musicApp
                 currentTrack = null;
                 currentTrackIndex = -1;
                 currentShuffledIndex = -1;
-                ClearContextualPlaybackQueue();
+                ClearContextualPlaybackQueue(offerUndo: false);
+                ClearQueueUndoOffer();
 
-                StopPlayback();
+                StopPlayback(clearQueue: false);
 
                 titleBarPlayer.SetTrackInfo("No track selected", "", "");
                 ClearMiniPlayerTrack();

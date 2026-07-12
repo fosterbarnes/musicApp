@@ -60,17 +60,26 @@ namespace musicApp
                 await Task.Run(() => AlbumArtCacheManager.InvalidateAll());
 
                 var totalNewTracks = 0;
-                foreach (var folderPath in musicFolders)
+                _libraryPipelinePhase = statusProgress.Begin(100, ("scanning files", 0.7), ("album artwork", 0.3));
+                try
                 {
-                    if (Directory.Exists(folderPath))
+                    foreach (var folderPath in musicFolders)
                     {
-                        await LoadMusicFromFolderAsync(folderPath, false);
-                        totalNewTracks += allTracks.Count(t => LibraryPathHelper.IsFileUnderMusicFolder(t.FilePath, folderPath));
+                        if (Directory.Exists(folderPath))
+                        {
+                            await LoadMusicFromFolderAsync(folderPath, false);
+                            totalNewTracks += allTracks.Count(t => LibraryPathHelper.IsFileUnderMusicFolder(t.FilePath, folderPath));
+                        }
                     }
-                }
 
-                UpdateUI();
-                await MaybeRunPostScanSystemArtworkCacheAsync();
+                    UpdateUI();
+                    await MaybeRunPostScanSystemArtworkCacheAsync();
+                }
+                finally
+                {
+                    _libraryPipelinePhase?.Dispose();
+                    _libraryPipelinePhase = null;
+                }
                 MessageDialog.Show(this, "Library Updated", $"Library re-scanned. Found {totalNewTracks} total tracks across all folders.", MessageDialog.Buttons.Ok);
             }
             catch (Exception ex)
@@ -81,23 +90,17 @@ namespace musicApp
 
         private async Task MaybeRunPostScanSystemArtworkCacheAsync()
         {
-            var listCount = allTracks.Count;
+            // Report into the active library pipeline phase (its last stage); only start a
+            // standalone phase when no outer flow owns one.
+            var phase = _libraryPipelinePhase;
+            var ownsPhase = phase == null && allTracks.Count > 0;
+            if (ownsPhase)
+                phase = statusProgress.Begin(90, ("album artwork", 1.0));
+            var artStage = phase != null ? phase.StageCount - 1 : 0;
+
             IProgress<(int done, int total)>? progress = null;
-            if (listCount > 0)
-            {
-                progress = new Progress<(int done, int total)>(p =>
-                {
-                    Dispatcher.BeginInvoke(
-                        () => UpdateStatusBarPostScanAlbumWork(p.done, p.total),
-                        DispatcherPriority.Normal);
-                });
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    progressBarFill.Visibility = Visibility.Visible;
-                    progressBarFill.Width = 0;
-                    UpdateStatusBarPostScanAlbumWork(0, listCount);
-                });
-            }
+            if (phase != null)
+                progress = new Progress<(int done, int total)>(p => phase.Report(artStage, p.done, p.total));
 
             try
             {
@@ -105,15 +108,8 @@ namespace musicApp
             }
             finally
             {
-                if (listCount > 0)
-                {
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        progressBarFill.Visibility = Visibility.Collapsed;
-                        progressBarFill.Width = 0;
-                        UpdateStatusBar();
-                    });
-                }
+                if (ownsPhase)
+                    phase?.Dispose();
 
                 await Dispatcher.InvokeAsync(() => StartThumbnailCacheBackfillIfNeeded());
             }

@@ -21,6 +21,7 @@ public partial class SearchPopupView : UserControl
     public SearchPopupView()
     {
         InitializeComponent();
+        ScrollWheelDampingHelper.Attach(SearchScrollViewer);
         PopupBorder.MinHeight = UILayoutConstants.CompactPopupMinHeight;
         PopupBorder.Height = UILayoutConstants.CompactPopupDefaultHeight;
         PopupBorder.MaxHeight = UILayoutConstants.CompactPopupMaxHeight;
