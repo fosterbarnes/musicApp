@@ -36,6 +36,9 @@ public static class UILayoutConstants
     public const double CompactPopupHorizontalContentPadding = 24;
     public const double CompactPopupWindowVerticalOverhead = 140;
 
+    /// <summary>Max songs in compact queue UIs (miniplayer + title-bar queue popup). Caps UI cost for huge library sessions.</summary>
+    public const int CompactQueueListMaxItems = 64;
+
     /// <summary>Alias retained for older call sites; same as <see cref="CompactPopupHorizontalContentPadding"/>.</summary>
     public const double SearchPopupHorizontalContentPadding = CompactPopupHorizontalContentPadding;
 

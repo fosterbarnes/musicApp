@@ -5,16 +5,13 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using musicApp.Constants;
+using musicApp.Helpers;
 
 namespace musicApp
 {
     public class SettingsManager
     {
-        private static readonly string AppDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
-            "musicApp");
-        
-        private static readonly string SettingsFilePath = Path.Combine(AppDataPath, "settings.json");
+        private static readonly string SettingsFilePath = AppPaths.SettingsPath;
 
         public class AppSettings
         {
@@ -72,15 +69,7 @@ namespace musicApp
 
         private SettingsManager()
         {
-            EnsureAppDataDirectoryExists();
-        }
-
-        private void EnsureAppDataDirectoryExists()
-        {
-            if (!Directory.Exists(AppDataPath))
-            {
-                Directory.CreateDirectory(AppDataPath);
-            }
+            AppPaths.EnsureAppDataDirectory();
         }
 
         /// <summary>
@@ -177,6 +166,18 @@ namespace musicApp
             catch
             {
             }
+        }
+
+        public void SaveSettingsSync(AppSettings settings)
+        {
+            AppPaths.EnsureAppDataDirectory();
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+            var json = JsonSerializer.Serialize(settings, options);
+            File.WriteAllText(SettingsFilePath, json);
         }
 
         #endregion

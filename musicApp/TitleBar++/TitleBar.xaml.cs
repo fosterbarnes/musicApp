@@ -9,6 +9,7 @@ using System.Windows.Threading;
 using MaterialDesignThemes.Wpf;
 using NAudio.Wave;
 using musicApp;
+using musicApp.Helpers;
 
 namespace musicApp.TitleBarPlus
 {
@@ -638,6 +639,8 @@ namespace musicApp.TitleBarPlus
         }
 
         // === Private Helper Methods ===
+        public Task ReloadPlayerSettingsFromDiskAsync() => LoadPlayerSettingsAsync();
+
         private async Task LoadPlayerSettingsAsync()
         {
             try
@@ -914,24 +917,15 @@ namespace musicApp.TitleBarPlus
             try
             {
                 if (txtCurrentTime != null)
-                    txtCurrentTime.Text = FormatTimeSpan(currentTime);
+                    txtCurrentTime.Text = PlaybackDisplayText.FormatTimeSpan(currentTime);
                 if (txtTotalDuration != null)
-                    txtTotalDuration.Text = FormatTimeSpan(totalTime);
+                    txtTotalDuration.Text = PlaybackDisplayText.FormatTimeSpan(totalTime);
 
                 totalDuration = totalTime;
 
                 if (progressFill != null)
                 {
-                    if (totalTime.TotalSeconds > 0)
-                    {
-                        double progress = currentTime.TotalSeconds / totalTime.TotalSeconds;
-                        double progressWidth = currentSeekBarWidth * progress;
-                        progressFill.Width = Math.Max(0, Math.Min(currentSeekBarWidth, progressWidth));
-                    }
-                    else
-                    {
-                        progressFill.Width = 0;
-                    }
+                    progressFill.Width = SeekBarInteractionHelper.ProgressFillWidth(currentTime, totalTime, currentSeekBarWidth);
                 }
             }
             catch (Exception ex)
@@ -941,11 +935,6 @@ namespace musicApp.TitleBarPlus
         }
 
 
-
-        private string FormatTimeSpan(TimeSpan timeSpan)
-        {
-            return $"{(int)timeSpan.TotalMinutes}:{timeSpan.Seconds:D2}";
-        }
 
         private void InitializeSeekBarTimer()
         {
@@ -1080,13 +1069,12 @@ namespace musicApp.TitleBarPlus
             if (audioFileReader == null || totalDuration.TotalSeconds <= 0) return;
 
             System.Windows.Point clickPoint = e.GetPosition(seekBarBackground);
-            double clickPosition = ClampMousePosition(clickPoint.X, currentSeekBarWidth);
+            double clickPosition = SeekBarInteractionHelper.Clamp(clickPoint.X, 0, currentSeekBarWidth);
 
             lastValidMousePosition = clickPoint;
             lastMouseDownTime = DateTime.Now;
 
-            double progress = Math.Max(0, Math.Min(1, clickPosition / currentSeekBarWidth));
-            dragTargetPosition = TimeSpan.FromSeconds(progress * totalDuration.TotalSeconds);
+            dragTargetPosition = SeekBarInteractionHelper.TimeFromSeekX(clickPosition, currentSeekBarWidth, totalDuration);
 
             if (audioFileReader != null && totalDuration.TotalSeconds > 0)
             {
@@ -1118,21 +1106,19 @@ namespace musicApp.TitleBarPlus
         {
             if (!isDragging || audioFileReader == null || totalDuration.TotalSeconds <= 0) return;
 
-            TimeSpan timeSinceMouseDown = DateTime.Now - lastMouseDownTime;
-            if (timeSinceMouseDown.TotalMilliseconds < MOUSE_MOVE_DELAY_MS)
+            if (!SeekBarInteractionHelper.HasPassedMoveDelay(lastMouseDownTime, MOUSE_MOVE_DELAY_MS))
                 return;
 
             System.Windows.Point currentPoint = e.GetPosition(seekBarBackground);
             double currentPosition = currentPoint.X;
 
-            if (currentPosition < -MOUSE_POSITION_TOLERANCE || currentPosition > currentSeekBarWidth + MOUSE_POSITION_TOLERANCE)
+            if (!SeekBarInteractionHelper.IsWithinDragTolerance(currentPosition, currentSeekBarWidth, MOUSE_POSITION_TOLERANCE))
                 return;
 
-            currentPosition = ClampMousePosition(currentPosition, currentSeekBarWidth);
+            currentPosition = SeekBarInteractionHelper.Clamp(currentPosition, 0, currentSeekBarWidth);
             lastValidMousePosition = currentPoint;
 
-            double progress = Math.Max(0, Math.Min(1, currentPosition / currentSeekBarWidth));
-            dragTargetPosition = TimeSpan.FromSeconds(progress * totalDuration.TotalSeconds);
+            dragTargetPosition = SeekBarInteractionHelper.TimeFromSeekX(currentPosition, currentSeekBarWidth, totalDuration);
 
             if (audioFileReader != null && totalDuration.TotalSeconds > 0)
             {
@@ -1178,11 +1164,6 @@ namespace musicApp.TitleBarPlus
                     d.Volume = linear0To1;
                     break;
             }
-        }
-
-        private double ClampMousePosition(double position, double maxWidth)
-        {
-            return Math.Max(0, Math.Min(maxWidth, position));
         }
 
         private void EndDragOperation()

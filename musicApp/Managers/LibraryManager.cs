@@ -10,9 +10,7 @@ namespace musicApp
 {
     public class LibraryManager
     {
-        private static readonly string AppDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
-            "musicApp");
+        private static readonly string AppDataPath = AppPaths.AppDataDirectory;
 
         public static string SettingsDirectoryPath => AppDataPath;
         
@@ -68,15 +66,7 @@ namespace musicApp
 
         private LibraryManager()
         {
-            EnsureAppDataDirectoryExists();
-        }
-
-        private void EnsureAppDataDirectoryExists()
-        {
-            if (!Directory.Exists(AppDataPath))
-            {
-                Directory.CreateDirectory(AppDataPath);
-            }
+            AppPaths.EnsureAppDataDirectory();
         }
 
         #region Library Cache Management

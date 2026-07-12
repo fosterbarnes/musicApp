@@ -40,50 +40,28 @@ internal static class InstallVersionReader
 
     public static string? TryReadVersion(string installRoot)
     {
+        var text = ReadVersionLine(installRoot, 0);
+        if (string.IsNullOrEmpty(text))
+            return null;
+        return text.TrimStart('v', 'V');
+    }
+
+    public static string? TryReadVersionTag(string installRoot) => ReadVersionLine(installRoot, 1);
+
+    public static string? TryReadVersionBuild(string installRoot) => ReadVersionLine(installRoot, 2);
+
+    private static string? ReadVersionLine(string installRoot, int index)
+    {
         try
         {
             var path = Path.Combine(installRoot, "Version");
             if (!File.Exists(path))
                 return null;
-            var text = File.ReadAllText(path).Trim();
-            if (!string.IsNullOrEmpty(text))
-                return text.TrimStart('v', 'V');
-        }
-        catch
-        {
-            // ignore
-        }
-
-        return null;
-    }
-
-    public static string? TryReadVersionTag(string installRoot)
-    {
-        try
-        {
-            var path = Path.Combine(installRoot, "VersionTag");
-            if (!File.Exists(path))
+            var lines = File.ReadAllLines(path);
+            if (index < 0 || index >= lines.Length)
                 return null;
-            var text = File.ReadAllText(path).Trim();
-            if (!string.IsNullOrEmpty(text))
-                return text;
-        }
-        catch
-        {
-            // ignore
-        }
-
-        return null;
-    }
-
-    public static string? TryReadVersionBuild(string installRoot)
-    {
-        try
-        {
-            var path = Path.Combine(installRoot, "VersionBuild");
-            if (!File.Exists(path))
-                return null;
-            return File.ReadAllText(path).Trim();
+            var text = lines[index].Trim();
+            return string.IsNullOrEmpty(text) ? null : text;
         }
         catch
         {

@@ -1,0 +1,192 @@
+<Window x:Class="musicApp.Views.MiniPlayerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:views="clr-namespace:musicApp.Views"
+        mc:Ignorable="d"
+        Title="Miniplayer"
+        Width="300"
+        Height="900"
+        MinWidth="240"
+        MinHeight="380"
+        WindowStyle="None"
+        AllowsTransparency="False"
+        ResizeMode="CanResize"
+        Background="{StaticResource AppBackground-brush}"
+        ShowInTaskbar="True"
+        WindowStartupLocation="CenterOwner">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome GlassFrameThickness="0"
+                      CornerRadius="0"
+                      CaptionHeight="0"
+                      ResizeBorderThickness="6"/>
+    </WindowChrome.WindowChrome>
+
+    <Border BorderBrush="{StaticResource BorderDefault-brush}"
+            BorderThickness="1"
+            Background="{StaticResource AppBackground-brush}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid x:Name="ArtHost"
+                  Grid.Row="0"
+                  Background="{StaticResource SurfaceDeep-brush}"
+                  MouseLeftButtonDown="ArtHost_MouseLeftButtonDown"
+                  SizeChanged="ArtHost_SizeChanged">
+                <Image x:Name="imgAlbumArt"
+                       Stretch="UniformToFill"
+                       SnapsToDevicePixels="True"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                <Button x:Name="btnClose"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="0,8,8,0"
+                        Width="28"
+                        Height="28"
+                        Cursor="Hand"
+                        ToolTip="Close miniplayer"
+                        Click="BtnClose_Click"
+                        WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=ArtHost}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd"
+                                    Background="#66000000"
+                                    CornerRadius="14"
+                                    Width="28"
+                                    Height="28">
+                                <materialDesign:PackIcon Kind="Close"
+                                                         Width="16"
+                                                         Height="16"
+                                                         Foreground="White"
+                                                         HorizontalAlignment="Center"
+                                                         VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#99000000"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Grid>
+
+            <StackPanel Grid.Row="1" Margin="12,10,12,4">
+                <TextBlock x:Name="txtCurrentTrack"
+                           Text="No track selected"
+                           Foreground="{StaticResource TextPrimary-brush}"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="txtArtistAlbum"
+                           Foreground="{StaticResource TextTertiary-brush}"
+                           FontSize="12"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="0,2,0,0"/>
+            </StackPanel>
+
+            <Grid Grid.Row="2" Margin="12,4,12,0" Height="20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="txtCurrentTime"
+                           Text="0:00"
+                           Foreground="{StaticResource TextTertiary-brush}"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+                <Border Grid.Column="1"
+                        x:Name="seekBarTrack"
+                        Height="4"
+                        Background="{StaticResource BorderDefault-brush}"
+                        CornerRadius="2"
+                        VerticalAlignment="Center"
+                        MouseLeftButtonDown="SeekBar_MouseLeftButtonDown"
+                        MouseMove="SeekBar_MouseMove"
+                        MouseLeftButtonUp="SeekBar_MouseLeftButtonUp"
+                        MouseLeave="SeekBar_MouseLeave"
+                        Cursor="Hand"
+                        SizeChanged="SeekBarTrack_SizeChanged">
+                    <Border x:Name="progressFill"
+                            Background="{StaticResource TextPrimary-brush}"
+                            HorizontalAlignment="Left"
+                            Width="0"/>
+                </Border>
+                <Border Grid.Column="1"
+                        Height="20"
+                        Background="Transparent"
+                        VerticalAlignment="Center"
+                        x:Name="seekBarExtendedArea"
+                        MouseLeftButtonDown="SeekBar_MouseLeftButtonDown"
+                        MouseMove="SeekBar_MouseMove"
+                        MouseLeftButtonUp="SeekBar_MouseLeftButtonUp"
+                        MouseLeave="SeekBar_MouseLeave"
+                        Cursor="Hand"
+                        Panel.ZIndex="-1"/>
+                <TextBlock x:Name="txtRemainingTime"
+                           Grid.Column="2"
+                           Text="-0:00"
+                           Foreground="{StaticResource TextTertiary-brush}"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           Margin="8,0,0,0"/>
+            </Grid>
+
+            <StackPanel Grid.Row="3"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Margin="12,6,12,8">
+                <Button Style="{DynamicResource MaterialDesignToolButton}"
+                        materialDesign:RippleAssist.IsDisabled="True"
+                        Width="40" Height="40"
+                        Click="BtnPrevious_Click"
+                        ToolTip="Previous">
+                    <materialDesign:PackIcon Kind="SkipPrevious" Width="28" Height="28"
+                                             Foreground="{StaticResource TextPrimary-brush}"/>
+                </Button>
+                <Button Style="{DynamicResource MaterialDesignToolButton}"
+                        materialDesign:RippleAssist.IsDisabled="True"
+                        Width="44" Height="44"
+                        Margin="8,0"
+                        Click="BtnPlayPause_Click"
+                        ToolTip="Play/Pause">
+                    <materialDesign:PackIcon x:Name="iconPlayPause"
+                                             Kind="Play"
+                                             Width="32" Height="32"
+                                             Foreground="{StaticResource TextPrimary-brush}"/>
+                </Button>
+                <Button Style="{DynamicResource MaterialDesignToolButton}"
+                        materialDesign:RippleAssist.IsDisabled="True"
+                        Width="40" Height="40"
+                        Click="BtnNext_Click"
+                        ToolTip="Next">
+                    <materialDesign:PackIcon Kind="SkipNext" Width="28" Height="28"
+                                             Foreground="{StaticResource TextPrimary-brush}"/>
+                </Button>
+            </StackPanel>
+
+            <views:CompactUpcomingQueueList x:Name="UpcomingQueue" Grid.Row="4"/>
+        </Grid>
+    </Border>
+</Window>

@@ -299,25 +299,13 @@ public partial class SearchPopupView : UserControl
             return;
 
         _contextMenuSong = song;
-
-        var addToPlaylistItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Add to Playlist");
         var mainWindow = Application.Current?.MainWindow as MainWindow;
-        var playlists = mainWindow?.Playlists;
-        if (addToPlaylistItem != null && playlists != null)
-            TrackContextMenuHelper.RebuildAddToPlaylistChildren(addToPlaylistItem, playlists, SearchContextMenu_PlaylistSubmenuClick);
-
-        var showInArtistsItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Show in Artists");
-        var showInSongsItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Show in Songs");
-        var showInAlbumsItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Show in Albums");
-        var showInQueueItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Show in Queue");
-        bool isInQueue = mainWindow?.IsTrackInQueue(_contextMenuSong) == true;
-        TrackContextMenuHelper.ApplyShowInMenuVisibility(
+        TrackContextMenuHelper.ApplyStandardOpened(
+            menu.Items,
             contextMenuViewName: null,
-            showInArtistsItem,
-            showInSongsItem,
-            showInAlbumsItem,
-            showInQueueItem,
-            isInQueue);
+            _contextMenuSong,
+            mainWindow?.Playlists,
+            SearchContextMenu_PlaylistSubmenuClick);
     }
 
     private void SearchContextMenu_PlaylistSubmenuClick(object sender, RoutedEventArgs e)

@@ -4,10 +4,10 @@ title = 'musicApp'
 
 # Bump paths when tagging a new release (tag + release codename in filenames).
 [params.downloads]
-x64 = 'https://github.com/fosterbarnes/musicApp/releases/download/v0.2.7/musicApp-v0.2.7-laughableFistin-x64-installer.exe'
-x86 = 'https://github.com/fosterbarnes/musicApp/releases/download/v0.2.7/musicApp-v0.2.7-laughableFistin-x86-installer.exe'
-arm64 = 'https://github.com/fosterbarnes/musicApp/releases/download/v0.2.7/musicApp-v0.2.7-laughableFistin-arm64-installer.exe'
-portable = 'https://github.com/fosterbarnes/musicApp/releases/download/v0.2.7/musicApp-v0.2.7-laughableFistin-portable.zip'
+x64 = 'https://github.com/fosterbarnes/musicApp/releases/download/v0.3.0/musicApp-v0.3.0-boobiliesCrepe-x64-installer.exe'
+x86 = 'https://github.com/fosterbarnes/musicApp/releases/download/v0.3.0/musicApp-v0.3.0-boobiliesCrepe-x86-installer.exe'
+arm64 = 'https://github.com/fosterbarnes/musicApp/releases/download/v0.3.0/musicApp-v0.3.0-boobiliesCrepe-arm64-installer.exe'
+portable = 'https://github.com/fosterbarnes/musicApp/releases/download/v0.3.0/musicApp-v0.3.0-boobiliesCrepe-portable.zip'
 
 [markup.highlight]
 noclasses = false

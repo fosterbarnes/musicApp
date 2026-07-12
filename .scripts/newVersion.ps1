@@ -1,72 +1,104 @@
-[CmdletBinding()]
-param(
-    [Parameter(Position = 0)][AllowNull()][string]$Spec,
-    [Alias('sv')][ValidatePattern('^\d+\.\d+\.\d+$')][string]$SetVersion,
-    [switch]$Major,
-    [switch]$Minor,
-    [switch]$Patch
-)
-
+# Version helper. Parse $args so -+, -++, -+++ work unquoted in pwsh.
 . "$PSScriptRoot\scriptHelper.ps1"
 
-$in = (($Spec ?? '').Trim())
-if ($in -match '^-(\+{1,3}|\d+\.\d+\.\d+)$') { $in = $Matches[1] }
-
-$swN = [int]$Major.IsPresent + [int]$Minor.IsPresent + [int]$Patch.IsPresent
-if ($swN -gt 1) { throw "Use only one of -Major, -Minor, -Patch." }
-
-$hasSw = $swN -eq 1
-$hasSpec = $in.Length -gt 0
-$hasSet = -not [string]::IsNullOrEmpty($SetVersion)
-if (@(($hasSet, $hasSw, $hasSpec) | Where-Object { $_ }).Count -gt 1) {
-    throw "Pick one: -SetVersion, -Major/-Minor/-Patch, or + / ++ / +++ / a.b.c."
-}
-if ($hasSpec -and $in -notmatch '^(\+{1,3}|\d+\.\d+\.\d+)$') {
-    throw "Invalid spec. Use +, ++, +++, a.b.c, or -SetVersion."
+function Show-NewVersionHelp {
+    Write-Host @"
+  .\newVersion.ps1 -h               Show help.
+  .\newVersion.ps1 -tag             Generate a new Version tag (line 2)
+  .\newVersion.ps1 -+               Major bump: 1.0.0 -> 2.0.0
+  .\newVersion.ps1 -++              Minor bump: 0.1.0 -> 0.2.0
+  .\newVersion.ps1 -+++             Patch bump: 0.0.1 -> 0.0.2
+"@
 }
 
-if ($hasSet -or $hasSw -or $hasSpec) {
-    $raw = [System.IO.File]::ReadAllText($version).Trim()
+function Update-BuildNotesHeader {
+    $lines = Read-VersionFileLines
+    $firstLine = "v$($lines[0].Trim()) release ($($lines[1].Trim()))"
+
+    $existingTail = @()
+    if (Test-Path -LiteralPath $buildNotes) {
+        $prev = [System.IO.File]::ReadAllLines($buildNotes)
+        if ($prev.Length -gt 1) { $existingTail = $prev[1..($prev.Length - 1)] }
+    }
+    $out = ((@($firstLine) + @($existingTail)) -join [Environment]::NewLine) + [Environment]::NewLine
+    Write-RepoUtf8NoBomFile -LiteralPath $buildNotes -Content $out
+}
+
+function Read-SemVerParts {
+    $lines = Read-VersionFileLines
+    $raw = $lines[0].Trim()
     $p = @($raw -split '\.')
     if ($p.Count -ne 3) { throw "Version must be major.minor.patch (got '$raw')." }
     foreach ($x in $p) {
         if ($x -notmatch '^\d+$') { throw "Invalid version: $raw" }
     }
-    [int]$ma = $p[0]; [int]$mi = $p[1]; [int]$pa = $p[2]
-
-    if ($hasSet) {
-        $v = $SetVersion -split '\.'
-        $ma = [int]$v[0]; $mi = [int]$v[1]; $pa = [int]$v[2]
+    return @{
+        Major = [int]$p[0]
+        Minor = [int]$p[1]
+        Patch = [int]$p[2]
+        Tag   = $lines[1]
+        Build = $lines[2]
     }
-    elseif ($hasSw) {
-        if ($Major) { $ma++; $mi = 0; $pa = 0 }
-        elseif ($Minor) { $mi++; $pa = 0 }
-        else { $pa++ }
-    }
-    else {
-        switch -Regex ($in) {
-            '^\+$' { $ma++; $mi = 0; $pa = 0; break }
-            '^\+\+$' { $mi++; $pa = 0; break }
-            '^\+\+\+$' { $pa++; break }
-            default {
-                $v = $in -split '\.'
-                $ma = [int]$v[0]; $mi = [int]$v[1]; $pa = [int]$v[2]
-            }
-        }
-    }
-    Write-RepoUtf8NoBomFile -LiteralPath $version -Content "$ma.$mi.$pa"
 }
 
-Write-Host (& "$root\.resources\exe\yapCli.exe" | Tee-Object -FilePath $versionTag)
-
-$versionContents = [System.IO.File]::ReadAllText($version).Trim()
-$versionTagContents = [System.IO.File]::ReadAllText($versionTag).Trim()
-$firstLine = "v$versionContents release ($versionTagContents)"
-
-$existingTail = @()
-if (Test-Path -LiteralPath $buildNotes) {
-    $prev = [System.IO.File]::ReadAllLines($buildNotes)
-    if ($prev.Length -gt 1) { $existingTail = $prev[1..($prev.Length - 1)] }
+function Write-SemVer {
+    param([int]$Major, [int]$Minor, [int]$Patch)
+    $cur = Read-VersionFileLines
+    Write-VersionFile -SemVer "$Major.$Minor.$Patch" -Tag $cur[1] -Build $cur[2]
+    Write-Host "Version -> $Major.$Minor.$Patch"
 }
-$out = ((@($firstLine) + @($existingTail)) -join [Environment]::NewLine) + [Environment]::NewLine
-Write-RepoUtf8NoBomFile -LiteralPath $buildNotes -Content $out
+
+$flags = @(
+    $args |
+        ForEach-Object { "$_".Trim() } |
+        Where-Object { $_.Length -gt 0 }
+)
+
+if ($flags.Count -eq 0) {
+    Show-NewVersionHelp
+    exit 0
+}
+
+$mode = $null
+foreach ($f in $flags) {
+    $next = switch -Regex ($f) {
+        '^(?i)(-h|--h|-help|--help)$' { 'help' }
+        '^(?i)(-tag|--tag)$' { 'tag' }
+        '^-\+\+\+$' { 'patch' }
+        '^-\+\+$' { 'minor' }
+        '^-\+$' { 'major' }
+        default { throw "Unknown argument: $f`nRun .\newVersion.ps1 -h for usage." }
+    }
+    if ($null -ne $mode -and $mode -ne $next) {
+        throw "Use only one mode at a time (got -$mode and -$next)."
+    }
+    $mode = $next
+}
+
+switch ($mode) {
+    'help' {
+        Show-NewVersionHelp
+    }
+    'tag' {
+        $tag = (& "$root\.resources\exe\yapCli.exe").Trim()
+        Write-Host $tag
+        $cur = Read-VersionFileLines
+        Write-VersionFile -SemVer $cur[0] -Tag $tag -Build $cur[2]
+        Update-BuildNotesHeader
+    }
+    'major' {
+        $v = Read-SemVerParts
+        Write-SemVer -Major ($v.Major + 1) -Minor 0 -Patch 0
+        Update-BuildNotesHeader
+    }
+    'minor' {
+        $v = Read-SemVerParts
+        Write-SemVer -Major $v.Major -Minor ($v.Minor + 1) -Patch 0
+        Update-BuildNotesHeader
+    }
+    'patch' {
+        $v = Read-SemVerParts
+        Write-SemVer -Major $v.Major -Minor $v.Minor -Patch ($v.Patch + 1)
+        Update-BuildNotesHeader
+    }
+}

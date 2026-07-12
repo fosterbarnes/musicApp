@@ -243,6 +243,15 @@
                                 <TextBlock Text="Settings" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
+
+                        <Button x:Name="btnMiniPlayer"
+                                Style="{StaticResource SidebarNavigationButton}"
+                                Click="BtnMiniPlayer_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="PictureInPictureBottomRight" VerticalAlignment="Center" Margin="{StaticResource Right10-thk}"/>
+                                <TextBlock Text="Miniplayer" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Border>
 

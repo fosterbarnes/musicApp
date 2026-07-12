@@ -41,8 +41,6 @@ public static class AlbumArtCacheManager
         _memoryCache.Clear();
     }
 
-    private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
-
     static AlbumArtCacheManager()
     {
         try
@@ -183,11 +181,9 @@ public static class AlbumArtCacheManager
 
                 try
                 {
-                    using var fs = new FileStream(track.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                    var atlTrack = new Track(fs);
-                    var pics = atlTrack.EmbeddedPictures;
-                    if (pics != null && pics.Count > 0)
-                        source = TryLoadBitmapFromPictureBytes(pics[0].PictureData);
+                    var embedded = AlbumArtSourceResolver.TryLoadEmbeddedBytes(track.FilePath);
+                    if (embedded != null)
+                        source = TryLoadBitmapFromPictureBytes(embedded);
                 }
                 catch
                 {
@@ -195,22 +191,9 @@ public static class AlbumArtCacheManager
 
                 if (source == null)
                 {
-                    var dir = Path.GetDirectoryName(track.FilePath);
-                    if (dir != null && Directory.Exists(dir))
-                    {
-                        var imageFiles = Directory.GetFiles(dir, "*.*")
-                            .Where(f => ImageExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
-                            .ToList();
-
-                        var artFile = imageFiles.FirstOrDefault(f =>
-                        {
-                            var name = Path.GetFileNameWithoutExtension(f).ToLowerInvariant();
-                            return name.Contains("album") || name.Contains("cover") || name.Contains("art") || name.Contains("folder");
-                        }) ?? imageFiles.FirstOrDefault();
-
-                        if (artFile != null)
-                            source = TryLoadBitmapFromImageFile(artFile);
-                    }
+                    var artFile = AlbumArtSourceResolver.TryFindDirectoryCoverPath(track.FilePath);
+                    if (artFile != null)
+                        source = TryLoadBitmapFromImageFile(artFile);
                 }
 
                 if (source == null)

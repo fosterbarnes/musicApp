@@ -54,7 +54,7 @@ Name: "startmenuicon"; Description: "{cm:CreateStartMenuIcon}"; GroupDescription
 Name: "dotnetdesktop8"; Description: ".NET 8.0 Desktop Runtime"; GroupDescription: "Install Dependencies"
 
 [Files]
-Source: "C:\Users\Foster\Documents\GitHub\musicApp\musicApp\bin\x86\Release\net8.0-windows\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "C:\Users\Foster\Documents\GitHub\musicApp\musicApp\bin\x86\Release\net10.0-windows\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#ExeName}"; Tasks: startmenuicon

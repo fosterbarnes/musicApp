@@ -51,44 +51,15 @@ public static class AlbumArtThumbnailHelper
 
         try
         {
-            // Embedded art via ATL
-            try
-            {
-                using var fs = new FileStream(track.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                var atlTrack = new Track(fs);
-                var embeddedPictures = atlTrack.EmbeddedPictures;
+            var embedded = AlbumArtSourceResolver.TryLoadEmbeddedBytes(track.FilePath);
+            if (embedded != null)
+                return AlbumArtDownscaleHelper.TryDownscaleToBitmapSource(embedded, targetSizePx);
 
-                if (embeddedPictures != null && embeddedPictures.Count > 0)
-                {
-                    var picture = embeddedPictures[0];
-                    return AlbumArtDownscaleHelper.TryDownscaleToBitmapSource(picture.PictureData, targetSizePx);
-                }
-            }
-            catch
-            {
-                // Fall through to directory search
-            }
-
-            // Fallback: image in same directory as file
-            var directory = Path.GetDirectoryName(track.FilePath);
-            if (directory == null || !Directory.Exists(directory))
-                return null;
-
-            var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
-            var imageFiles = Directory.GetFiles(directory, "*.*")
-                .Where(f => imageExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
-                .ToList();
-
-            var albumArtFile = imageFiles.FirstOrDefault(file =>
-            {
-                var name = Path.GetFileNameWithoutExtension(file).ToLowerInvariant();
-                return name.Contains("album") || name.Contains("cover") || name.Contains("art") || name.Contains("folder");
-            }) ?? imageFiles.FirstOrDefault();
-
+            var albumArtFile = AlbumArtSourceResolver.TryFindDirectoryCoverPath(track.FilePath);
             if (albumArtFile != null)
                 return AlbumArtDownscaleHelper.TryDownscaleToBitmapSource(albumArtFile, targetSizePx);
 
-            var itcBytes = FruitAppLocalAlbumArtCache.TryGetCoverImageBytesForAudioPath(track.FilePath);
+            var itcBytes = AlbumArtSourceResolver.TryLoadItunesCacheBytes(track.FilePath);
             if (itcBytes != null)
                 return AlbumArtDownscaleHelper.TryDownscaleToBitmapSource(itcBytes, targetSizePx);
 
@@ -117,43 +88,20 @@ public static class AlbumArtThumbnailHelper
 
         try
         {
-            try
+            var embedded = AlbumArtSourceResolver.TryLoadEmbeddedBytes(track.FilePath);
+            if (embedded != null)
+                result = LoadBitmapImageFromBytes(embedded);
+
+            if (result == null)
             {
-                using var fs = new FileStream(track.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                var atlTrack = new Track(fs);
-                var embeddedPictures = atlTrack.EmbeddedPictures;
-                if (embeddedPictures != null && embeddedPictures.Count > 0)
-                    result = LoadBitmapImageFromBytes(embeddedPictures[0].PictureData);
-            }
-            catch
-            {
-                // Fall through to directory search
+                var albumArtFile = AlbumArtSourceResolver.TryFindDirectoryCoverPath(track.FilePath);
+                if (albumArtFile != null)
+                    result = LoadBitmapImageFromFile(albumArtFile);
             }
 
             if (result == null)
             {
-                var directory = Path.GetDirectoryName(track.FilePath);
-                if (directory != null && Directory.Exists(directory))
-                {
-                    var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
-                    var imageFiles = Directory.GetFiles(directory, "*.*")
-                        .Where(f => imageExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
-                        .ToList();
-
-                    var albumArtFile = imageFiles.FirstOrDefault(file =>
-                    {
-                        var name = Path.GetFileNameWithoutExtension(file).ToLowerInvariant();
-                        return name.Contains("album") || name.Contains("cover") || name.Contains("art") || name.Contains("folder");
-                    }) ?? imageFiles.FirstOrDefault();
-
-                    if (albumArtFile != null)
-                        result = LoadBitmapImageFromFile(albumArtFile);
-                }
-            }
-
-            if (result == null)
-            {
-                var itcBytes = FruitAppLocalAlbumArtCache.TryGetCoverImageBytesForAudioPath(track.FilePath);
+                var itcBytes = AlbumArtSourceResolver.TryLoadItunesCacheBytes(track.FilePath);
                 if (itcBytes != null)
                     result = LoadBitmapImageFromBytes(itcBytes);
             }

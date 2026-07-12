@@ -77,6 +77,26 @@ namespace musicApp
             btnClearSettings.Visibility = s.ShowClearSettings ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        /// <summary>
+        /// Reloads <c>settings.json</c> into the live session after Settings import (window layout + player UI).
+        /// </summary>
+        public void ApplyImportedSettingsFromDisk()
+        {
+            try
+            {
+                appSettings = settingsManager.LoadSettingsSync() ?? new SettingsManager.AppSettings();
+                RestoreWindowState();
+            }
+            catch
+            {
+                // Keep current in-memory settings if reload fails.
+            }
+
+            ApplySidebarPreferences();
+            ApplyPlaybackPreferences();
+            _ = titleBarPlayer.ReloadPlayerSettingsFromDiskAsync();
+        }
+
         public void RunClearSettingsFromSettings() => ClearSettings();
 
         private void UpdatePlaylistsView()
@@ -154,6 +174,7 @@ namespace musicApp
                 StopPlayback();
 
                 titleBarPlayer.SetTrackInfo("No track selected", "", "");
+                ClearMiniPlayerTrack();
 
                 appSettings = new SettingsManager.AppSettings();
                 windowManager.ResetWindowState();

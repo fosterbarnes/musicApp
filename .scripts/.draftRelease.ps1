@@ -1,37 +1,47 @@
 $Host.UI.RawUI.WindowTitle = "Draft musicApp Release"
 . "$PSScriptRoot\scriptHelper.ps1"; Set-Location $root
-$portableRelease = "$appRoot\bin\portable\Release\net8.0-windows"
+$portableRelease = "$appRoot\bin\portable\Release\net10.0-windows"
 $portableZip = Join-Path $env:TEMP "musicApp_${versionContents}"
 if (Test-Path $portableZip) { Remove-Item $portableZip -Recurse -Force }
 Copy-Item -Path $portableRelease -Destination $portableZip -Recurse
 Write-Host "Portable Release output (copied to temp for zip): $portableZip"
 Write-Host "Version: $versionContents"
-Write-Host "`nEnter release notes:" -ForegroundColor Yellow
-Write-Host "Tabs will be converted to spaces for GitHub formatting." -ForegroundColor Cyan
-$releaseNotesLines = @()
-$consecutiveEmptyLines = 0
-$hasReleaseNotes = $false
-
-while ($true) {
-    $line = Read-Host ">"
-    if ($line -eq "") {
-        $consecutiveEmptyLines++
-        if ($consecutiveEmptyLines -ge 2) { break }
-        $releaseNotesLines += ""
-    } else {
-        $line = $line -replace "`t", "    "
-        $releaseNotesLines += $line
-        $consecutiveEmptyLines = 0
-        $hasReleaseNotes = $true
+if (Test-Path -LiteralPath $buildNotes) {
+    Write-Host "Release notes source: $buildNotes" -ForegroundColor Cyan
+    $releaseNotes = ($buildNotesContents -replace "`t", "    ").Trim()
+    if ([string]::IsNullOrWhiteSpace($releaseNotes)) {
+        Write-Host "Error: buildNotes.txt is empty." -ForegroundColor Red
+        exit 1
     }
+} else {
+    Write-Host "`nEnter release notes:" -ForegroundColor Yellow
+    Write-Host "Tabs will be converted to spaces for GitHub formatting." -ForegroundColor Cyan
+    $releaseNotesLines = @()
+    $consecutiveEmptyLines = 0
+    $hasReleaseNotes = $false
+
+    while ($true) {
+        $line = Read-Host ">"
+        if ($line -eq "") {
+            $consecutiveEmptyLines++
+            if ($consecutiveEmptyLines -ge 2) { break }
+            $releaseNotesLines += ""
+        } else {
+            $line = $line -replace "`t", "    "
+            $releaseNotesLines += $line
+            $consecutiveEmptyLines = 0
+            $hasReleaseNotes = $true
+        }
+    }
+
+    if (-not $hasReleaseNotes) {
+        Write-Host "Error: No release notes entered." -ForegroundColor Red
+        exit 1
+    }
+
+    $releaseNotes = $releaseNotesLines -join "`n"
 }
 
-if (-not $hasReleaseNotes) {
-    Write-Host "Error: No release notes entered." -ForegroundColor Red
-    exit 1
-}
-
-$releaseNotes = $releaseNotesLines -join "`n"
 $releaseTagSegment = Get-ReleaseTagSegment -Tag $versionTagContents
 Write-Host "VersionTag raw: '$versionTagContents' => segment: '$releaseTagSegment'" -ForegroundColor Cyan
 

@@ -16,9 +16,7 @@ internal static class RecentlyAddedPlaybackOrder
             .Where(t => t != null && !string.IsNullOrWhiteSpace(t.Album) && t.Album != "Unknown Album")
             .GroupBy(t =>
             {
-                var albumArtist = !string.IsNullOrWhiteSpace(t.AlbumArtist)
-                    ? t.AlbumArtist
-                    : t.Artist ?? string.Empty;
+                var albumArtist = AlbumGroupedPlaybackOrder.AlbumArtistKey(t);
                 return (Album: t.Album ?? string.Empty, Artist: albumArtist);
             })
             .Select(g =>

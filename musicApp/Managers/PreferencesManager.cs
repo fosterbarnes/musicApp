@@ -11,11 +11,7 @@ namespace musicApp
     /// <summary><c>preferences.json</c> in %AppData%/musicApp (included when Clear Settings recycles *.json there).</summary>
     public class PreferencesManager
     {
-        private static readonly string AppDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "musicApp");
-
-        private static readonly string PreferencesFilePath = Path.Combine(AppDataPath, "preferences.json");
+        private static readonly string PreferencesFilePath = AppPaths.PreferencesPath;
 
         private static readonly JsonSerializerOptions LoadOptions = new JsonSerializerOptions
         {
@@ -36,6 +32,13 @@ namespace musicApp
             public SidebarPreferences Sidebar { get; set; } = new SidebarPreferences();
             public PlaybackPreferences Playback { get; set; } = new PlaybackPreferences();
             public LibraryPreferences Library { get; set; } = new LibraryPreferences();
+            public ThemePreferences Theme { get; set; } = new ThemePreferences();
+        }
+
+        public class ThemePreferences
+        {
+            /// <summary>When true, donation links are shown in About (and any other donation UI).</summary>
+            public bool ShowDonationLinks { get; set; } = true;
         }
 
         public class LibraryPreferences
@@ -108,15 +111,7 @@ namespace musicApp
 
         private PreferencesManager()
         {
-            EnsureAppDataDirectoryExists();
-        }
-
-        private void EnsureAppDataDirectoryExists()
-        {
-            if (!Directory.Exists(AppDataPath))
-            {
-                Directory.CreateDirectory(AppDataPath);
-            }
+            AppPaths.EnsureAppDataDirectory();
         }
 
         public AppPreferences LoadPreferencesSync()
@@ -217,6 +212,7 @@ namespace musicApp
             preferences.Sidebar ??= new SidebarPreferences();
             preferences.Playback ??= new PlaybackPreferences();
             preferences.Library ??= new LibraryPreferences();
+            preferences.Theme ??= new ThemePreferences();
             preferences.General.Language ??= "en-system";
             preferences.General.UiFontFamily ??= "";
             preferences.General.UiFontSize = Math.Clamp(
@@ -242,7 +238,8 @@ namespace musicApp
                 General = new GeneralPreferences(),
                 Sidebar = new SidebarPreferences(),
                 Playback = new PlaybackPreferences(),
-                Library = new LibraryPreferences()
+                Library = new LibraryPreferences(),
+                Theme = new ThemePreferences()
             };
         }
     }

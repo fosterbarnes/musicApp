@@ -41,6 +41,23 @@ public sealed class SongRowViewModel : INotifyPropertyChanged
     public Song Song { get; }
     public string Title => Song.Title;
     public string Artist => Song.Artist;
+    public string Album => Song.Album ?? "";
+    public string Duration => Song.Duration ?? "";
+    public string ArtistAlbum
+    {
+        get
+        {
+            bool hasArtist = !string.IsNullOrWhiteSpace(Song.Artist);
+            bool hasAlbum = !string.IsNullOrWhiteSpace(Song.Album);
+            if (hasArtist && hasAlbum)
+                return $"{Song.Artist} - {Song.Album}";
+            if (hasArtist)
+                return Song.Artist;
+            if (hasAlbum)
+                return Song.Album ?? "";
+            return "";
+        }
+    }
 
     public bool IsNowPlaying
     {

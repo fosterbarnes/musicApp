@@ -90,6 +90,7 @@
 - Dropdown
 #### Import/Export
 - Import/Export Settings (two buttons)
+- Write settings file format and import/export logic
 ### Playback
 #### EQ
 - Pre-made EQ options, with options to create, import or export profiles (dropdown)
@@ -127,9 +128,10 @@
 - Spacing, with options to create, import or export profiles (dropdown)
 - Size, with options to create, import or export profiles (dropdown)
 - List size, with options to create, import or export profiles (dropdown)
-- Toggle donation links (tickbox)
+- Toggle donation links (tick-box)
 
 ### About
 - Version info (e.g. musicApp v0.1.0 dollyShakeswerve x64)
 - Project link (https://github.com/fosterbarnes/musicApp)
 - Issues link (https://github.com/fosterbarnes/musicApp/issues/new)
+- Donation link (https://buymeacoffee.com/fosterbarnes)

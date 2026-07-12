@@ -19,34 +19,69 @@ namespace musicApp
             try
             {
                 LogDebug("Cleaning up audio objects...");
-                titleBarPlayer.IsPlaying = false;
-                TeardownCrossfadePlaybackState();
-
-                if (waveOut != null)
-                {
-                    LogDebug("Removing PlaybackStopped handler and stopping waveOut");
-                    waveOut.PlaybackStopped -= WaveOut_PlaybackStopped;
-                    waveOut.Stop();
-                    waveOut.Dispose();
-                    waveOut = null;
-                }
-
-                if (audioFileReader != null)
-                {
-                    LogDebug("Disposing audioFileReader");
-                    audioFileReader.Dispose();
-                    audioFileReader = null;
-                }
-
-                _sessionVolumeProvider = null;
-                ClearCrossfadeMixerReferences();
-
+                TeardownPlaybackOutput();
                 ResetToIdleState();
             }
             catch (Exception ex)
             {
                 LogDebug($"Error during audio cleanup: {ex.Message}");
             }
+        }
+
+        private void TeardownPlaybackOutput()
+        {
+            titleBarPlayer.IsPlaying = false;
+            TeardownCrossfadePlaybackState();
+
+            if (waveOut != null)
+            {
+                LogDebug("Removing PlaybackStopped handler and stopping waveOut");
+                waveOut.PlaybackStopped -= WaveOut_PlaybackStopped;
+                waveOut.Stop();
+                waveOut.Dispose();
+                waveOut = null;
+            }
+
+            if (audioFileReader != null)
+            {
+                LogDebug("Disposing audioFileReader");
+                audioFileReader.Dispose();
+                audioFileReader = null;
+            }
+
+            _sessionVolumeProvider = null;
+            ClearCrossfadeMixerReferences();
+        }
+
+        private void CreateAndBindPlaybackOutput(string filePath, bool autoPlay, TimeSpan? seekTo = null)
+        {
+            RefreshPlaybackAudioPreferenceFields();
+            audioFileReader = new AudioFileReader(filePath);
+            waveOut = AudioOutputDeviceFactory.Create(_cachedAudioBackend);
+            waveOut.PlaybackStopped += WaveOut_PlaybackStopped;
+            waveOut.Init(CreatePlaybackInitChain(audioFileReader, filePath));
+
+            if (seekTo is TimeSpan pos && pos > TimeSpan.Zero && pos < audioFileReader.TotalTime)
+                audioFileReader.CurrentTime = pos;
+
+            TitleBarSetAudioObjects(waveOut, audioFileReader);
+            _crossfadeOverlapStartedForThisOutgoing = false;
+            EnsureCrossfadePollTimer();
+
+            if (autoPlay)
+            {
+                waveOut.Play();
+                titleBarPlayer.IsPlaying = true;
+            }
+            else
+                titleBarPlayer.IsPlaying = false;
+        }
+
+        private void UpdateNowPlayingUi(Song track)
+        {
+            var art = AlbumArtLoader.LoadAlbumArt(track, GetTitleBarAlbumArtTargetPixelSize());
+            titleBarPlayer.SetTrackInfo(track.Title, track.Artist, track.Album, art);
+            PushMiniPlayerTrack(track);
         }
 
         private void StopPlayback()
@@ -292,19 +327,7 @@ namespace musicApp
 
             try
             {
-                titleBarPlayer.IsPlaying = false;
-                TeardownCrossfadePlaybackState();
-                waveOut.PlaybackStopped -= WaveOut_PlaybackStopped;
-                waveOut.Stop();
-                waveOut.Dispose();
-                waveOut = null;
-                if (audioFileReader != null)
-                {
-                    audioFileReader.Dispose();
-                    audioFileReader = null;
-                }
-                ClearCrossfadeMixerReferences();
-                _sessionVolumeProvider = null;
+                TeardownPlaybackOutput();
                 TitleBarSetAudioObjects(null, null);
             }
             catch (Exception ex)
@@ -332,29 +355,7 @@ namespace musicApp
 
             try
             {
-                TeardownCrossfadePlaybackState();
-                RefreshPlaybackAudioPreferenceFields();
-                audioFileReader = new AudioFileReader(path);
-                waveOut = AudioOutputDeviceFactory.Create(_cachedAudioBackend);
-                waveOut.PlaybackStopped += WaveOut_PlaybackStopped;
-                waveOut.Init(CreatePlaybackInitChain(audioFileReader, path));
-
-                if (release.Position > TimeSpan.Zero && release.Position < audioFileReader.TotalTime)
-                    audioFileReader.CurrentTime = release.Position;
-
-                TitleBarSetAudioObjects(waveOut, audioFileReader);
-                _crossfadeOverlapStartedForThisOutgoing = false;
-                EnsureCrossfadePollTimer();
-
-                if (release.WasPlaying)
-                {
-                    waveOut.Play();
-                    titleBarPlayer.IsPlaying = true;
-                }
-                else
-                {
-                    titleBarPlayer.IsPlaying = false;
-                }
+                CreateAndBindPlaybackOutput(path, autoPlay: release.WasPlaying, seekTo: release.Position);
             }
             catch (Exception ex)
             {
@@ -375,6 +376,8 @@ namespace musicApp
         private void TitleBarSetAudioObjects(IWavePlayer? w, AudioFileReader? r)
         {
             titleBarPlayer.SetAudioObjects(w, r, _useSoftwareSessionVolume);
+            if (_miniPlayerWindow != null && _miniPlayerWindow.IsVisible)
+                _miniPlayerWindow.SetAudioObjects(w, r);
         }
 
         private float GetTitleBarOutputVolumeLinear()
@@ -405,50 +408,11 @@ namespace musicApp
                 wasPlaying = false;
             }
 
-            TeardownCrossfadePlaybackState();
-            try
-            {
-                if (waveOut != null)
-                {
-                    waveOut.PlaybackStopped -= WaveOut_PlaybackStopped;
-                    waveOut.Stop();
-                    waveOut.Dispose();
-                    waveOut = null;
-                }
-            }
-            catch { }
+            TeardownPlaybackOutput();
 
             try
             {
-                audioFileReader?.Dispose();
-            }
-            catch { }
-            audioFileReader = null;
-            ClearCrossfadeMixerReferences();
-            _sessionVolumeProvider = null;
-
-            try
-            {
-                RefreshPlaybackAudioPreferenceFields();
-                audioFileReader = new AudioFileReader(path);
-                waveOut = AudioOutputDeviceFactory.Create(_cachedAudioBackend);
-                waveOut.PlaybackStopped += WaveOut_PlaybackStopped;
-                waveOut.Init(CreatePlaybackInitChain(audioFileReader, path));
-
-                if (position > TimeSpan.Zero && position < audioFileReader.TotalTime)
-                    audioFileReader.CurrentTime = position;
-
-                TitleBarSetAudioObjects(waveOut, audioFileReader);
-                _crossfadeOverlapStartedForThisOutgoing = false;
-                EnsureCrossfadePollTimer();
-
-                if (wasPlaying)
-                {
-                    waveOut.Play();
-                    titleBarPlayer.IsPlaying = true;
-                }
-                else
-                    titleBarPlayer.IsPlaying = false;
+                CreateAndBindPlaybackOutput(path, autoPlay: wasPlaying, seekTo: position);
             }
             catch (Exception ex)
             {

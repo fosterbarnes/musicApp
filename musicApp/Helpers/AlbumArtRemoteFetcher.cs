@@ -21,13 +21,13 @@ public static class AlbumArtRemoteFetcher
 
     private static Query CreateQuery()
     {
-        var ver = AppReleaseVersion.ReadLabel();
+        var ver = AppVersionFiles.ReadLabel();
         return new Query("musicApp", ver, MbContactUrl);
     }
 
     private static CoverArt CreateCoverArt()
     {
-        var ver = AppReleaseVersion.ReadLabel();
+        var ver = AppVersionFiles.ReadLabel();
         return new CoverArt("musicApp", ver, MbContactUrl);
     }
 
@@ -118,7 +118,7 @@ public static class AlbumArtRemoteFetcher
     {
         var http = new HttpClient();
         http.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",
-            $"musicApp/{AppReleaseVersion.ReadLabel()} ({MbContactUrl})");
+            $"musicApp/{AppVersionFiles.ReadLabel()} ({MbContactUrl})");
         return http;
     }
 

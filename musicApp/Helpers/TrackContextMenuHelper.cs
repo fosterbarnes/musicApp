@@ -150,4 +150,34 @@ internal static class TrackContextMenuHelper
         if (showInQueueItem != null)
             showInQueueItem.Visibility = showQueue ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    public static void ApplyStandardOpened(
+        ItemCollection items,
+        string? contextMenuViewName,
+        Song? selectedSong,
+        IEnumerable<Playlist>? playlists,
+        RoutedEventHandler playlistItemClick,
+        bool applyRemoveFromPlaylist = false,
+        bool removeFromPlaylistVisible = false)
+    {
+        var addToPlaylistItem = FindMenuItemByHeader(items, "Add to Playlist");
+        if (addToPlaylistItem != null && playlists != null)
+            RebuildAddToPlaylistChildren(addToPlaylistItem, playlists, playlistItemClick);
+
+        if (applyRemoveFromPlaylist)
+        {
+            var removeFromPlaylistItem = FindMenuItemByHeader(items, "Remove from Playlist");
+            ApplyRemoveFromPlaylistVisibility(removeFromPlaylistItem, removeFromPlaylistVisible);
+        }
+
+        var mainWindow = Application.Current?.MainWindow as MainWindow;
+        bool isInQueue = selectedSong != null && mainWindow?.IsTrackInQueue(selectedSong) == true;
+        ApplyShowInMenuVisibility(
+            contextMenuViewName,
+            FindMenuItemByHeader(items, "Show in Artists"),
+            FindMenuItemByHeader(items, "Show in Songs"),
+            FindMenuItemByHeader(items, "Show in Albums"),
+            FindMenuItemByHeader(items, "Show in Queue"),
+            isInQueue);
+    }
 }

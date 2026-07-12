@@ -2,35 +2,24 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Windows;
-using System.Windows.Controls;
+using musicApp.Helpers;
 
 namespace musicApp.Views
 {
-    public partial class SongsView : UserControl
+    public partial class SongsView : TrackListHostBase
     {
         public static readonly DependencyProperty IsLibraryEmptyProperty = DependencyProperty.Register(
             nameof(IsLibraryEmpty), typeof(bool), typeof(SongsView), new PropertyMetadata(true));
 
         private INotifyCollectionChanged? _itemsSourceCollection;
 
+        protected override TrackListView TrackList => trackList;
+
         public SongsView()
         {
             InitializeComponent();
-
+            WireTrackList();
             emptyOverlay.AddMusicFolderRequested += (_, __) => AddMusicFolderRequested?.Invoke(this, EventArgs.Empty);
-
-            trackList.AddToPlaylistRequested += (s, track) => AddToPlaylistRequested?.Invoke(this, track);
-            trackList.AddTrackToPlaylistRequested += (s, args) => AddTrackToPlaylistRequested?.Invoke(this, args);
-            trackList.CreateNewPlaylistWithTrackRequested += (s, track) => CreateNewPlaylistWithTrackRequested?.Invoke(this, track);
-            trackList.PlayNextRequested += (s, track) => PlayNextRequested?.Invoke(this, track);
-            trackList.AddToQueueRequested += (s, track) => AddToQueueRequested?.Invoke(this, track);
-            trackList.InfoRequested += (s, track) => InfoRequested?.Invoke(this, track);
-            trackList.ShowInArtistsRequested += (s, track) => ShowInArtistsRequested?.Invoke(this, track);
-            trackList.ShowInAlbumsRequested += (s, track) => ShowInAlbumsRequested?.Invoke(this, track);
-            trackList.ShowInQueueRequested += (s, track) => ShowInQueueRequested?.Invoke(this, track);
-            trackList.ShowInExplorerRequested += (s, track) => ShowInExplorerRequested?.Invoke(this, track);
-            trackList.RemoveFromLibraryRequested += (s, tracks) => RemoveFromLibraryRequested?.Invoke(this, tracks);
-            trackList.DeleteRequested += (s, track) => DeleteRequested?.Invoke(this, track);
         }
 
         public bool IsLibraryEmpty
@@ -39,7 +28,7 @@ namespace musicApp.Views
             set => SetValue(IsLibraryEmptyProperty, value);
         }
 
-        public System.Collections.IEnumerable? ItemsSource
+        public new System.Collections.IEnumerable? ItemsSource
         {
             get => trackList.ItemsSource;
             set
@@ -59,33 +48,10 @@ namespace musicApp.Views
             }
         }
 
-        public event System.EventHandler? AddMusicFolderRequested;
-
-        public event System.EventHandler<Song>? PlayTrackRequested;
-
-        public event System.EventHandler<Song>? AddToPlaylistRequested;
-        public event System.EventHandler<(Song track, Playlist playlist)>? AddTrackToPlaylistRequested;
-        public event System.EventHandler<Song>? CreateNewPlaylistWithTrackRequested;
-        public event System.EventHandler<Song>? PlayNextRequested;
-        public event System.EventHandler<Song>? AddToQueueRequested;
-        public event System.EventHandler<Song>? InfoRequested;
-        public event System.EventHandler<Song>? ShowInArtistsRequested;
-        public event System.EventHandler<Song>? ShowInAlbumsRequested;
-        public event System.EventHandler<Song>? ShowInQueueRequested;
-        public event System.EventHandler<Song>? ShowInExplorerRequested;
-        public event System.EventHandler<IReadOnlyList<Song>>? RemoveFromLibraryRequested;
-        public event System.EventHandler<Song>? DeleteRequested;
-
-        public void RebuildColumns() => trackList.RebuildColumns();
-
-        public void RefreshTrackListBindings() => trackList.RefreshItemBindings();
+        public event EventHandler? AddMusicFolderRequested;
 
         public void ScrollToSong(Song song) => trackList.ScrollToSong(song);
 
-        /// <summary>
-        /// Selects (highlights) the matching song in the list and scrolls it into view.
-        /// Matching prefers FilePath when available.
-        /// </summary>
         public void SelectTrack(Song track, bool grabFocus = false)
         {
             if (track == null)
@@ -97,54 +63,14 @@ namespace musicApp.Views
                 return;
             }
 
-            // Prefer file-path matching so selection works even if the Song instance differs.
-            if (!string.IsNullOrWhiteSpace(track.FilePath))
-            {
-                foreach (var item in trackList.ItemsSource)
-                {
-                    if (item is not Song s) continue;
-                    if (!string.IsNullOrWhiteSpace(s.FilePath) &&
-                        string.Equals(s.FilePath, track.FilePath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        trackList.ScrollToSong(s, grabFocus);
-                        return;
-                    }
-                }
-            }
-
-            // Fallback: title/artist/album.
-            foreach (var item in trackList.ItemsSource)
-            {
-                if (item is not Song s) continue;
-                if (string.Equals(s.Title, track.Title, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(s.Artist, track.Artist, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(s.Album, track.Album, StringComparison.OrdinalIgnoreCase))
-                {
-                    trackList.ScrollToSong(s, grabFocus);
-                    return;
-                }
-            }
-
-            // Last resort: set selection to the provided instance.
-            trackList.ScrollToSong(track, grabFocus);
+            var matched = SongIdentity.FindInEnumerable(trackList.ItemsSource, track) ?? track;
+            trackList.ScrollToSong(matched, grabFocus);
         }
 
-        public Song? SelectedTrack => trackList.SelectedTrack;
-
-        private void TrackList_PlayTrackRequested(object? sender, Song e)
-        {
-            PlayTrackRequested?.Invoke(this, e);
-        }
-
-        private void OnItemsSourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        {
+        private void OnItemsSourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
             UpdateIsLibraryEmpty(trackList.ItemsSource);
-        }
 
-        private void UpdateIsLibraryEmpty(System.Collections.IEnumerable? source)
-        {
+        private void UpdateIsLibraryEmpty(System.Collections.IEnumerable? source) =>
             IsLibraryEmpty = EmptyLibraryAddOverlay.IsTrackLibraryEmpty(source);
-        }
-
     }
 }

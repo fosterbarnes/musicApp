@@ -30,22 +30,13 @@ public partial class MainWindow
         }
     }
 
-    private static bool SameSongPath(Song? a, Song? b)
-    {
-        if (a == null || b == null)
-            return ReferenceEquals(a, b);
-        if (!string.IsNullOrWhiteSpace(a.FilePath) && !string.IsNullOrWhiteSpace(b.FilePath))
-            return string.Equals(a.FilePath, b.FilePath, StringComparison.OrdinalIgnoreCase);
-        return ReferenceEquals(a, b);
-    }
-
     private static bool SongListsIdenticalOrderByPath(IReadOnlyList<Song> linear, IList<Song> other)
     {
         if (linear.Count != other.Count)
             return false;
         for (int i = 0; i < linear.Count; i++)
         {
-            if (!SameSongPath(linear[i], other[i]))
+            if (!SongIdentity.SamePath(linear[i], other[i]))
                 return false;
         }
         return true;
@@ -117,7 +108,7 @@ public partial class MainWindow
 
         var histCounts = ContextualHistoryPathCounts();
         int idx = anchor != null
-            ? ArtistPlaybackOrder.IndexOfTrackInOrderedList(contextualSessionOrderedFull, anchor)
+            ? SongIdentity.IndexOf(contextualSessionOrderedFull, anchor)
             : -1;
         int start = idx >= 0 ? idx : 0;
 
@@ -148,7 +139,7 @@ public partial class MainWindow
         var histCounts = ContextualHistoryPathCounts();
         var pool = new List<Song>();
         int anchorIdx = anchor != null
-            ? ArtistPlaybackOrder.IndexOfTrackInOrderedList(contextualSessionOrderedFull, anchor)
+            ? SongIdentity.IndexOf(contextualSessionOrderedFull, anchor)
             : -1;
 
         for (int i = 0; i < contextualSessionOrderedFull.Count; i++)
@@ -329,7 +320,7 @@ public partial class MainWindow
         if (src.Count == 0)
             return;
 
-        int idx = ArtistPlaybackOrder.IndexOfTrackInOrderedList(src, selected);
+        int idx = SongIdentity.IndexOf(src, selected);
         if (idx < 0)
             return;
 
@@ -357,85 +348,48 @@ public partial class MainWindow
 
     private void TryInitializeContextFromPlayTrack(object? requestSource, Song selectedTrack)
     {
-        TryInitializeArtistContextQueue(requestSource, selectedTrack);
-        TryInitializeGenreContextQueue(requestSource, selectedTrack);
-        TryInitializeSongsContextQueue(requestSource, selectedTrack);
-        TryInitializePlaylistContextQueue(requestSource, selectedTrack);
-        TryInitializeAlbumContextQueue(requestSource, selectedTrack);
-    }
+        TryInitializeContextQueue(
+            requestSource,
+            selectedTrack,
+            () => artistsViewControl != null &&
+                  ReferenceEquals(requestSource, artistsViewControl) &&
+                  string.Equals(artistsViewControl.ViewName, "Artists", StringComparison.OrdinalIgnoreCase) &&
+                  !string.IsNullOrWhiteSpace(selectedTrack.Artist),
+            () => ArtistPlaybackOrder.BuildOrderedArtistTracks(allTracks, selectedTrack.Artist));
 
-    private void TryInitializeArtistContextQueue(object? requestSource, Song selectedTrack)
-    {
-        if (artistsViewControl == null ||
-            !ReferenceEquals(requestSource, artistsViewControl) ||
-            !string.Equals(artistsViewControl.ViewName, "Artists", StringComparison.OrdinalIgnoreCase))
-            return;
+        TryInitializeContextQueue(
+            requestSource,
+            selectedTrack,
+            () => genresViewControl != null &&
+                  ReferenceEquals(requestSource, genresViewControl) &&
+                  string.Equals(genresViewControl.ViewName, "Genres", StringComparison.OrdinalIgnoreCase) &&
+                  !string.IsNullOrWhiteSpace(selectedTrack.Genre),
+            () => GenrePlaybackOrder.BuildOrderedGenreTracks(allTracks, selectedTrack.Genre));
 
-        if (string.IsNullOrWhiteSpace(selectedTrack.Artist))
-            return;
+        TryInitializeContextQueue(
+            requestSource,
+            selectedTrack,
+            () => ReferenceEquals(requestSource, songsView),
+            () => allTracks.ToList());
 
-        ClearContextualPlaybackQueue();
+        TryInitializeContextQueue(
+            requestSource,
+            selectedTrack,
+            () => playlistsViewControl != null &&
+                  ReferenceEquals(requestSource, playlistsViewControl) &&
+                  playlistsViewControl.SelectedPlaylist != null,
+            () => playlistsViewControl!.SelectedPlaylist!.Tracks.ToList());
 
-        var ordered = ArtistPlaybackOrder.BuildOrderedArtistTracks(allTracks, selectedTrack.Artist);
-        InitializeContextualSession(ordered, selectedTrack);
-    }
-
-    private void TryInitializeGenreContextQueue(object? requestSource, Song selectedTrack)
-    {
-        if (genresViewControl == null ||
-            !ReferenceEquals(requestSource, genresViewControl) ||
-            !string.Equals(genresViewControl.ViewName, "Genres", StringComparison.OrdinalIgnoreCase))
-            return;
-
-        if (string.IsNullOrWhiteSpace(selectedTrack.Genre))
-            return;
-
-        ClearContextualPlaybackQueue();
-
-        var ordered = GenrePlaybackOrder.BuildOrderedGenreTracks(allTracks, selectedTrack.Genre);
-        InitializeContextualSession(ordered, selectedTrack);
-    }
-
-    private void TryInitializeSongsContextQueue(object? requestSource, Song selectedTrack)
-    {
-        if (!ReferenceEquals(requestSource, songsView))
-            return;
-
-        ClearContextualPlaybackQueue();
-
-        var ordered = allTracks.ToList();
-        InitializeContextualSession(ordered, selectedTrack);
-    }
-
-    private void TryInitializePlaylistContextQueue(object? requestSource, Song selectedTrack)
-    {
-        if (playlistsViewControl == null || !ReferenceEquals(requestSource, playlistsViewControl))
-            return;
-
-        var pl = playlistsViewControl.SelectedPlaylist;
-        if (pl == null)
-            return;
-
-        ClearContextualPlaybackQueue();
-
-        var ordered = pl.Tracks.ToList();
-        InitializeContextualSession(ordered, selectedTrack);
-    }
-
-    private void TryInitializeAlbumContextQueue(object? requestSource, Song selectedTrack)
-    {
         if (!ReferenceEquals(requestSource, albumsViewControl) || albumsViewControl == null)
             return;
 
         if (albumsViewControl.BrowseMode == AlbumsBrowseMode.RecentlyAdded)
         {
-            ClearContextualPlaybackQueue();
-
-            var ordered = RecentlyAddedPlaybackOrder.BuildOrderedTracks(allTracks);
-            if (ordered.Count == 0)
-                return;
-
-            InitializeContextualSession(ordered, selectedTrack);
+            TryInitializeContextQueue(
+                requestSource,
+                selectedTrack,
+                () => true,
+                () => RecentlyAddedPlaybackOrder.BuildOrderedTracks(allTracks));
             return;
         }
 
@@ -447,20 +401,33 @@ public partial class MainWindow
             ? selectedTrack.AlbumArtist
             : selectedTrack.Artist ?? string.Empty;
 
-        ClearContextualPlaybackQueue();
+        TryInitializeContextQueue(
+            requestSource,
+            selectedTrack,
+            () => true,
+            () => AlbumTrackOrder.SortByAlbumSequence(
+                allTracks.Where(s =>
+                    string.Equals(s.Album, albumTitle, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(
+                        !string.IsNullOrWhiteSpace(s.AlbumArtist) ? s.AlbumArtist : s.Artist,
+                        selectedAlbumArtist,
+                        StringComparison.OrdinalIgnoreCase))).ToList());
+    }
 
-        var albumTracks = AlbumTrackOrder.SortByAlbumSequence(
-            allTracks.Where(s =>
-                string.Equals(s.Album, albumTitle, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(
-                    !string.IsNullOrWhiteSpace(s.AlbumArtist) ? s.AlbumArtist : s.Artist,
-                    selectedAlbumArtist,
-                    StringComparison.OrdinalIgnoreCase)));
-
-        if (albumTracks.Count == 0)
+    private void TryInitializeContextQueue(
+        object? requestSource,
+        Song selectedTrack,
+        Func<bool> isMatch,
+        Func<List<Song>> buildOrder)
+    {
+        if (!isMatch())
             return;
 
-        InitializeContextualSession(albumTracks, selectedTrack);
+        ClearContextualPlaybackQueue();
+        var ordered = buildOrder();
+        if (ordered.Count == 0)
+            return;
+        InitializeContextualSession(ordered, selectedTrack);
     }
 
     private bool HasContextualPlaybackQueue()
@@ -489,7 +456,7 @@ public partial class MainWindow
         if (natural.Count == 0)
             return null;
 
-        int idx = ArtistPlaybackOrder.IndexOfTrackInOrderedList(natural, currentTrack);
+        int idx = SongIdentity.IndexOf(natural, currentTrack);
         if (idx < 0)
             return null;
 
@@ -503,7 +470,7 @@ public partial class MainWindow
 
         if (titleBarPlayer.IsShuffleEnabled && shuffledTracks.Count > 0)
         {
-            int si = FindTrackIndexInPlayQueue(shuffledTracks, currentTrack);
+            int si = SongIdentity.IndexOf(shuffledTracks, currentTrack);
             if (si < 0)
                 si = 0;
 
@@ -603,24 +570,12 @@ public partial class MainWindow
             song.IsUserQueued = false;
     }
 
-    private static int IndexOfBySongPath(IList<Song> list, Song target)
-    {
-        if (list == null || target == null)
-            return -1;
-        for (int i = 0; i < list.Count; i++)
-        {
-            if (SameSongPath(list[i], target))
-                return i;
-        }
-        return -1;
-    }
-
     private Song? FindNaturalNextAfter(Song finished)
     {
         if (contextualSessionOrderedFull == null || finished == null)
             return null;
 
-        int idx = ArtistPlaybackOrder.IndexOfTrackInOrderedList(contextualSessionOrderedFull, finished);
+        int idx = SongIdentity.IndexOf(contextualSessionOrderedFull, finished);
         var histCounts = ContextualHistoryPathCounts();
         int start = idx >= 0 ? idx + 1 : 0;
 
@@ -677,7 +632,7 @@ public partial class MainWindow
 
         if (titleBarPlayer.IsShuffleEnabled)
         {
-            int existing = IndexOfBySongPath(contextualShuffledFuture, prev);
+            int existing = SongIdentity.IndexOfByPath(contextualShuffledFuture, prev);
             if (existing >= 0)
                 contextualShuffledFuture.RemoveAt(existing);
             contextualShuffledFuture.Insert(0, prev);
@@ -686,31 +641,6 @@ public partial class MainWindow
         SetActivePlaybackFuture(prev);
         trackToPlay = prev;
         return trackToPlay != null;
-    }
-
-    private static int FindTrackIndexInPlayQueue(IList<Song> queue, Song track)
-    {
-        if (queue == null || track == null)
-            return -1;
-
-        if (!string.IsNullOrWhiteSpace(track.FilePath))
-        {
-            for (int i = 0; i < queue.Count; i++)
-            {
-                var t = queue[i];
-                if (t != null && !string.IsNullOrWhiteSpace(t.FilePath) &&
-                    string.Equals(t.FilePath, track.FilePath, StringComparison.OrdinalIgnoreCase))
-                    return i;
-            }
-        }
-
-        for (int i = 0; i < queue.Count; i++)
-        {
-            if (ReferenceEquals(queue[i], track))
-                return i;
-        }
-
-        return -1;
     }
 
     private bool TrySyncPlaybackIndicesFromQueueView(Song track)
@@ -730,7 +660,7 @@ public partial class MainWindow
         if (queue is not IList<Song> list)
             return false;
 
-        int idx = FindTrackIndexInPlayQueue(list, t);
+        int idx = SongIdentity.IndexOf(list, t);
         if (idx < 0)
             return false;
 
@@ -742,7 +672,7 @@ public partial class MainWindow
                 return false;
 
             var head = contextualPlaybackFuture[0];
-            bool headMatches = head != null && SameSongPath(head, t);
+            bool headMatches = head != null && SongIdentity.SamePath(head, t);
 
             if (!headMatches)
                 return false;
@@ -774,7 +704,7 @@ public partial class MainWindow
         if (!HasContextualPlaybackQueue() || contextualPlaybackFuture == null)
             return;
 
-        int j = IndexOfBySongPath(contextualPlaybackFuture, track);
+        int j = SongIdentity.IndexOfByPath(contextualPlaybackFuture, track);
         if (j < 0)
         {
             ClearContextualPlaybackQueue();
@@ -818,7 +748,7 @@ public partial class MainWindow
                 contextualPlaybackFuture.Count > 0)
             {
                 var head = contextualPlaybackFuture[0];
-                bool headMatches = head != null && SameSongPath(head, t);
+                bool headMatches = head != null && SongIdentity.SamePath(head, t);
 
                 if (headMatches)
                 {
@@ -846,8 +776,8 @@ public partial class MainWindow
         {
             var t = contextualSessionOrderedFull[i];
             if (t == null) continue;
-            if (currentTrack != null && SameSongPath(t, currentTrack)) continue;
-            if (SameSongPath(t, song))
+            if (currentTrack != null && SongIdentity.SamePath(t, currentTrack)) continue;
+            if (SongIdentity.SamePath(t, song))
                 contextualSessionOrderedFull.RemoveAt(i);
         }
     }
@@ -857,7 +787,7 @@ public partial class MainWindow
         if (song == null) return;
         for (int i = contextualShuffledFuture.Count - 1; i >= 1; i--)
         {
-            if (SameSongPath(contextualShuffledFuture[i], song))
+            if (SongIdentity.SamePath(contextualShuffledFuture[i], song))
                 contextualShuffledFuture.RemoveAt(i);
         }
     }
@@ -900,13 +830,12 @@ public partial class MainWindow
             }
             else
             {
-                int absFrom = ArtistPlaybackOrder.IndexOfTrackInOrderedList(contextualSessionOrderedFull, fromTrack);
-                int absTo = ArtistPlaybackOrder.IndexOfTrackInOrderedList(contextualSessionOrderedFull, toTrack);
-                if (absFrom >= 0 && absTo >= 0)
+                int absFrom = SongIdentity.IndexOf(contextualSessionOrderedFull, fromTrack);
+                int absTo = SongIdentity.IndexOf(contextualSessionOrderedFull, toTrack);
+                if (absFrom >= 0 && absTo >= 0 && absFrom != absTo)
                 {
                     var movedNatural = contextualSessionOrderedFull[absFrom];
                     contextualSessionOrderedFull.RemoveAt(absFrom);
-                    if (absTo > absFrom) absTo -= 1;
                     contextualSessionOrderedFull.Insert(absTo, movedNatural);
                 }
             }

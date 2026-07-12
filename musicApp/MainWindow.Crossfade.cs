@@ -327,8 +327,7 @@ namespace musicApp
             // reflects the incoming track during the overlap (avoids Repair/Clear on cancel).
             _songOutgoingDuringCrossfade = currentTrack;
 
-            var art = AlbumArtLoader.LoadAlbumArt(next, GetTitleBarAlbumArtTargetPixelSize());
-            titleBarPlayer.SetTrackInfo(next.Title, next.Artist, next.Album, art);
+            UpdateNowPlayingUi(next);
             TitleBarSetAudioObjects(waveOut, _incomingAudioFileReader);
         }
 
@@ -413,8 +412,7 @@ namespace musicApp
                     UpdateShuffleIndicesAfterTrackChange(promoted);
                 }
 
-                var albumArt = AlbumArtLoader.LoadAlbumArt(promoted, GetTitleBarAlbumArtTargetPixelSize());
-                titleBarPlayer.SetTrackInfo(promoted.Title, promoted.Artist, promoted.Album, albumArt);
+                UpdateNowPlayingUi(promoted);
                 TitleBarSetAudioObjects(waveOut, audioFileReader);
 
                 AddToRecentlyPlayed(promoted);
@@ -453,8 +451,7 @@ namespace musicApp
                 currentTrack = back;
                 try
                 {
-                    var artBack = AlbumArtLoader.LoadAlbumArt(back, GetTitleBarAlbumArtTargetPixelSize());
-                    titleBarPlayer.SetTrackInfo(back.Title, back.Artist, back.Album, artBack);
+                    UpdateNowPlayingUi(back);
                     TitleBarSetAudioObjects(waveOut, audioFileReader);
                 }
                 catch

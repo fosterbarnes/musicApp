@@ -1,7 +1,0 @@
-v0.2.5 release (nuggetsEverdark)
-
-Shuffle:
-- Fix shuffle AGAIN (maybe)
-
-Startup:
-- Actually update UI and track list on startup

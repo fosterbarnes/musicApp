@@ -2,12 +2,20 @@
 $root = Split-Path -Path $PSScriptRoot -Parent
 $appRoot = "$root\musicApp"
 $version = "$appRoot\Version"
-$versionBuild = "$appRoot\VersionBuild"
-$versionTag = "$appRoot\VersionTag"
 $buildNotes = "$root\buildNotes.txt"
-$versionContents = [System.IO.File]::ReadAllText($version).Trim()
-$versionBuildContents = [System.IO.File]::ReadAllText($versionBuild).Trim()
-$versionTagContents = [System.IO.File]::ReadAllText($versionTag).Trim()
+
+function Read-VersionFileLines {
+    param([string]$LiteralPath = $version)
+    $raw = [System.IO.File]::ReadAllText($LiteralPath)
+    $lines = @($raw -split '\r?\n' | ForEach-Object { $_.TrimEnd() })
+    while ($lines.Count -lt 3) { $lines += '' }
+    return $lines
+}
+
+$versionLines = Read-VersionFileLines
+$versionContents = $versionLines[0].Trim()
+$versionTagContents = $versionLines[1].Trim()
+$versionBuildContents = $versionLines[2].Trim()
 $buildNotesContents = if (Test-Path -LiteralPath $buildNotes) {
     [System.IO.File]::ReadAllText($buildNotes).Trim()
 } else { "" }
@@ -34,12 +42,25 @@ function Write-RepoUtf8NoBomFile {
     [System.IO.File]::WriteAllText($LiteralPath, $Content, $Utf8NoBomEncoding)
 }
 
+function Write-VersionFile {
+    param(
+        [Parameter(Mandatory)][string]$SemVer,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Tag,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Build,
+        [string]$LiteralPath = $version
+    )
+    $content = (($SemVer.Trim(), $Tag.Trim(), $Build.Trim()) -join [Environment]::NewLine) + [Environment]::NewLine
+    Write-RepoUtf8NoBomFile -LiteralPath $LiteralPath -Content $content
+}
+
 function Set-VersionBuildPlatform {
     param(
         [Parameter(Mandatory)][string]$Platform,
-        [string]$LiteralPath = $versionBuild
+        [string]$LiteralPath = $version
     )
-    [System.IO.File]::WriteAllText($LiteralPath, $Platform)
+    $lines = Read-VersionFileLines -LiteralPath $LiteralPath
+    Write-VersionFile -SemVer $lines[0] -Tag $lines[1] -Build $Platform -LiteralPath $LiteralPath
+    $script:versionBuildContents = $Platform.Trim()
 }
 
 function Get-ReleaseTagSegment {

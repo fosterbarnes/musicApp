@@ -81,6 +81,7 @@ namespace musicApp
         private string? _pendingLaunchSettingsSection;
         private string? _pendingLaunchInfoSection;
         private SettingsView? _settingsWindow;
+        private MiniPlayerWindow? _miniPlayerWindow;
 
         // ===========================================
         // HOTKEY MANAGEMENT
@@ -246,93 +247,17 @@ namespace musicApp
             playlistsViewControl = new PlaylistsView();
             playlistsViewControl.LibraryTracks = allTracks;
 
-            void OnPlayTrackRequested(object? s, Song track) => PlayTrack(track, s);
-            songsView.PlayTrackRequested += OnPlayTrackRequested;
-            queueViewControl.PlayTrackRequested += OnPlayTrackRequested;
-            recentlyPlayedViewControl.PlayTrackRequested += OnPlayTrackRequested;
-            artistsViewControl.PlayTrackRequested += OnPlayTrackRequested;
-            genresViewControl.PlayTrackRequested += OnPlayTrackRequested;
-            playlistsViewControl.PlayTrackRequested += OnPlayTrackRequested;
-
-            songsView.PlayNextRequested += OnPlayNextRequested;
-            queueViewControl.PlayNextRequested += OnPlayNextRequested;
-            recentlyPlayedViewControl.PlayNextRequested += OnPlayNextRequested;
-            artistsViewControl.PlayNextRequested += OnPlayNextRequested;
-            genresViewControl.PlayNextRequested += OnPlayNextRequested;
-            playlistsViewControl.PlayNextRequested += OnPlayNextRequested;
-
-            songsView.AddToQueueRequested += OnAddToQueueRequested;
-            songsView.AddTrackToPlaylistRequested += OnAddTrackToPlaylistRequested;
-            songsView.CreateNewPlaylistWithTrackRequested += OnCreateNewPlaylistWithTrackRequested;
-            songsView.InfoRequested += OnInfoRequested;
-            queueViewControl.AddToQueueRequested += OnAddToQueueRequested;
-            queueViewControl.AddTrackToPlaylistRequested += OnAddTrackToPlaylistRequested;
-            queueViewControl.CreateNewPlaylistWithTrackRequested += OnCreateNewPlaylistWithTrackRequested;
-            queueViewControl.InfoRequested += OnInfoRequested;
-            recentlyPlayedViewControl.AddToQueueRequested += OnAddToQueueRequested;
-            recentlyPlayedViewControl.AddTrackToPlaylistRequested += OnAddTrackToPlaylistRequested;
-            recentlyPlayedViewControl.CreateNewPlaylistWithTrackRequested += OnCreateNewPlaylistWithTrackRequested;
-            recentlyPlayedViewControl.InfoRequested += OnInfoRequested;
-            artistsViewControl.AddToQueueRequested += OnAddToQueueRequested;
-            artistsViewControl.AddTrackToPlaylistRequested += OnAddTrackToPlaylistRequested;
-            artistsViewControl.CreateNewPlaylistWithTrackRequested += OnCreateNewPlaylistWithTrackRequested;
-            artistsViewControl.InfoRequested += OnInfoRequested;
-            genresViewControl.AddToQueueRequested += OnAddToQueueRequested;
-            genresViewControl.AddTrackToPlaylistRequested += OnAddTrackToPlaylistRequested;
-            genresViewControl.CreateNewPlaylistWithTrackRequested += OnCreateNewPlaylistWithTrackRequested;
-            genresViewControl.InfoRequested += OnInfoRequested;
-            playlistsViewControl.AddToQueueRequested += OnAddToQueueRequested;
-            playlistsViewControl.AddTrackToPlaylistRequested += OnAddTrackToPlaylistRequested;
-            playlistsViewControl.CreateNewPlaylistWithTrackRequested += OnCreateNewPlaylistWithTrackRequested;
-            playlistsViewControl.InfoRequested += OnInfoRequested;
-
-            songsView.ShowInExplorerRequested += OnShowInExplorerRequested;
-            queueViewControl.ShowInExplorerRequested += OnShowInExplorerRequested;
-            recentlyPlayedViewControl.ShowInExplorerRequested += OnShowInExplorerRequested;
-            artistsViewControl.ShowInExplorerRequested += OnShowInExplorerRequested;
-            genresViewControl.ShowInExplorerRequested += OnShowInExplorerRequested;
-            playlistsViewControl.ShowInExplorerRequested += OnShowInExplorerRequested;
-            songsView.ShowInArtistsRequested += OnShowInArtistsRequested;
-            queueViewControl.ShowInArtistsRequested += OnShowInArtistsRequested;
-            recentlyPlayedViewControl.ShowInArtistsRequested += OnShowInArtistsRequested;
-            artistsViewControl.ShowInArtistsRequested += OnShowInArtistsRequested;
-            genresViewControl.ShowInArtistsRequested += OnShowInArtistsRequested;
-            playlistsViewControl.ShowInArtistsRequested += OnShowInArtistsRequested;
-            songsView.ShowInAlbumsRequested += OnShowInAlbumsRequested;
-            queueViewControl.ShowInAlbumsRequested += OnShowInAlbumsRequested;
-            recentlyPlayedViewControl.ShowInAlbumsRequested += OnShowInAlbumsRequested;
-            artistsViewControl.ShowInAlbumsRequested += OnShowInAlbumsRequested;
-            genresViewControl.ShowInAlbumsRequested += OnShowInAlbumsRequested;
-            playlistsViewControl.ShowInAlbumsRequested += OnShowInAlbumsRequested;
-            songsView.ShowInQueueRequested += OnShowInQueueRequested;
-            recentlyPlayedViewControl.ShowInQueueRequested += OnShowInQueueRequested;
-            artistsViewControl.ShowInQueueRequested += OnShowInQueueRequested;
-            genresViewControl.ShowInQueueRequested += OnShowInQueueRequested;
-            playlistsViewControl.ShowInQueueRequested += OnShowInQueueRequested;
-            queueViewControl.ShowInSongsRequested += OnShowInSongsRequested;
-            recentlyPlayedViewControl.ShowInSongsRequested += OnShowInSongsRequested;
-            artistsViewControl.ShowInSongsRequested += OnShowInSongsRequested;
-            genresViewControl.ShowInSongsRequested += OnShowInSongsRequested;
-            playlistsViewControl.ShowInSongsRequested += OnShowInSongsRequested;
-
-            songsView.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
-            queueViewControl.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
-            recentlyPlayedViewControl.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
-            artistsViewControl.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
-            genresViewControl.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
-            playlistsViewControl.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
+            WireTrackListHost(songsView);
+            WireTrackListHost(queueViewControl);
+            WireTrackListHost(recentlyPlayedViewControl);
+            WireTrackListHost(artistsViewControl);
+            WireTrackListHost(genresViewControl);
+            WireTrackListHost(playlistsViewControl);
 
             songsView.AddMusicFolderRequested += OnAddMusicFolderRequested;
             artistsViewControl.AddMusicFolderRequested += OnAddMusicFolderRequested;
             genresViewControl.AddMusicFolderRequested += OnAddMusicFolderRequested;
             playlistsViewControl.AddMusicFolderRequested += OnAddMusicFolderRequested;
-
-            songsView.DeleteRequested += OnDeleteRequested;
-            queueViewControl.DeleteRequested += OnDeleteRequested;
-            recentlyPlayedViewControl.DeleteRequested += OnDeleteRequested;
-            artistsViewControl.DeleteRequested += OnDeleteRequested;
-            genresViewControl.DeleteRequested += OnDeleteRequested;
-            playlistsViewControl.DeleteRequested += OnDeleteRequested;
 
             queueViewControl.TracksReordered += OnQueueTracksReordered;
             queueViewControl.QueueToolbarRemoveRequested += OnQueueToolbarRemoveRequested;
@@ -348,6 +273,23 @@ namespace musicApp
 
             ApplyInitialMainView(appSettings.LastActiveView);
             UpdateUI();
+        }
+
+        private void WireTrackListHost(TrackListHostBase source)
+        {
+            source.PlayTrackRequested += (s, track) => PlayTrack(track, s);
+            source.PlayNextRequested += OnPlayNextRequested;
+            source.AddToQueueRequested += OnAddToQueueRequested;
+            source.AddTrackToPlaylistRequested += OnAddTrackToPlaylistRequested;
+            source.CreateNewPlaylistWithTrackRequested += OnCreateNewPlaylistWithTrackRequested;
+            source.InfoRequested += OnInfoRequested;
+            source.ShowInExplorerRequested += OnShowInExplorerRequested;
+            source.ShowInArtistsRequested += OnShowInArtistsRequested;
+            source.ShowInAlbumsRequested += OnShowInAlbumsRequested;
+            source.ShowInQueueRequested += OnShowInQueueRequested;
+            source.ShowInSongsRequested += OnShowInSongsRequested;
+            source.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
+            source.DeleteRequested += OnDeleteRequested;
         }
 
         private string GetCurrentMainViewKey()
@@ -1012,6 +954,7 @@ namespace musicApp
                 queuePopupView.QueueToolbarRemoveRequested += OnQueueToolbarRemoveRequested;
                 queuePopupView.QueueToolbarMoveUpRequested += OnQueueToolbarMoveUpRequested;
                 queuePopupView.QueueToolbarMoveDownRequested += OnQueueToolbarMoveDownRequested;
+                queuePopupView.TracksReordered += OnQueueTracksReordered;
                 queuePopupView.PlayNextRequested += OnPlayNextRequested;
                 queuePopupView.AddToQueueRequested += OnAddToQueueRequested;
                 queuePopupView.AddTrackToPlaylistRequested += OnAddTrackToPlaylistRequested;
@@ -1063,10 +1006,68 @@ namespace musicApp
                     break;
                 case object _ when ReferenceEquals(current, playlistsViewControl):
                     UpdatePlaylistsView();
+                    PushMiniPlayerQueue();
                     break;
                 default:
+                    PushMiniPlayerQueue();
                     break;
             }
+        }
+
+        private void PushMiniPlayerTrack(Song? track)
+        {
+            if (_miniPlayerWindow == null)
+                return;
+
+            if (track == null)
+            {
+                _miniPlayerWindow.SetTrackInfo("No track selected", "", null, null);
+                return;
+            }
+
+            // Text first; art loads full-res off the UI thread (same source as albums flyout).
+            // AlbumArtLoader prefers the 250px disk thumbnail cache — too soft for the large art panel.
+            _miniPlayerWindow.SetTrackInfo(track.Title, track.Artist, track.Album, null);
+            _ = LoadMiniPlayerAlbumArtAsync(_miniPlayerWindow, track);
+        }
+
+        private async Task LoadMiniPlayerAlbumArtAsync(MiniPlayerWindow window, Song track)
+        {
+            try
+            {
+                int px = window.GetAlbumArtTargetPixelSize();
+                var art = await Task.Run(() =>
+                    (System.Windows.Media.ImageSource?)AlbumArtThumbnailHelper.LoadFullSizeForTrack(track)
+                    ?? AlbumArtLoader.LoadAlbumArt(track, px));
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (!ReferenceEquals(_miniPlayerWindow, window))
+                        return;
+                    if (currentTrack == null ||
+                        !string.Equals(currentTrack.FilePath, track.FilePath, StringComparison.OrdinalIgnoreCase))
+                        return;
+                    window.SetTrackInfo(track.Title, track.Artist, track.Album, art);
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"LoadMiniPlayerAlbumArtAsync: {ex.Message}");
+            }
+        }
+
+        private void PushMiniPlayerQueue()
+        {
+            if (_miniPlayerWindow == null)
+                return;
+            _miniPlayerWindow.SetQueue(BuildQueueView(UILayoutConstants.CompactQueueListMaxItems));
+        }
+
+        private void ClearMiniPlayerTrack()
+        {
+            if (_miniPlayerWindow == null)
+                return;
+            _miniPlayerWindow.SetTrackInfo("No track selected", "", null, null);
         }
 
         private void RefreshTrackListBindingsAndAlbumsView(Song? updatedTrack, bool allowInPlaceAlbumPatch)
@@ -1112,6 +1113,14 @@ namespace musicApp
 
             var albumArt = AlbumArtLoader.LoadAlbumArt(currentTrack, GetTitleBarAlbumArtTargetPixelSize());
             titleBarPlayer.SetTrackInfo(currentTrack.Title, currentTrack.Artist, currentTrack.Album, albumArt);
+            PushMiniPlayerTrack(currentTrack);
+        }
+
+        private void PushMiniPlayerState(MiniPlayerWindow w)
+        {
+            PushMiniPlayerTrack(currentTrack);
+            w.SetAudioObjects(waveOut, audioFileReader);
+            w.SetQueue(BuildQueueView(UILayoutConstants.CompactQueueListMaxItems));
         }
 
         private void RefreshAfterMetadataEdit(Song updatedTrack)
@@ -1305,7 +1314,7 @@ namespace musicApp
             searchPopup.IsOpen = false;
             queuePopup.HorizontalOffset = 0;
             if (queuePopupView != null)
-                queuePopupView.QueueTracks = BuildQueueView();
+                queuePopupView.QueueTracks = BuildQueueView(UILayoutConstants.CompactQueueListMaxItems);
             queuePopup.IsOpen = true;
             queuePopupView?.RefreshHeight();
         }
@@ -1398,7 +1407,7 @@ namespace musicApp
                 if (currentTrack != null)
                 {
                     currentTrackIndex = filteredTracks.IndexOf(currentTrack);
-                    currentShuffledIndex = FindTrackIndexInPlayQueue(shuffledTracks, currentTrack);
+                    currentShuffledIndex = SongIdentity.IndexOf(shuffledTracks, currentTrack);
                     if (currentShuffledIndex < 0)
                         currentShuffledIndex = 0;
                 }
@@ -1487,7 +1496,7 @@ namespace musicApp
             if (currentTrack != null)
             {
                 currentTrackIndex = filteredTracks.IndexOf(currentTrack);
-                currentShuffledIndex = FindTrackIndexInPlayQueue(shuffledTracks, currentTrack);
+                currentShuffledIndex = SongIdentity.IndexOf(shuffledTracks, currentTrack);
                 if (currentShuffledIndex < 0)
                     RegenerateShuffledTracks();
             }
@@ -1509,7 +1518,7 @@ namespace musicApp
                     RegenerateShuffledTracks();
                 else
                 {
-                    int siAfter = FindTrackIndexInPlayQueue(shuffledTracks, track);
+                    int siAfter = SongIdentity.IndexOf(shuffledTracks, track);
                     if (siAfter >= 0)
                         currentShuffledIndex = siAfter;
                     currentTrackIndex = filteredTracks.IndexOf(track);
@@ -1525,7 +1534,7 @@ namespace musicApp
             }
             currentTrackIndex = li;
 
-            int si = FindTrackIndexInPlayQueue(shuffledTracks, track);
+            int si = SongIdentity.IndexOf(shuffledTracks, track);
             if (si < 0)
             {
                 RegenerateShuffledTracks();
@@ -1552,7 +1561,7 @@ namespace musicApp
                     return;
                 }
 
-                if (currentTrack != null && FindTrackIndexInPlayQueue(shuffledTracks, currentTrack) == -1)
+                if (currentTrack != null && SongIdentity.IndexOf(shuffledTracks, currentTrack) == -1)
                 {
                     RegenerateShuffledTracks();
                     return;
@@ -1560,7 +1569,7 @@ namespace musicApp
 
                 if (currentTrack != null && currentShuffledIndex == -1)
                 {
-                    currentShuffledIndex = FindTrackIndexInPlayQueue(shuffledTracks, currentTrack);
+                    currentShuffledIndex = SongIdentity.IndexOf(shuffledTracks, currentTrack);
                     if (currentShuffledIndex == -1)
                         RegenerateShuffledTracks();
                 }
@@ -2207,7 +2216,13 @@ namespace musicApp
         /// <summary>
         /// Inserts the given track to play immediately after the current track (play next).
         /// </summary>
-        private void OnPlayNextRequested(object? sender, Song track)
+        private void OnPlayNextRequested(object? sender, Song track) =>
+            InjectTrackIntoQueue(track, playNext: true);
+
+        private void OnAddToQueueRequested(object? sender, Song track) =>
+            InjectTrackIntoQueue(track, playNext: false);
+
+        private void InjectTrackIntoQueue(Song track, bool playNext)
         {
             if (!IsValidTrackWithPath(track))
                 return;
@@ -2216,59 +2231,38 @@ namespace musicApp
             if (session == null)
                 return;
 
-            bool sameAsCurrent = currentTrack != null && SameSongPath(currentTrack, track);
+            bool sameAsCurrent = currentTrack != null && SongIdentity.SamePath(currentTrack, track);
 
             if (!sameAsCurrent)
             {
                 RemoveFromSessionOrderedFullSkippingCurrent(track);
                 RemoveFromShuffledFutureSkippingHead(track);
 
-                int curIdx = currentTrack != null
-                    ? Helpers.ArtistPlaybackOrder.IndexOfTrackInOrderedList(session, currentTrack)
-                    : -1;
-                int insertIdx = curIdx + 1;
-                if (insertIdx < 0 || insertIdx > session.Count)
-                    insertIdx = session.Count;
-                session.Insert(insertIdx, track);
-
-                if (titleBarPlayer.IsShuffleEnabled)
+                if (playNext)
                 {
-                    int shInsert = contextualShuffledFuture.Count >= 1 ? 1 : 0;
-                    contextualShuffledFuture.Insert(shInsert, track);
-                    CaptureContextualShuffleWrapPathOrder();
+                    int curIdx = currentTrack != null
+                        ? SongIdentity.IndexOf(session, currentTrack)
+                        : -1;
+                    int insertIdx = curIdx + 1;
+                    if (insertIdx < 0 || insertIdx > session.Count)
+                        insertIdx = session.Count;
+                    session.Insert(insertIdx, track);
+
+                    if (titleBarPlayer.IsShuffleEnabled)
+                    {
+                        int shInsert = contextualShuffledFuture.Count >= 1 ? 1 : 0;
+                        contextualShuffledFuture.Insert(shInsert, track);
+                        CaptureContextualShuffleWrapPathOrder();
+                    }
                 }
-            }
-
-            MarkUserQueued(track);
-            SetActivePlaybackFuture(currentTrack);
-            UpdateQueueView();
-            RefreshVisibleViews();
-        }
-
-        /// <summary>
-        /// Appends the given track to the end of the current queue.
-        /// </summary>
-        private void OnAddToQueueRequested(object? sender, Song track)
-        {
-            if (!IsValidTrackWithPath(track))
-                return;
-
-            var session = GetOrPromoteContextualSessionForQueueEdit();
-            if (session == null)
-                return;
-
-            bool sameAsCurrent = currentTrack != null && SameSongPath(currentTrack, track);
-
-            if (!sameAsCurrent)
-            {
-                RemoveFromSessionOrderedFullSkippingCurrent(track);
-                RemoveFromShuffledFutureSkippingHead(track);
-
-                session.Add(track);
-                if (titleBarPlayer.IsShuffleEnabled)
+                else
                 {
-                    contextualShuffledFuture.Add(track);
-                    CaptureContextualShuffleWrapPathOrder();
+                    session.Add(track);
+                    if (titleBarPlayer.IsShuffleEnabled)
+                    {
+                        contextualShuffledFuture.Add(track);
+                        CaptureContextualShuffleWrapPathOrder();
+                    }
                 }
             }
 
@@ -2287,12 +2281,7 @@ namespace musicApp
 
         private void OnQueueToolbarRemoveRequested(object? sender, EventArgs e)
         {
-            int viewIndex = -1;
-            if (queuePopupView != null && ReferenceEquals(sender, queuePopupView))
-                viewIndex = queuePopupView.GetSelectedViewIndex();
-            else if (queueViewControl != null)
-                viewIndex = queueViewControl.GetSelectedViewIndex();
-
+            int viewIndex = GetQueueToolbarSelectedViewIndex(sender);
             if (viewIndex < 0)
                 return;
 
@@ -2307,7 +2296,7 @@ namespace musicApp
 
             Song? removed = queue[q];
             bool removeWasCurrent = viewIndex == 0 && currentTrack != null && removed != null &&
-                SameSongPath(removed, currentTrack);
+                SongIdentity.SamePath(removed, currentTrack);
 
             bool wasPlaying = titleBarPlayer.IsPlaying;
 
@@ -2319,7 +2308,7 @@ namespace musicApp
                 {
                     int sIdx = contextualShuffledFuture.FindIndex(t => ReferenceEquals(t, removed));
                     if (sIdx < 0)
-                        sIdx = IndexOfBySongPath(contextualShuffledFuture, removed);
+                        sIdx = SongIdentity.IndexOfByPath(contextualShuffledFuture, removed);
                     if (sIdx >= 0)
                         contextualShuffledFuture.RemoveAt(sIdx);
                 }
@@ -2329,7 +2318,7 @@ namespace musicApp
 
                 int sessionIdx = contextualSessionOrderedFull.FindIndex(t => ReferenceEquals(t, removed));
                 if (sessionIdx < 0)
-                    sessionIdx = IndexOfBySongPath(contextualSessionOrderedFull, removed);
+                    sessionIdx = SongIdentity.IndexOfByPath(contextualSessionOrderedFull, removed);
                 if (sessionIdx >= 0)
                     contextualSessionOrderedFull.RemoveAt(sessionIdx);
 
@@ -2384,11 +2373,47 @@ namespace musicApp
             RefreshVisibleViews();
         }
 
+        private Song? GetQueueToolbarSelectedSong(object? sender)
+        {
+            if (queuePopupView != null && ReferenceEquals(sender, queuePopupView))
+                return queuePopupView.GetPrimarySelectedSong();
+
+            if (_miniPlayerWindow != null && ReferenceEquals(sender, _miniPlayerWindow))
+                return _miniPlayerWindow.GetPrimarySelectedSong();
+
+            return queueViewControl?.SelectedTrack;
+        }
+
+        private int GetQueueToolbarSelectedViewIndex(object? sender)
+        {
+            var playQ = GetCurrentPlayQueue();
+            int baseIdx = GetCurrentTrackIndex();
+            if (playQ == null || baseIdx < 0)
+                return -1;
+
+            var selected = GetQueueToolbarSelectedSong(sender);
+            if (selected != null)
+            {
+                for (int i = 0; i < playQ.Count; i++)
+                {
+                    if (ReferenceEquals(playQ[i], selected) || SongIdentity.SamePath(playQ[i], selected))
+                    {
+                        int viewIdx = i - baseIdx;
+                        return viewIdx >= 0 ? viewIdx : -1;
+                    }
+                }
+            }
+
+            if (queuePopupView != null && ReferenceEquals(sender, queuePopupView))
+                return queuePopupView.GetSelectedViewIndex();
+            if (_miniPlayerWindow != null && ReferenceEquals(sender, _miniPlayerWindow))
+                return _miniPlayerWindow.GetSelectedViewIndex();
+            return queueViewControl?.GetSelectedViewIndex() ?? -1;
+        }
+
         private void OnQueueToolbarMoveUpRequested(object? sender, EventArgs e)
         {
-            int ix = queuePopupView != null && ReferenceEquals(sender, queuePopupView)
-                ? queuePopupView.GetSelectedViewIndex()
-                : queueViewControl?.GetSelectedViewIndex() ?? -1;
+            int ix = GetQueueToolbarSelectedViewIndex(sender);
             if (ix < 2)
                 return;
             OnQueueTracksReordered(this, (ix, ix - 1));
@@ -2396,15 +2421,8 @@ namespace musicApp
 
         private void OnQueueToolbarMoveDownRequested(object? sender, EventArgs e)
         {
-            var playQ = GetCurrentPlayQueue();
-            int baseIdx = GetCurrentTrackIndex();
-            int ix = queuePopupView != null && ReferenceEquals(sender, queuePopupView)
-                ? queuePopupView.GetSelectedViewIndex()
-                : queueViewControl?.GetSelectedViewIndex() ?? -1;
-            if (playQ == null || baseIdx < 0 || ix < 1)
-                return;
-            int viewCount = playQ.Count - baseIdx;
-            if (ix >= viewCount - 1)
+            int ix = GetQueueToolbarSelectedViewIndex(sender);
+            if (ix < 1)
                 return;
             OnQueueTracksReordered(this, (ix, ix + 1));
         }
@@ -2422,31 +2440,7 @@ namespace musicApp
             if (queue == null || queue.Count == 0)
                 return false;
 
-            if (!string.IsNullOrWhiteSpace(track.FilePath))
-            {
-                for (int i = 0; i < queue.Count; i++)
-                {
-                    var queued = queue[i];
-                    if (!string.IsNullOrWhiteSpace(queued.FilePath) &&
-                        string.Equals(queued.FilePath, track.FilePath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            for (int i = 0; i < queue.Count; i++)
-            {
-                var queued = queue[i];
-                if (string.Equals(queued.Title, track.Title, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(queued.Artist, track.Artist, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(queued.Album, track.Album, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return SongIdentity.IndexOf(queue, track) >= 0;
         }
 
         private async void OnAddTrackToPlaylistRequested(object? sender, (Song track, Playlist playlist) args)
@@ -2561,6 +2555,7 @@ namespace musicApp
                 currentShuffledIndex = -1;
                 ClearContextualPlaybackQueue();
                 titleBarPlayer.SetTrackInfo("No track selected", "", "");
+                ClearMiniPlayerTrack();
             }
 
             foreach (var track in tracks)
@@ -2610,10 +2605,23 @@ namespace musicApp
 
                 if (queuePopup.IsOpen && queuePopupView != null)
                 {
-                    queuePopupView.QueueTracks = queueView ?? new ObservableCollection<Song>();
+                    var max = UILayoutConstants.CompactQueueListMaxItems;
+                    ObservableCollection<Song> capped;
+                    if (queueView != null && queueView.Count > max)
+                    {
+                        capped = new ObservableCollection<Song>();
+                        for (int i = 0; i < max; i++)
+                            capped.Add(queueView[i]);
+                    }
+                    else
+                        capped = queueView ?? new ObservableCollection<Song>();
+
+                    queuePopupView.QueueTracks = capped;
                     queuePopupView.RefreshHeight();
                     _ = Dispatcher.BeginInvoke(new Action(CenterQueuePopupUnderPlacementButton), DispatcherPriority.ContextIdle);
                 }
+
+                PushMiniPlayerQueue();
             }
             catch (Exception ex)
             {
@@ -2622,7 +2630,7 @@ namespace musicApp
             }
         }
 
-        private ObservableCollection<Song> BuildQueueView()
+        private ObservableCollection<Song> BuildQueueView(int? maxItems = null)
         {
             try
             {
@@ -2642,6 +2650,9 @@ namespace musicApp
                     {
                         for (int i = currentIndex + 1; i < currentQueue.Count; i++)
                         {
+                            if (maxItems.HasValue && queueView.Count >= maxItems.Value)
+                                break;
+
                             var track = currentQueue[i];
                             if (track != null && !string.IsNullOrEmpty(track.FilePath))
                                 queueView.Add(track);
@@ -2883,24 +2894,7 @@ namespace musicApp
 
                 try
                 {
-                    titleBarPlayer.IsPlaying = false;
-                    TeardownCrossfadePlaybackState();
-
-                    if (waveOut != null)
-                    {
-                        waveOut.PlaybackStopped -= WaveOut_PlaybackStopped;
-                        waveOut.Stop();
-                        waveOut.Dispose();
-                        waveOut = null;
-                    }
-
-                    if (audioFileReader != null)
-                    {
-                        audioFileReader.Dispose();
-                        audioFileReader = null;
-                    }
-
-                    ClearCrossfadeMixerReferences();
+                    TeardownPlaybackOutput();
                 }
                 catch (Exception ex)
                 {
@@ -2910,26 +2904,13 @@ namespace musicApp
                 currentTrack = track;
                 ClearInjectedFlagFor(track);
 
-                // Set the current track index in the active queue context.
                 SyncCurrentTrackIndices(track, requestSource);
                 UpdateShuffleIndicesAfterTrackChange(track);
 
-                var albumArt = AlbumArtLoader.LoadAlbumArt(track, GetTitleBarAlbumArtTargetPixelSize());
-
-                titleBarPlayer.SetTrackInfo(track.Title, track.Artist, track.Album, albumArt);
+                UpdateNowPlayingUi(track);
                 TitleBarSetAudioObjects(waveOut, audioFileReader);
 
-                RefreshPlaybackAudioPreferenceFields();
-                audioFileReader = new AudioFileReader(track.FilePath);
-                waveOut = AudioOutputDeviceFactory.Create(_cachedAudioBackend);
-                waveOut.PlaybackStopped += WaveOut_PlaybackStopped;
-                waveOut.Init(CreatePlaybackInitChain(audioFileReader, track.FilePath));
-                waveOut.Play();
-
-                TitleBarSetAudioObjects(waveOut, audioFileReader);
-                titleBarPlayer.IsPlaying = true;
-                _crossfadeOverlapStartedForThisOutgoing = false;
-                EnsureCrossfadePollTimer();
+                CreateAndBindPlaybackOutput(track.FilePath, autoPlay: true);
 
                 AddToRecentlyPlayed(track);
 
@@ -2979,25 +2960,12 @@ namespace musicApp
                 currentTrack = track;
                 ClearInjectedFlagFor(track);
 
-                // Set the current track index in the active queue context.
                 SyncCurrentTrackIndices(track);
                 UpdateShuffleIndicesAfterTrackChange(track);
 
-                var albumArt = AlbumArtLoader.LoadAlbumArt(track, GetTitleBarAlbumArtTargetPixelSize());
-
-                titleBarPlayer.SetTrackInfo(track.Title, track.Artist, track.Album, albumArt);
-
-                RefreshPlaybackAudioPreferenceFields();
-                audioFileReader = new AudioFileReader(track.FilePath);
-                waveOut = AudioOutputDeviceFactory.Create(_cachedAudioBackend);
-                waveOut.PlaybackStopped += WaveOut_PlaybackStopped;
-                waveOut.Init(CreatePlaybackInitChain(audioFileReader, track.FilePath));
-
-                TitleBarSetAudioObjects(waveOut, audioFileReader);
-
+                UpdateNowPlayingUi(track);
+                CreateAndBindPlaybackOutput(track.FilePath, autoPlay: false);
                 titleBarPlayer.IsPlaying = wasPlaying;
-                _crossfadeOverlapStartedForThisOutgoing = false;
-                EnsureCrossfadePollTimer();
 
                 AddToRecentlyPlayed(track);
 
@@ -3079,6 +3047,7 @@ namespace musicApp
                 currentShuffledIndex = -1;
 
                 titleBarPlayer.SetTrackInfo("No track selected", "", "");
+                ClearMiniPlayerTrack();
                 RefreshVisibleViews();
             }
             catch (Exception ex)

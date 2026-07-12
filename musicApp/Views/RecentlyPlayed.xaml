@@ -1,6 +1,7 @@
-<UserControl x:Class="musicApp.Views.RecentlyPlayedView"
+<local:TrackListHostBase x:Class="musicApp.Views.RecentlyPlayedView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:musicApp.Views"
              xmlns:views="clr-namespace:musicApp.Views"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -9,7 +10,6 @@
     <Grid>
         <views:TrackListView x:Name="trackList"
                              ViewName="Recently Played"
-                             SingleClickPlays="True"
-                             PlayTrackRequested="TrackList_PlayTrackRequested" />
+                             SingleClickPlays="True"/>
     </Grid>
-</UserControl>
+</local:TrackListHostBase>

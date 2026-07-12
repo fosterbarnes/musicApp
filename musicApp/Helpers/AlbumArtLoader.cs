@@ -11,8 +11,6 @@ namespace musicApp.Helpers;
 
 public static class AlbumArtLoader
 {
-    private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
-
     /// <summary>Physical pixel size for the title bar album square at the given DPI (matches <see cref="UILayoutConstants.TitleBarAlbumArtLogicalSizeDip"/> dip).</summary>
     public static int GetTitleBarTargetPixelSize(System.Windows.DpiScale dpi)
     {
@@ -37,13 +35,10 @@ public static class AlbumArtLoader
 
             try
             {
-                using var fs = new FileStream(track.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                var atlTrack = new Track(fs);
-                var embeddedPictures = atlTrack.EmbeddedPictures;
-
-                if (embeddedPictures != null && embeddedPictures.Count > 0)
+                var embedded = AlbumArtSourceResolver.TryLoadEmbeddedBytes(track.FilePath);
+                if (embedded != null)
                 {
-                    var bmp = AlbumArtDownscaleHelper.TryDownscaleToBitmapSource(embeddedPictures[0].PictureData, targetSizePx);
+                    var bmp = AlbumArtDownscaleHelper.TryDownscaleToBitmapSource(embedded, targetSizePx);
                     if (bmp != null)
                         return bmp;
                 }
@@ -53,27 +48,11 @@ public static class AlbumArtLoader
                 Debug.WriteLine($"Error loading embedded album art for {track.Title}: {ex.Message}");
             }
 
-            var directory = Path.GetDirectoryName(track.FilePath);
-            if (directory == null)
-                return null;
-
-            var imageFiles = Directory.GetFiles(directory, "*.*")
-                .Where(file => ImageExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
-                .ToList();
-
-            var albumArtFile = imageFiles.FirstOrDefault(file =>
-            {
-                var fileName = Path.GetFileNameWithoutExtension(file).ToLowerInvariant();
-                return fileName.Contains("album") ||
-                       fileName.Contains("cover") ||
-                       fileName.Contains("art") ||
-                       fileName.Contains("folder");
-            }) ?? imageFiles.FirstOrDefault();
-
+            var albumArtFile = AlbumArtSourceResolver.TryFindDirectoryCoverPath(track.FilePath);
             if (albumArtFile != null)
                 return AlbumArtDownscaleHelper.TryDownscaleToBitmapSource(albumArtFile, targetSizePx);
 
-            var itcBytes = FruitAppLocalAlbumArtCache.TryGetCoverImageBytesForAudioPath(track.FilePath);
+            var itcBytes = AlbumArtSourceResolver.TryLoadItunesCacheBytes(track.FilePath);
             return itcBytes != null ? AlbumArtDownscaleHelper.TryDownscaleToBitmapSource(itcBytes, targetSizePx) : null;
         }
         catch (Exception ex)

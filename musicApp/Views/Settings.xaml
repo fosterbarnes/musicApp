@@ -295,11 +295,15 @@
                                         Orientation="Horizontal"
                                         Margin="{StaticResource FieldRowGap-thk}"
                                         VerticalAlignment="Center">
-                                <Button Content="Import"
+                                <Button x:Name="GeneralImportSettingsButton"
+                                        Content="Import"
                                         Style="{StaticResource SettingsGeneralActionButtonStyle}"
-                                        Margin="{StaticResource Right8-thk}" />
-                                <Button Content="Export"
-                                        Style="{StaticResource SettingsGeneralActionButtonStyle}" />
+                                        Margin="{StaticResource Right8-thk}"
+                                        Click="GeneralImportSettingsButton_Click" />
+                                <Button x:Name="GeneralExportSettingsButton"
+                                        Content="Export"
+                                        Style="{StaticResource SettingsGeneralActionButtonStyle}"
+                                        Click="GeneralExportSettingsButton_Click" />
                             </StackPanel>
                         </Grid>
                     </ScrollViewer>
@@ -823,6 +827,8 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0"
@@ -903,6 +909,27 @@
                                 <ComboBoxItem Content="Import..." />
                                 <ComboBoxItem Content="Export..." />
                             </ComboBox>
+
+                            <Separator Grid.Row="7"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="8"
+                                       Grid.Column="0"
+                                       Text="Donation links"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <CheckBox x:Name="ThemeShowDonationLinksCheckBox"
+                                      Grid.Row="8"
+                                      Grid.Column="1"
+                                      Content="Show donation links"
+                                      Foreground="{StaticResource TextPrimary-brush}"
+                                      Margin="{StaticResource FieldRowGap-thk}"
+                                      VerticalAlignment="Center"
+                                      Checked="ThemeShowDonationLinksCheckBox_Changed"
+                                      Unchecked="ThemeShowDonationLinksCheckBox_Changed" />
                         </Grid>
                     </ScrollViewer>
                 </Grid>
@@ -1125,6 +1152,19 @@
                                                        RequestNavigate="AboutHyperlink_RequestNavigate"
                                                        Foreground="{StaticResource TextLinkStrong-brush}">
                                                 github.com/fosterbarnes/musicApp/issues/new
+                                            </Hyperlink>
+                                        </Paragraph>
+                                    </FlowDocument>
+                                </RichTextBox>
+                                <RichTextBox x:Name="AboutDonationLinkText"
+                                             Style="{StaticResource AboutLinkReadOnlyRichTextBoxStyle}">
+                                    <FlowDocument PagePadding="0" TextAlignment="Left">
+                                        <Paragraph Margin="0">
+                                            <Hyperlink Style="{StaticResource AboutHyperlinkStyle}"
+                                                       NavigateUri="https://buymeacoffee.com/fosterbarnes"
+                                                       RequestNavigate="AboutHyperlink_RequestNavigate"
+                                                       Foreground="{StaticResource TextLinkStrong-brush}">
+                                                buymeacoffee.com/fosterbarnes
                                             </Hyperlink>
                                         </Paragraph>
                                     </FlowDocument>

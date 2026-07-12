@@ -4,32 +4,23 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
+using musicApp.Helpers;
 
 namespace musicApp.Views
 {
-    public partial class PlaylistsView : UserControl
+    public partial class PlaylistsView : TrackListHostBase
     {
         private ObservableCollection<Song>? _libraryTracks;
         private INotifyCollectionChanged? _libraryCollectionNotify;
+
+        protected override TrackListView TrackList => trackList;
 
         public PlaylistsView()
         {
             InitializeComponent();
             emptyLibraryOverlay.AddMusicFolderRequested += (_, __) => AddMusicFolderRequested?.Invoke(this, EventArgs.Empty);
             trackList.ContextMenuViewName = "Playlists";
-            trackList.AddToPlaylistRequested += (s, track) => AddToPlaylistRequested?.Invoke(this, track);
-            trackList.AddTrackToPlaylistRequested += (s, args) => AddTrackToPlaylistRequested?.Invoke(this, args);
-            trackList.CreateNewPlaylistWithTrackRequested += (s, track) => CreateNewPlaylistWithTrackRequested?.Invoke(this, track);
-            trackList.PlayNextRequested += (s, track) => PlayNextRequested?.Invoke(this, track);
-            trackList.AddToQueueRequested += (s, track) => AddToQueueRequested?.Invoke(this, track);
-            trackList.InfoRequested += (s, track) => InfoRequested?.Invoke(this, track);
-            trackList.ShowInArtistsRequested += (s, track) => ShowInArtistsRequested?.Invoke(this, track);
-            trackList.ShowInSongsRequested += (s, track) => ShowInSongsRequested?.Invoke(this, track);
-            trackList.ShowInAlbumsRequested += (s, track) => ShowInAlbumsRequested?.Invoke(this, track);
-            trackList.ShowInQueueRequested += (s, track) => ShowInQueueRequested?.Invoke(this, track);
-            trackList.ShowInExplorerRequested += (s, track) => ShowInExplorerRequested?.Invoke(this, track);
-            trackList.RemoveFromLibraryRequested += (s, tracks) => RemoveFromLibraryRequested?.Invoke(this, tracks);
-            trackList.DeleteRequested += (s, track) => DeleteRequested?.Invoke(this, track);
+            WireTrackList();
             trackList.RemoveFromPlaylistRequested += (s, args) => RemoveFromPlaylistRequested?.Invoke(this, args);
         }
 
@@ -66,30 +57,14 @@ namespace musicApp.Views
 
         public Playlist? SelectedPlaylist => lstPlaylists.SelectedItem as Playlist;
 
-        public Song? SelectedTrack => trackList.SelectedTrack;
-
         public void SelectTrack(Song track, bool grabFocus = false)
         {
             if (track == null) return;
-            trackList.ScrollToSong(track, grabFocus);
+            var matched = SongIdentity.FindInEnumerable(trackList.ItemsSource, track) ?? track;
+            trackList.ScrollToSong(matched, grabFocus);
         }
 
-        public event System.EventHandler<Song>? PlayTrackRequested;
-
-        public event System.EventHandler<Song>? AddToPlaylistRequested;
-        public event System.EventHandler<(Song track, Playlist playlist)>? AddTrackToPlaylistRequested;
-        public event System.EventHandler<Song>? CreateNewPlaylistWithTrackRequested;
-        public event System.EventHandler<Song>? PlayNextRequested;
-        public event System.EventHandler<Song>? AddToQueueRequested;
-        public event System.EventHandler<Song>? InfoRequested;
-        public event System.EventHandler<Song>? ShowInArtistsRequested;
-        public event System.EventHandler<Song>? ShowInSongsRequested;
-        public event System.EventHandler<Song>? ShowInAlbumsRequested;
-        public event System.EventHandler<Song>? ShowInQueueRequested;
-        public event System.EventHandler<Song>? ShowInExplorerRequested;
-        public event System.EventHandler<IReadOnlyList<Song>>? RemoveFromLibraryRequested;
-        public event System.EventHandler<Song>? DeleteRequested;
-        public event System.EventHandler<(Song track, Playlist playlist)>? RemoveFromPlaylistRequested;
+        public event EventHandler<(Song track, Playlist playlist)>? RemoveFromPlaylistRequested;
 
         private void OnLibraryTracksChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -131,11 +106,6 @@ namespace musicApp.Views
             }
         }
 
-        private void TrackList_PlayTrackRequested(object? sender, Song e)
-        {
-            PlayTrackRequested?.Invoke(this, e);
-        }
-
         public event EventHandler? CreatePlaylistRequested;
         public event EventHandler? ImportPlaylistRequested;
         public event EventHandler<Playlist>? ExportPlaylistRequested;
@@ -149,8 +119,6 @@ namespace musicApp.Views
             if (playlist != null)
                 lstPlaylists.ScrollIntoView(playlist);
         }
-
-        public void RefreshTrackListBindings() => trackList.RefreshItemBindings();
 
         private void CreatePlaylist_Click(object sender, RoutedEventArgs e)
         {

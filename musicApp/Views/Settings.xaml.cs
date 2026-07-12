@@ -31,6 +31,7 @@ namespace musicApp.Views
         private string _fileStorageMusicPathOpen = "";
         private bool _playbackNormalizationCheckLoading;
         private bool _sidebarLibraryActionCheckLoading;
+        private bool _themeDonationLinksCheckLoading;
         private bool _libraryAlbumArtScanGuiBusy;
         private bool _generalFontUiLoading;
         private bool _generalUIFontSizeTextLoading;
@@ -408,6 +409,18 @@ namespace musicApp.Views
             {
                 _playbackAudioOutputUiLoading = false;
             }
+
+            _themeDonationLinksCheckLoading = true;
+            try
+            {
+                ThemeShowDonationLinksCheckBox.IsChecked = _preferences.Theme.ShowDonationLinks;
+            }
+            finally
+            {
+                _themeDonationLinksCheckLoading = false;
+            }
+
+            ApplyDonationLinksVisibility();
         }
 
         private void RestoreDefaultsButton_Click(object sender, RoutedEventArgs e)
@@ -426,6 +439,96 @@ namespace musicApp.Views
 
             PreferencesManager.Instance.SavePreferencesSync(_preferences);
             NotifyMainWindowIfOwner();
+        }
+
+        private void GeneralExportSettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ReadUiIntoPreferences();
+                PreferencesManager.Instance.SavePreferencesSync(_preferences);
+
+                var dlg = new Microsoft.Win32.SaveFileDialog
+                {
+                    Title = "Export Settings",
+                    Filter = SettingsBundleIO.FileFilter,
+                    FileName = SettingsBundleIO.DefaultExportFileName,
+                    AddExtension = true,
+                    DefaultExt = ".json"
+                };
+
+                if (dlg.ShowDialog(this) != true)
+                    return;
+
+                var settings = SettingsManager.Instance.LoadSettingsSync();
+                SettingsBundleIO.Export(dlg.FileName, settings, _preferences);
+                MessageDialog.Show(this, "Export Settings", "Settings exported successfully.", MessageDialog.Buttons.Ok);
+            }
+            catch (Exception ex)
+            {
+                MessageDialog.Show(this, "Export Settings", $"Failed to export settings: {ex.Message}", MessageDialog.Buttons.Ok);
+            }
+        }
+
+        private void GeneralImportSettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dlg = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "Import Settings",
+                    Filter = SettingsBundleIO.FileFilter,
+                    CheckFileExists = true
+                };
+
+                if (dlg.ShowDialog(this) != true)
+                    return;
+
+                var confirm = MessageDialog.Show(
+                    this,
+                    "Import Settings",
+                    "This will replace your current settings and preferences (not your music library).\n\nContinue?",
+                    MessageDialog.Buttons.YesNo);
+                if (confirm != true)
+                    return;
+
+                var bundle = SettingsBundleIO.Import(dlg.FileName);
+
+                if (bundle.Settings != null)
+                    SettingsManager.Instance.SaveSettingsSync(bundle.Settings);
+
+                if (bundle.Preferences != null)
+                {
+                    PreferencesManager.EnsureInitialized(bundle.Preferences);
+                    PreferencesManager.Instance.SavePreferencesSync(bundle.Preferences);
+                    _preferences = bundle.Preferences;
+                }
+                else
+                {
+                    _preferences = PreferencesManager.Instance.LoadPreferencesSync();
+                }
+
+                _generalFontUiLoading = true;
+                try
+                {
+                    BindPreferencesModelToUi();
+                }
+                finally
+                {
+                    _generalFontUiLoading = false;
+                }
+
+                if (Owner is MainWindow main)
+                    main.ApplyImportedSettingsFromDisk();
+                else
+                    NotifyMainWindowIfOwner();
+
+                MessageDialog.Show(this, "Import Settings", "Settings imported successfully.", MessageDialog.Buttons.Ok);
+            }
+            catch (Exception ex)
+            {
+                MessageDialog.Show(this, "Import Settings", $"Failed to import settings: {ex.Message}", MessageDialog.Buttons.Ok);
+            }
         }
 
         private bool _playbackCrossfadeRampTextLoading;
@@ -527,6 +630,8 @@ namespace musicApp.Views
                 _preferences.Playback.OutputBits = PlaybackOutputBitsUtil.Normalize(bitsParsed);
             else
                 _preferences.Playback.OutputBits = PlaybackOutputBitsUtil.Default;
+
+            _preferences.Theme.ShowDonationLinks = ThemeShowDonationLinksCheckBox.IsChecked == true;
         }
 
         private void UpdateGeneralFontPreview()
@@ -667,6 +772,22 @@ namespace musicApp.Views
             PreferencesManager.Instance.SavePreferencesSync(_preferences);
             NotifyMainWindowIfOwner();
             RefreshPlaybackNormalizationStatsLine();
+        }
+
+        private void ThemeShowDonationLinksCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_themeDonationLinksCheckLoading)
+                return;
+            PreferencesManager.EnsureInitialized(_preferences);
+            _preferences.Theme.ShowDonationLinks = ThemeShowDonationLinksCheckBox.IsChecked == true;
+            PreferencesManager.Instance.SavePreferencesSync(_preferences);
+            ApplyDonationLinksVisibility();
+        }
+
+        private void ApplyDonationLinksVisibility()
+        {
+            var show = ThemeShowDonationLinksCheckBox.IsChecked == true;
+            AboutDonationLinkText.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void PlaybackAudioInfrastructure_Changed(object sender, RoutedEventArgs e)

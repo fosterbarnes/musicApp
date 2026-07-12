@@ -1,6 +1,7 @@
-<UserControl x:Class="musicApp.Views.SongsView"
+<local:TrackListHostBase x:Class="musicApp.Views.SongsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:musicApp.Views"
              xmlns:views="clr-namespace:musicApp.Views"
              xmlns:converters="clr-namespace:musicApp.Converters"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -15,9 +16,8 @@
     <Grid>
         <views:TrackListView x:Name="trackList"
                              ViewName="Songs"
-                             SingleClickPlays="False"
-                             PlayTrackRequested="TrackList_PlayTrackRequested" />
+                             SingleClickPlays="False"/>
         <views:EmptyLibraryAddOverlay x:Name="emptyOverlay"
-                                      Visibility="{Binding IsLibraryEmpty, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                      Visibility="{Binding IsLibraryEmpty, RelativeSource={RelativeSource AncestorType=local:SongsView}, Converter={StaticResource BoolToVisibilityConverter}}"/>
     </Grid>
-</UserControl>
+</local:TrackListHostBase>

@@ -103,7 +103,7 @@
 
 #### Import/Export
 - ~~Import/Export Settings (two buttons)~~
-- Write settings file format and import/export logic
+- ~~Write settings file format and import/export logic~~
 
 
 ### Playback
@@ -162,13 +162,13 @@
 - Spacing, with options to create, import or export profiles (dropdown)
 - Size, with options to create, import or export profiles (dropdown)
 - List size, with options to create, import or export profiles (dropdown)
-- Toggle donation links (tick-box)
+- ~~Toggle donation links (tick-box)~~
 
 ### About
 - ~~Version info (e.g. musicApp v0.1.0 dollyShakeswerve x64)~~
 - ~~Project link (https://github.com/fosterbarnes/musicApp)~~
 - ~~Issues link (https://github.com/fosterbarnes/musicApp/issues/new)~~
-- Donation link (https://buymeacoffee.com/fosterbarnes)
+- ~~Donation link (https://buymeacoffee.com/fosterbarnes)~~
 
 
 ## General
@@ -279,7 +279,7 @@
 - Robust queuing system/menu. I like to make "on the fly" playlists with my queues, so it must be as seamless and robust as possible (WIP)
 - "Like" system and liked tracks menu
 - Keyboard shortcuts for actions like "play/pause", "skip" "volume up/down" etc. These should work whether or not the app window is focused
-- Mini-player window that can be open in addition to the main window, or as a replacement to the main window
+- ~~Mini-player window that can be open in addition to the main window, or as a replacement to the main window~~
 - Support for multiple libraries
 - Option to add "Add to musicApp" to windows right-click context menu
 - Spotify integration

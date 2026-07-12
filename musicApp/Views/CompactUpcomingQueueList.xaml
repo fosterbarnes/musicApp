@@ -1,0 +1,254 @@
+<UserControl x:Class="musicApp.Views.CompactUpcomingQueueList"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             Background="Transparent">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <ContextMenu x:Key="CompactQueueTrackContextMenu"
+                         x:Shared="False"
+                         Style="{StaticResource TrackContextMenuStyle}"
+                         Opened="QueueContextMenu_Opened">
+                <ContextMenu.Resources>
+                    <Style TargetType="Separator"
+                           BasedOn="{StaticResource TrackContextMenuSeparatorStyle}"/>
+                </ContextMenu.Resources>
+                <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                          Header="Play Next"
+                          Click="QueueContextMenu_PlayNextClick"/>
+                <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                          Header="Add to Queue"
+                          Click="QueueContextMenu_AddToQueueClick"/>
+                <Separator/>
+                <MenuItem Style="{StaticResource TrackContextMenuItemWithSubmenuStyle}"
+                          Header="Add to Playlist"
+                          Click="QueueContextMenu_AddToPlaylistClick">
+                    <MenuItem.ItemContainerStyle>
+                        <Style TargetType="MenuItem"
+                               BasedOn="{StaticResource TrackContextSubMenuItemStyle}"/>
+                    </MenuItem.ItemContainerStyle>
+                    <MenuItem Header="New Playlist"
+                              Click="QueueContextMenu_NewPlaylistClick"/>
+                    <Separator/>
+                </MenuItem>
+                <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                          Header="Show in Artists"
+                          Click="QueueContextMenu_ShowInArtistsClick"/>
+                <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                          Header="Show in Albums"
+                          Click="QueueContextMenu_ShowInAlbumsClick"/>
+                <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                          Header="Show in Songs"
+                          Click="QueueContextMenu_ShowInSongsClick"/>
+                <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                          Header="Show in Queue"
+                          Click="QueueContextMenu_ShowInQueueClick"/>
+                <Separator/>
+                <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                          Header="Info"
+                          Click="QueueContextMenu_InfoClick"/>
+                <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                          Header="Show in Explorer"
+                          Click="QueueContextMenu_ShowInExplorerClick"/>
+                <Separator/>
+                <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                          Header="Remove from Library"
+                          Click="QueueContextMenu_RemoveFromLibraryClick"/>
+                <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                          Header="Delete"
+                          Click="QueueContextMenu_DeleteClick"/>
+            </ContextMenu>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid>
+        <ScrollViewer x:Name="QueueScrollViewer"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      AllowDrop="True"
+                      PreviewMouseLeftButtonDown="QueueScrollViewer_PreviewMouseLeftButtonDown"
+                      PreviewMouseMove="QueueScrollViewer_PreviewMouseMove"
+                      PreviewMouseLeftButtonUp="QueueScrollViewer_PreviewMouseLeftButtonUp"
+                      DragOver="QueueScrollViewer_DragOver"
+                      Drop="QueueScrollViewer_Drop"
+                      DragLeave="QueueScrollViewer_DragLeave">
+            <StackPanel x:Name="QueueContentPanel">
+                <ItemsControl x:Name="QueueItemsList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid x:Name="QueueRowRoot"
+                                  Cursor="Hand"
+                                  SnapsToDevicePixels="True"
+                                  MouseLeftButtonDown="QueueSongItem_MouseLeftButtonDown"
+                                  PreviewMouseRightButtonDown="QueueSongItem_PreviewMouseRightButtonDown"
+                                  ContextMenu="{StaticResource CompactQueueTrackContextMenu}">
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="{StaticResource Hover-brush}"/>
+                                            </Trigger>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="Background" Value="{StaticResource TrackRowSelection-brush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="40"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid Grid.Column="0"
+                                      Width="36"
+                                      Height="36"
+                                      Margin="8,6,0,6"
+                                      ClipToBounds="False">
+                                    <Border Background="{StaticResource BorderDefault-brush}"
+                                            CornerRadius="2"
+                                            ClipToBounds="True">
+                                        <Image Source="{Binding AlbumArtSource}" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <Button HorizontalAlignment="Left"
+                                            VerticalAlignment="Top"
+                                            Width="14"
+                                            Height="14"
+                                            Cursor="Hand"
+                                            ToolTip="Remove from queue"
+                                            Click="QueueRemoveButton_Click"
+                                            Panel.ZIndex="1">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsMouseOver, ElementName=QueueRowRoot}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="Bd"
+                                                        Background="#E53935"
+                                                        CornerRadius="7"
+                                                        Width="14"
+                                                        Height="14"
+                                                        SnapsToDevicePixels="True">
+                                                    <Rectangle Width="7"
+                                                               Height="2"
+                                                               Fill="White"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               RadiusX="1"
+                                                               RadiusY="1"
+                                                               SnapsToDevicePixels="True"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="#C62828"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </Grid>
+                                <StackPanel Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            Margin="10,0,8,0">
+                                    <TextBlock Text="{Binding Title}"
+                                               Foreground="{StaticResource TextPrimary-brush}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding ArtistAlbum}"
+                                               Foreground="{StaticResource TextTertiary-brush}"
+                                               FontSize="11"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                                <Grid Grid.Column="2"
+                                      MinWidth="36"
+                                      Margin="0,0,8,0"
+                                      VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Duration}"
+                                               Foreground="{StaticResource TextTertiary-brush}"
+                                               FontSize="11"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsMouseOver, ElementName=QueueRowRoot}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <Button HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Width="28"
+                                            Height="28"
+                                            Cursor="Hand"
+                                            ToolTip="More"
+                                            Click="QueueMoreButton_Click">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsMouseOver, ElementName=QueueRowRoot}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="Transparent">
+                                                    <materialDesign:PackIcon Kind="DotsHorizontal"
+                                                                             Width="18"
+                                                                             Height="18"
+                                                                             Foreground="{StaticResource TextPrimary-brush}"
+                                                                             HorizontalAlignment="Center"
+                                                                             VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </Grid>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="EmptyQueueText"
+                           Text="Nothing in queue"
+                           Foreground="{StaticResource TextMuted-brush}"
+                           FontSize="13"
+                           Margin="12,16,12,12"
+                           Visibility="Collapsed"/>
+            </StackPanel>
+        </ScrollViewer>
+        <Border x:Name="RowReorderInsertLine"
+                VerticalAlignment="Top"
+                HorizontalAlignment="Stretch"
+                Height="2"
+                Background="{StaticResource TextPrimary-brush}"
+                Visibility="Collapsed"
+                IsHitTestVisible="False"
+                SnapsToDevicePixels="True"/>
+    </Grid>
+</UserControl>

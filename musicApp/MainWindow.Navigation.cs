@@ -78,6 +78,8 @@ namespace musicApp
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e) => ShowSettingsWindow();
 
+        private void BtnMiniPlayer_Click(object sender, RoutedEventArgs e) => ShowMiniPlayerWindow();
+
         private void ShowSettingsWindow(string? launchSection = null)
         {
             if (_settingsWindow != null && _settingsWindow.IsVisible)
@@ -94,6 +96,50 @@ namespace musicApp
                     _settingsWindow = null;
             };
             w.Show();
+        }
+
+        private void ShowMiniPlayerWindow()
+        {
+            if (_miniPlayerWindow != null && _miniPlayerWindow.IsVisible)
+            {
+                _miniPlayerWindow.Activate();
+                return;
+            }
+
+            var w = new MiniPlayerWindow { Owner = this };
+            _miniPlayerWindow = w;
+            w.PlayPauseRequested += TitleBarPlayer_PlayPauseRequested;
+            w.PreviousTrackRequested += TitleBarPlayer_PreviousTrackRequested;
+            w.NextTrackRequested += TitleBarPlayer_NextTrackRequested;
+            w.PlaybackPositionCommitted += OnTitleBarPlaybackPositionCommitted;
+            w.SongPlayRequested += MiniPlayer_SongPlayRequested;
+            w.QueueRemoveRequested += OnQueueToolbarRemoveRequested;
+            w.TracksReordered += OnQueueTracksReordered;
+            w.PlayNextRequested += OnPlayNextRequested;
+            w.AddToQueueRequested += OnAddToQueueRequested;
+            w.AddTrackToPlaylistRequested += OnAddTrackToPlaylistRequested;
+            w.CreateNewPlaylistWithTrackRequested += OnCreateNewPlaylistWithTrackRequested;
+            w.InfoRequested += OnInfoRequested;
+            w.ShowInArtistsRequested += OnShowInArtistsRequested;
+            w.ShowInSongsRequested += OnShowInSongsRequested;
+            w.ShowInAlbumsRequested += OnShowInAlbumsRequested;
+            w.ShowInQueueRequested += OnShowInQueueRequested;
+            w.ShowInExplorerRequested += OnShowInExplorerRequested;
+            w.RemoveFromLibraryRequested += OnRemoveFromLibraryRequested;
+            w.DeleteRequested += OnDeleteRequested;
+            w.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_miniPlayerWindow, w))
+                    _miniPlayerWindow = null;
+            };
+            w.Show();
+            PushMiniPlayerState(w);
+        }
+
+        private void MiniPlayer_SongPlayRequested(object? sender, Song song)
+        {
+            if (song != null)
+                PlayTrack(song, _miniPlayerWindow);
         }
 
         private void ShowLibraryView()

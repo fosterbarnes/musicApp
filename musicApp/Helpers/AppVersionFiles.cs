@@ -6,6 +6,12 @@ namespace musicApp.Helpers;
 
 public static class AppVersionFiles
 {
+    public static string ReadLabel()
+    {
+        var ver = ReadVersionCore();
+        return string.IsNullOrEmpty(ver) ? "0.0.0" : ver;
+    }
+
     public static string GetGitHubReleaseUrlForCurrentVersion()
     {
         var ver = ReadVersionCore().Trim().TrimStart('v', 'V');
@@ -26,7 +32,7 @@ public static class AppVersionFiles
     /// <summary>Suffix for the About title, e.g. <c> (portable)</c>, or empty if missing/unknown.</summary>
     public static string GetAboutTitleSuffix()
     {
-        var raw = ReadTrimmedFile("VersionBuild");
+        var raw = ReadVersionBuildCore();
         if (string.IsNullOrEmpty(raw))
             return "";
 
@@ -42,7 +48,7 @@ public static class AppVersionFiles
 
     private static string ReadVersionCore()
     {
-        var fromFile = ReadTrimmedFile("Version");
+        var fromFile = ReadVersionLine(0);
         if (!string.IsNullOrEmpty(fromFile))
             return fromFile.TrimStart('v', 'V');
 
@@ -52,21 +58,26 @@ public static class AppVersionFiles
         return av.Build >= 0 ? $"{av.Major}.{av.Minor}.{av.Build}" : $"{av.Major}.{av.Minor}";
     }
 
-    private static string ReadVersionTagCore() => ReadTrimmedFile("VersionTag") ?? "";
+    private static string ReadVersionTagCore() => ReadVersionLine(1) ?? "";
 
-    private static string? ReadTrimmedFile(string fileName)
+    private static string? ReadVersionBuildCore() => ReadVersionLine(2);
+
+    private static string? ReadVersionLine(int index)
     {
         try
         {
-            var path = Path.Combine(AppContext.BaseDirectory, fileName);
-            if (File.Exists(path))
-                return File.ReadAllText(path).Trim();
+            var path = Path.Combine(AppContext.BaseDirectory, "Version");
+            if (!File.Exists(path))
+                return null;
+            var lines = File.ReadAllLines(path);
+            if (index < 0 || index >= lines.Length)
+                return null;
+            var text = lines[index].Trim();
+            return string.IsNullOrEmpty(text) ? null : text;
         }
         catch
         {
-            // ignore
+            return null;
         }
-
-        return null;
     }
 }

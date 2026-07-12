@@ -198,23 +198,16 @@ namespace musicApp.Views
             Song? selectedSong = null;
             if (listView != null && TrackContextMenuHelper.TryGetSingleSelectedSong(listView, out var one))
                 selectedSong = one;
-            var addToPlaylistItem = TrackContextMenuHelper.FindMenuItemByHeader(contextMenu.Items, "Add to Playlist");
             var mainWindow = Application.Current?.MainWindow as MainWindow;
-            var playlists = mainWindow?.Playlists;
-            if (addToPlaylistItem != null && playlists != null)
-                TrackContextMenuHelper.RebuildAddToPlaylistChildren(addToPlaylistItem, playlists, PlaylistSubmenuItem_Click);
-
-            var removeFromPlaylistItem = TrackContextMenuHelper.FindMenuItemByHeader(contextMenu.Items, "Remove from Playlist");
-            TrackContextMenuHelper.ApplyRemoveFromPlaylistVisibility(removeFromPlaylistItem, CurrentPlaylist != null);
-
-            var showInArtistsItem = TrackContextMenuHelper.FindMenuItemByHeader(contextMenu.Items, "Show in Artists");
-            var showInSongsItem = TrackContextMenuHelper.FindMenuItemByHeader(contextMenu.Items, "Show in Songs");
-            var showInAlbumsItem = TrackContextMenuHelper.FindMenuItemByHeader(contextMenu.Items, "Show in Albums");
-            var showInQueueItem = TrackContextMenuHelper.FindMenuItemByHeader(contextMenu.Items, "Show in Queue");
-            bool isInQueue = selectedSong != null && mainWindow?.IsTrackInQueue(selectedSong) == true;
             var contextName = string.IsNullOrWhiteSpace(ContextMenuViewName) ? ViewName : ContextMenuViewName;
-            TrackContextMenuHelper.ApplyShowInMenuVisibility(
-                contextName, showInArtistsItem, showInSongsItem, showInAlbumsItem, showInQueueItem, isInQueue);
+            TrackContextMenuHelper.ApplyStandardOpened(
+                contextMenu.Items,
+                contextName,
+                selectedSong,
+                mainWindow?.Playlists,
+                PlaylistSubmenuItem_Click,
+                applyRemoveFromPlaylist: true,
+                removeFromPlaylistVisible: CurrentPlaylist != null);
         }
 
         private void PlaylistSubmenuItem_Click(object sender, RoutedEventArgs e)
@@ -579,30 +572,11 @@ namespace musicApp.Views
             BuildGridViewColumns();
         }
 
-        private static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
-        {
-            if (depObj == null) yield break;
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
-            {
-                var child = VisualTreeHelper.GetChild(depObj, i);
-                if (child == null) continue;
-                if (child is T t)
-                    yield return t;
-                foreach (var childOfChild in FindVisualChildren<T>(child))
-                    yield return childOfChild;
-            }
-        }
+        private static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject =>
+            VisualTreeExtensions.FindVisualChildren<T>(depObj);
 
-        private static T? FindVisualAncestor<T>(DependencyObject? node) where T : DependencyObject
-        {
-            while (node != null)
-            {
-                if (node is T match)
-                    return match;
-                node = VisualTreeHelper.GetParent(node);
-            }
-            return null;
-        }
+        private static T? FindVisualAncestor<T>(DependencyObject? node) where T : DependencyObject =>
+            VisualTreeExtensions.FindVisualAncestor<T>(node);
 
         private int TryGetSongItemIndexFromSource(DependencyObject? source)
         {
@@ -791,14 +765,16 @@ namespace musicApp.Views
                 return;
             }
 
-            if (fromIndex == toIndex)
+            // insert-before drop index → Move index
+            int toMove = fromIndex < toIndex ? toIndex - 1 : toIndex;
+            if (fromIndex == toMove)
             {
                 e.Effects = DragDropEffects.None;
                 e.Handled = true;
                 return;
             }
 
-            TrackRowsReordered?.Invoke(this, (fromIndex, toIndex));
+            TrackRowsReordered?.Invoke(this, (fromIndex, toMove));
             e.Effects = DragDropEffects.Move;
             e.Handled = true;
             HideRowReorderInsertLine();

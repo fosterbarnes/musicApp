@@ -6,10 +6,11 @@ using System.Collections.Specialized;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using musicApp.Helpers;
 
 namespace musicApp.Views
 {
-    public partial class ArtistGenreView : UserControl
+    public partial class ArtistGenreView : TrackListHostBase
     {
         public static readonly DependencyProperty ViewNameProperty = DependencyProperty.Register(
             nameof(ViewName), typeof(string), typeof(ArtistGenreView),
@@ -26,25 +27,15 @@ namespace musicApp.Views
         private INotifyCollectionChanged? _libraryCollectionNotify;
         private readonly ObservableCollection<string> _namesList = new ObservableCollection<string>();
 
+        protected override TrackListView TrackList => trackList;
+
         public ArtistGenreView()
         {
             InitializeComponent();
             lstArtistsOrGenres.ItemsSource = _namesList;
             trackList.ViewName = "Songs";
             trackList.ContextMenuViewName = ViewName;
-            trackList.AddToPlaylistRequested += (s, track) => AddToPlaylistRequested?.Invoke(this, track);
-            trackList.AddTrackToPlaylistRequested += (s, args) => AddTrackToPlaylistRequested?.Invoke(this, args);
-            trackList.CreateNewPlaylistWithTrackRequested += (s, track) => CreateNewPlaylistWithTrackRequested?.Invoke(this, track);
-            trackList.PlayNextRequested += (s, track) => PlayNextRequested?.Invoke(this, track);
-            trackList.AddToQueueRequested += (s, track) => AddToQueueRequested?.Invoke(this, track);
-            trackList.InfoRequested += (s, track) => InfoRequested?.Invoke(this, track);
-            trackList.ShowInArtistsRequested += (s, track) => ShowInArtistsRequested?.Invoke(this, track);
-            trackList.ShowInSongsRequested += (s, track) => ShowInSongsRequested?.Invoke(this, track);
-            trackList.ShowInAlbumsRequested += (s, track) => ShowInAlbumsRequested?.Invoke(this, track);
-            trackList.ShowInQueueRequested += (s, track) => ShowInQueueRequested?.Invoke(this, track);
-            trackList.ShowInExplorerRequested += (s, track) => ShowInExplorerRequested?.Invoke(this, track);
-            trackList.RemoveFromLibraryRequested += (s, tracks) => RemoveFromLibraryRequested?.Invoke(this, tracks);
-            trackList.DeleteRequested += (s, track) => DeleteRequested?.Invoke(this, track);
+            WireTrackList();
             emptyLibraryOverlay.AddMusicFolderRequested += (_, __) => AddMusicFolderRequested?.Invoke(this, EventArgs.Empty);
             Loaded += (_, _) => UpdateSidebarTitleAndPlaceholder();
         }
@@ -52,7 +43,7 @@ namespace musicApp.Views
         public event EventHandler? AddMusicFolderRequested;
 
         /// <summary>Full library of tracks. Used to build artist/genre list and to filter when one is selected.</summary>
-        public IEnumerable? ItemsSource
+        public new IEnumerable? ItemsSource
         {
             get => _allTracks;
             set
@@ -79,27 +70,6 @@ namespace musicApp.Views
                 ApplySidebarSelectionToRightPane();
             }
         }
-
-        public event EventHandler<Song>? PlayTrackRequested;
-        public event EventHandler<Song>? AddToPlaylistRequested;
-        public event EventHandler<(Song track, Playlist playlist)>? AddTrackToPlaylistRequested;
-        public event EventHandler<Song>? CreateNewPlaylistWithTrackRequested;
-        public event EventHandler<Song>? PlayNextRequested;
-        public event EventHandler<Song>? AddToQueueRequested;
-        public event EventHandler<Song>? InfoRequested;
-        public event EventHandler<Song>? ShowInArtistsRequested;
-        public event EventHandler<Song>? ShowInSongsRequested;
-        public event EventHandler<Song>? ShowInAlbumsRequested;
-        public event EventHandler<Song>? ShowInQueueRequested;
-        public event EventHandler<Song>? ShowInExplorerRequested;
-        public event EventHandler<IReadOnlyList<Song>>? RemoveFromLibraryRequested;
-        public event EventHandler<Song>? DeleteRequested;
-
-        public void RebuildColumns() => trackList.RebuildColumns();
-
-        public void RefreshTrackListBindings() => trackList.RefreshItemBindings();
-
-        public Song? SelectedTrack => trackList.SelectedTrack;
 
         /// <summary>
         /// Selects the track's artist in the sidebar and highlights that track in the right-side track list.
@@ -255,41 +225,7 @@ namespace musicApp.Views
             placeholderText.Visibility = Visibility.Collapsed;
         }
 
-        private void TrackList_PlayTrackRequested(object? sender, Song e)
-        {
-            PlayTrackRequested?.Invoke(this, e);
-        }
-
-        private Song? FindTrackInCurrentList(Song track)
-        {
-            if (trackList.ItemsSource is not IEnumerable items)
-                return null;
-
-            Song? fallback = null;
-            foreach (var item in items)
-            {
-                if (item is not Song song)
-                    continue;
-
-                if (ReferenceEquals(song, track))
-                    return song;
-
-                if (!string.IsNullOrWhiteSpace(song.FilePath) &&
-                    !string.IsNullOrWhiteSpace(track.FilePath) &&
-                    string.Equals(song.FilePath, track.FilePath, StringComparison.OrdinalIgnoreCase))
-                {
-                    return song;
-                }
-
-                if (fallback == null &&
-                    string.Equals(song.Title, track.Title, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(song.Album, track.Album, StringComparison.OrdinalIgnoreCase))
-                {
-                    fallback = song;
-                }
-            }
-
-            return fallback;
-        }
+        private Song? FindTrackInCurrentList(Song track) =>
+            SongIdentity.FindInEnumerable(trackList.ItemsSource, track);
     }
 }
