@@ -29,6 +29,45 @@ namespace musicApp.Views
             return _flyoutSelectedKeys.Contains(FlyoutSelectionKeyForSong(song));
         }
 
+        public Song? SelectedTrack
+        {
+            get
+            {
+                if (_currentFlyout?.Tracks == null || _currentFlyout.Tracks.Count == 0)
+                    return null;
+
+                var list = _currentFlyout.Tracks;
+                if (!string.IsNullOrWhiteSpace(SelectedFlyoutTrackFilePath))
+                {
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        var t = list[i];
+                        if (t != null && !string.IsNullOrWhiteSpace(t.FilePath) &&
+                            string.Equals(t.FilePath, SelectedFlyoutTrackFilePath, StringComparison.OrdinalIgnoreCase))
+                            return t;
+                    }
+                }
+
+                foreach (var t in list)
+                {
+                    if (t != null && _flyoutSelectedKeys.Contains(FlyoutSelectionKeyForSong(t)))
+                        return t;
+                }
+
+                return null;
+            }
+        }
+
+        public Song? GetDefaultPlayTrack() =>
+            SelectedTrack ?? _currentFlyout?.Tracks?.FirstOrDefault();
+
+        public void SelectTrack(Song track, bool grabFocus = false)
+        {
+            if (track == null || string.IsNullOrWhiteSpace(track.FilePath))
+                return;
+            ApplyProgrammaticFlyoutSelection(track.FilePath);
+        }
+
         private void BumpFlyoutSelectionRevision() =>
             SetValue(FlyoutSelectionRevisionProperty, (int)GetValue(FlyoutSelectionRevisionProperty) + 1);
 

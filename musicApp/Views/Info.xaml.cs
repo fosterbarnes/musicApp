@@ -899,6 +899,7 @@ public partial class InfoMetadataView : Window
 
     private void InfoMetadataView_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        TryApplyLyricsFromTempIfChanged();
         StopLyricsPolling();
         CleanupLyricsTempFile();
     }
@@ -1080,10 +1081,18 @@ public partial class InfoMetadataView : Window
 
     private void RefreshLyricsUi()
     {
-        var has = _track != null && !string.IsNullOrWhiteSpace(_track.Lyrics);
-        LyricsEmptyPanel.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
-        LyricsContentPanel.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
-        LyricsBodyTextBlock.Text = has ? (_track!.Lyrics ?? "") : "";
+        var track = _track;
+        if (track == null || string.IsNullOrWhiteSpace(track.Lyrics))
+        {
+            LyricsEmptyPanel.Visibility = Visibility.Visible;
+            LyricsContentPanel.Visibility = Visibility.Collapsed;
+            LyricsBodyTextBlock.Text = "";
+            return;
+        }
+
+        LyricsEmptyPanel.Visibility = Visibility.Collapsed;
+        LyricsContentPanel.Visibility = Visibility.Visible;
+        LyricsBodyTextBlock.Text = track.Lyrics;
     }
 
     private void TopSongNameText_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

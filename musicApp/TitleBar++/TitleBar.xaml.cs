@@ -651,7 +651,6 @@ namespace musicApp.TitleBarPlus
 
                 UpdateShuffleIcon();
                 UpdateRepeatIcon();
-                ShuffleStateChanged?.Invoke(this, IsShuffleEnabled);
             }
             catch (Exception ex)
             {

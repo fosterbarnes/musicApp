@@ -28,14 +28,33 @@ namespace musicApp
 
         private void ApplyCrossfadePreferenceSeconds(int seconds)
         {
+            int previous = _crossfadeSecondsPreferred;
             _crossfadeSecondsPreferred = Math.Clamp(seconds, 0, 15);
+
             if (_crossfadeSecondsPreferred == 0)
             {
                 CancelCrossfadeIncomingBranch();
                 StopCrossfadePollTimer();
+                // Drop the mixer chain if this track was started with crossfade enabled
+                if (previous > 0 &&
+                    _mixingProvider != null &&
+                    audioFileReader != null &&
+                    currentTrack != null)
+                {
+                    RecreateAudioOutputForPreferencesChange();
+                }
+                return;
             }
-            else
-                EnsureCrossfadePollTimer();
+
+            EnsureCrossfadePollTimer();
+
+            // Track was started with crossfade off — rebuild so the mixer exists for overlap
+            if (_mixingProvider == null &&
+                audioFileReader != null &&
+                currentTrack != null)
+            {
+                RecreateAudioOutputForPreferencesChange();
+            }
         }
 
         private void ApplyCrossfadeRampSeconds(double seconds)
@@ -66,6 +85,59 @@ namespace musicApp
         {
             _mixingProvider = null;
             _outgoingVolumeSampleProvider = null;
+        }
+
+        /// <summary>
+        /// Drops an in-progress overlap mix without restoring the outgoing track in the UI.
+        /// Queue/playhead are left for the caller to update.
+        /// </summary>
+        private void DiscardActiveCrossfadeOverlapAudio()
+        {
+            try
+            {
+                if (_incomingVolumeSampleProvider != null && _mixingProvider != null)
+                    _mixingProvider.RemoveMixerInput(_incomingVolumeSampleProvider);
+            }
+            catch { }
+            try { _incomingAudioFileReader?.Dispose(); } catch { }
+            _incomingAudioFileReader = null;
+            _incomingVolumeSampleProvider = null;
+            _pendingIncomingSong = null;
+            _crossfadeOverlapActive = false;
+            _crossfadeOverlapStartedForThisOutgoing = false;
+            _crossfadeRampComplete = false;
+            _songOutgoingDuringCrossfade = null;
+            if (_outgoingVolumeSampleProvider != null)
+                _outgoingVolumeSampleProvider.Volume = 1f;
+        }
+
+        /// <summary>
+        /// During crossfade the title bar shows the incoming track. Align queue/currentTrack to
+        /// that visible track (outgoing finished) so Skip/Previous operate on what the user sees.
+        /// </summary>
+        private bool TryAdoptVisibleCrossfadeTrackAsCurrent()
+        {
+            if (!_crossfadeOverlapActive || _pendingIncomingSong == null)
+                return false;
+
+            var visible = _pendingIncomingSong;
+            DiscardActiveCrossfadeOverlapAudio();
+
+            if (HasContextualPlaybackQueue())
+            {
+                if (TryAdvanceContextualSessionMovingFinishedToHistory(out var next) && next != null)
+                    currentTrack = next;
+                else
+                    currentTrack = visible;
+            }
+            else
+            {
+                currentTrack = visible;
+                SyncCurrentTrackIndices(visible);
+                UpdateShuffleIndicesAfterTrackChange(visible);
+            }
+
+            return true;
         }
 
         private IWaveProvider CreatePlaybackInitChain(AudioFileReader reader, string pathForBuild)
@@ -209,6 +281,11 @@ namespace musicApp
 
         private void BeginCrossfadeOverlap(Song next)
         {
+            var mixer = _mixingProvider;
+            var outgoingReader = audioFileReader;
+            if (mixer == null || outgoingReader == null)
+                return;
+
             try
             {
                 _incomingAudioFileReader = new AudioFileReader(next.FilePath);
@@ -217,7 +294,7 @@ namespace musicApp
                     _incomingAudioFileReader.WaveFormat,
                     _cachedOutputSampleRateHz);
                 _incomingVolumeSampleProvider = new VolumeSampleProvider(incomingSp) { Volume = 0f };
-                _mixingProvider!.AddMixerInput(_incomingVolumeSampleProvider);
+                mixer.AddMixerInput(_incomingVolumeSampleProvider);
             }
             catch
             {
@@ -234,7 +311,7 @@ namespace musicApp
             double remainingAtStart;
             try
             {
-                remainingAtStart = (audioFileReader!.TotalTime - audioFileReader.CurrentTime).TotalSeconds;
+                remainingAtStart = (outgoingReader.TotalTime - outgoingReader.CurrentTime).TotalSeconds;
             }
             catch
             {
@@ -246,14 +323,13 @@ namespace musicApp
                 remainingAtStart);
             _crossfadeRampStartUtc = DateTime.UtcNow;
 
+            // Keep playhead/queue on the outgoing track until promote. Only the title bar
+            // reflects the incoming track during the overlap (avoids Repair/Clear on cancel).
             _songOutgoingDuringCrossfade = currentTrack;
-            currentTrack = next;
-            SyncCurrentTrackIndices(next);
 
             var art = AlbumArtLoader.LoadAlbumArt(next, GetTitleBarAlbumArtTargetPixelSize());
             titleBarPlayer.SetTrackInfo(next.Title, next.Artist, next.Album, art);
             TitleBarSetAudioObjects(waveOut, _incomingAudioFileReader);
-            RefreshVisibleViews();
         }
 
         private void AdvanceCrossfadeRamp()
@@ -319,9 +395,23 @@ namespace musicApp
                 _crossfadeOverlapStartedForThisOutgoing = false;
                 _crossfadeRampComplete = false;
 
-                currentTrack = promoted;
-                SyncCurrentTrackIndices(promoted);
-                UpdateShuffleIndicesAfterTrackChange(promoted);
+                if (HasContextualPlaybackQueue())
+                {
+                    if (TryAdvanceContextualSessionMovingFinishedToHistory(out var nextContext) &&
+                        nextContext != null)
+                        currentTrack = nextContext;
+                    else
+                    {
+                        currentTrack = promoted;
+                        SyncCurrentTrackIndices(promoted);
+                    }
+                }
+                else
+                {
+                    currentTrack = promoted;
+                    SyncCurrentTrackIndices(promoted);
+                    UpdateShuffleIndicesAfterTrackChange(promoted);
+                }
 
                 var albumArt = AlbumArtLoader.LoadAlbumArt(promoted, GetTitleBarAlbumArtTargetPixelSize());
                 titleBarPlayer.SetTrackInfo(promoted.Title, promoted.Artist, promoted.Album, albumArt);
@@ -361,7 +451,6 @@ namespace musicApp
                 var back = _songOutgoingDuringCrossfade;
                 _songOutgoingDuringCrossfade = null;
                 currentTrack = back;
-                SyncCurrentTrackIndices(back);
                 try
                 {
                     var artBack = AlbumArtLoader.LoadAlbumArt(back, GetTitleBarAlbumArtTargetPixelSize());

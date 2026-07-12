@@ -51,6 +51,12 @@ namespace musicApp.Views
 
         public Song? SelectedTrack => trackList.SelectedTrack;
 
+        public void SelectTrack(Song track, bool grabFocus = false)
+        {
+            if (track == null) return;
+            trackList.ScrollToSong(track, grabFocus);
+        }
+
         private void TrackList_PlayTrackRequested(object? sender, Song e)
         {
             PlayTrackRequested?.Invoke(this, e);

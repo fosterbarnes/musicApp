@@ -270,11 +270,15 @@ namespace musicApp
             var playlist = new Playlist(playlistName);
 
             var availableTracks = allSongs?.ToList() ?? new List<Song>();
+            var m3uDir = Path.GetDirectoryName(m3uPath);
             foreach (var entry in Helpers.M3uPlaylistHelper.Parse(m3uPath))
             {
                 var path = entry.FilePath;
                 if (string.IsNullOrWhiteSpace(path))
                     continue;
+
+                if (!Path.IsPathRooted(path) && !string.IsNullOrWhiteSpace(m3uDir))
+                    path = Path.GetFullPath(Path.Combine(m3uDir, path));
 
                 playlist.TrackFilePaths.Add(path);
 

@@ -68,6 +68,12 @@ namespace musicApp.Views
 
         public Song? SelectedTrack => trackList.SelectedTrack;
 
+        public void SelectTrack(Song track, bool grabFocus = false)
+        {
+            if (track == null) return;
+            trackList.ScrollToSong(track, grabFocus);
+        }
+
         public event System.EventHandler<Song>? PlayTrackRequested;
 
         public event System.EventHandler<Song>? AddToPlaylistRequested;

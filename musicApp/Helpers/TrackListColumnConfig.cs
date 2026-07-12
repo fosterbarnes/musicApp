@@ -20,16 +20,16 @@ namespace musicApp.Helpers
             public IValueConverter? Converter { get; set; }
         }
 
-        private static Dictionary<string, ColumnDefinition>? _columnDefinitions;
-        private static Dictionary<string, List<string>>? _defaultVisibleColumns;
+        private static readonly Dictionary<string, ColumnDefinition> _columnDefinitions = new();
+        private static readonly Dictionary<string, List<string>> _defaultVisibleColumns = new();
+        private static bool _initialized;
 
         public static Dictionary<string, ColumnDefinition> ColumnDefinitions
         {
             get
             {
-                if (_columnDefinitions == null)
-                    Initialize();
-                return _columnDefinitions!;
+                EnsureInitialized();
+                return _columnDefinitions;
             }
         }
 
@@ -37,17 +37,22 @@ namespace musicApp.Helpers
         {
             get
             {
-                if (_defaultVisibleColumns == null)
-                    Initialize();
-                return _defaultVisibleColumns!;
+                EnsureInitialized();
+                return _defaultVisibleColumns;
             }
+        }
+
+        private static void EnsureInitialized()
+        {
+            if (_initialized)
+                return;
+            Initialize();
         }
 
         public static void Initialize()
         {
-            _columnDefinitions = new Dictionary<string, ColumnDefinition>();
-            _defaultVisibleColumns = new Dictionary<string, List<string>>();
-
+            _columnDefinitions.Clear();
+            _defaultVisibleColumns.Clear();
             _columnDefinitions["#"] = new ColumnDefinition
             {
                 DisplayName = "",
@@ -240,6 +245,7 @@ namespace musicApp.Helpers
             _defaultVisibleColumns["Genres"] = new List<string> { "Title", "Artist", "Album", "Time" };
             _defaultVisibleColumns["Recently Played"] = new List<string> { "Title", "Artist", "Album", "Time" };
             _defaultVisibleColumns["Playlist"] = new List<string> { "Title", "Artist", "Album", "Time" };
+            _initialized = true;
         }
     }
 }

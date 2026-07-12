@@ -49,16 +49,21 @@ namespace musicApp
 
         public List<string> CopyLibraryFilePathsForLoudnormStats()
         {
-            return allTracks
-                .Where(t => !string.IsNullOrWhiteSpace(t.FilePath))
-                .Select(t => t.FilePath!)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Where(p =>
+            var paths = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var t in allTracks)
+            {
+                var path = t.FilePath;
+                if (string.IsNullOrWhiteSpace(path) || !seen.Add(path))
+                    continue;
+                try
                 {
-                    try { return File.Exists(p); }
-                    catch { return false; }
-                })
-                .ToList();
+                    if (File.Exists(path))
+                        paths.Add(path);
+                }
+                catch { }
+            }
+            return paths;
         }
 
         public void ApplySidebarPreferences()

@@ -18,7 +18,7 @@ namespace musicApp.Helpers;
 public static class FruitAppLocalAlbumArtCache
 {
     private static readonly object Gate = new();
-    private static Dictionary<string, string>? _audioPathToItc;
+    private static Dictionary<string, string> _audioPathToItc = new(StringComparer.OrdinalIgnoreCase);
     private static bool _indexLoaded;
 
     public static int LastIndexedPathCount { get; private set; }
@@ -33,7 +33,7 @@ public static class FruitAppLocalAlbumArtCache
         lock (Gate)
         {
             _indexLoaded = false;
-            _audioPathToItc = null;
+            _audioPathToItc = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         }
     }
 
@@ -55,7 +55,7 @@ public static class FruitAppLocalAlbumArtCache
         var key = LibraryPathHelper.TryNormalizePath(audioFilePath);
         if (string.IsNullOrEmpty(key))
             return false;
-        if (_audioPathToItc!.TryGetValue(key, out itcPath))
+        if (_audioPathToItc.TryGetValue(key, out itcPath))
             return true;
         if (key.StartsWith(@"\\?\", StringComparison.Ordinal) && key.Length > 4)
             return _audioPathToItc.TryGetValue(key[4..], out itcPath);

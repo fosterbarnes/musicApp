@@ -100,45 +100,28 @@ namespace musicApp
         {
             try
             {
-                Console.WriteLine($"LoadSettingsSync - Settings file exists: {File.Exists(SettingsFilePath)}");
-                Console.WriteLine($"LoadSettingsSync - Settings file path: {SettingsFilePath}");
-                
                 if (File.Exists(SettingsFilePath))
                 {
                     var json = File.ReadAllText(SettingsFilePath);
-                    Console.WriteLine($"LoadSettingsSync - JSON content: {json}");
-                    
                     var options = new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true
                     };
                     var settings = JsonSerializer.Deserialize<AppSettings>(json, options);
-                    Console.WriteLine($"LoadSettingsSync - Deserialized settings is null: {settings == null}");
-                    
-                    // Ensure all properties are properly initialized
+
                     if (settings != null)
                     {
-                        Console.WriteLine($"LoadSettingsSync - Player is null: {settings.Player == null}");
-                        Console.WriteLine($"LoadSettingsSync - WindowState is null: {settings.WindowState == null}");
-                        
                         settings.Player ??= new PlayerSettings();
                         settings.WindowState ??= new WindowStateSettings();
-
                         MigrateLegacySidebarWidth(settings.WindowState);
-                        
-                        Console.WriteLine($"LoadSettingsSync - After null coalescing - Player.IsShuffleEnabled: {settings.Player.IsShuffleEnabled}");
                         return settings;
                     }
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"Error loading settings: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
             }
-            
-            // Return new settings with proper initialization
-            Console.WriteLine("LoadSettingsSync - Returning new AppSettings with defaults");
+
             return new AppSettings
             {
                 Player = new PlayerSettings(),
@@ -150,45 +133,28 @@ namespace musicApp
         {
             try
             {
-                Console.WriteLine($"LoadSettingsAsync - Settings file exists: {File.Exists(SettingsFilePath)}");
-                Console.WriteLine($"LoadSettingsAsync - Settings file path: {SettingsFilePath}");
-                
                 if (File.Exists(SettingsFilePath))
                 {
                     var json = await File.ReadAllTextAsync(SettingsFilePath);
-                    Console.WriteLine($"LoadSettingsAsync - JSON content: {json}");
-                    
                     var options = new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true
                     };
                     var settings = JsonSerializer.Deserialize<AppSettings>(json, options);
-                    Console.WriteLine($"LoadSettingsAsync - Deserialized settings is null: {settings == null}");
-                    
-                    // Ensure all properties are properly initialized
+
                     if (settings != null)
                     {
-                        Console.WriteLine($"LoadSettingsSync - Player is null: {settings.Player == null}");
-                        Console.WriteLine($"LoadSettingsSync - WindowState is null: {settings.WindowState == null}");
-                        
                         settings.Player ??= new PlayerSettings();
                         settings.WindowState ??= new WindowStateSettings();
-
                         MigrateLegacySidebarWidth(settings.WindowState);
-                        
-                        Console.WriteLine($"LoadSettingsAsync - After null coalescing - Player.IsShuffleEnabled: {settings.Player.IsShuffleEnabled}");
                         return settings;
                     }
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"Error loading settings: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
             }
-            
-            // Return new settings with proper initialization
-            Console.WriteLine("LoadSettingsAsync - Returning new AppSettings with defaults");
+
             return new AppSettings
             {
                 Player = new PlayerSettings(),
@@ -200,17 +166,16 @@ namespace musicApp
         {
             try
             {
-                var options = new JsonSerializerOptions 
-                { 
+                var options = new JsonSerializerOptions
+                {
                     WriteIndented = true,
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 };
                 var json = JsonSerializer.Serialize(settings, options);
                 await File.WriteAllTextAsync(SettingsFilePath, json);
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"Error saving settings: {ex.Message}");
             }
         }
 
@@ -221,25 +186,16 @@ namespace musicApp
         public async Task<bool> GetShuffleStateAsync()
         {
             var settings = await LoadSettingsAsync();
-            Console.WriteLine($"GetShuffleStateAsync - Player is null: {settings.Player == null}");
-            if (settings.Player != null)
-            {
-                Console.WriteLine($"GetShuffleStateAsync - Player.IsShuffleEnabled: {settings.Player.IsShuffleEnabled}");
-            }
             return settings.Player?.IsShuffleEnabled ?? false;
         }
 
         public async Task SetShuffleStateAsync(bool isEnabled)
         {
-            Console.WriteLine($"SetShuffleStateAsync called with value: {isEnabled}");
             var settings = await LoadSettingsAsync();
-            Console.WriteLine($"Loaded settings - Player is null: {settings.Player == null}");
             if (settings.Player != null)
             {
                 settings.Player.IsShuffleEnabled = isEnabled;
-                Console.WriteLine($"Set Player.IsShuffleEnabled to: {settings.Player.IsShuffleEnabled}");
                 await SaveSettingsAsync(settings);
-                Console.WriteLine($"Settings saved successfully");
             }
         }
 
@@ -255,6 +211,16 @@ namespace musicApp
             if (settings.Player != null)
             {
                 settings.Player.RepeatMode = repeatMode;
+                await SaveSettingsAsync(settings);
+            }
+        }
+
+        public async Task SetTitleBarVolume0To100Async(double volume0To100)
+        {
+            var settings = await LoadSettingsAsync();
+            if (settings.Player != null)
+            {
+                settings.Player.TitleBarVolume0To100 = Math.Clamp(volume0To100, 0, 100);
                 await SaveSettingsAsync(settings);
             }
         }

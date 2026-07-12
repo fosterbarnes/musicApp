@@ -15,6 +15,7 @@ public partial class SearchPopupView : UserControl
 {
     private Song? _contextMenuSong;
     private int _heightAdjustGeneration;
+    private int _albumArtLoadGeneration;
     private int _searchSongAnchorIndex = -1;
 
     public SearchPopupView()
@@ -91,7 +92,8 @@ public partial class SearchPopupView : UserControl
 
         // Populate images when ready (band-aid: load async after list is shown).
         // TODO: Implement a better solution (e.g. dedicated image cache, virtualization-friendly loading, cancel on new search).
-        _ = view.LoadAlbumArtWhenReadyAsync(artistRows, albumRows, songRows);
+        int artGen = ++view._albumArtLoadGeneration;
+        _ = view.LoadAlbumArtWhenReadyAsync(artGen, artistRows, albumRows, songRows);
     }
 
     private StackPanel SectionPanelFor(SearchSection section) => section switch
@@ -117,37 +119,56 @@ public partial class SearchPopupView : UserControl
     }
 
     private async System.Threading.Tasks.Task LoadAlbumArtWhenReadyAsync(
+        int generation,
         ObservableCollection<ArtistRowViewModel> artistRows,
         ObservableCollection<AlbumRowViewModel> albumRows,
         ObservableCollection<SongRowViewModel> songRows)
     {
         foreach (var row in artistRows)
         {
+            if (generation != _albumArtLoadGeneration) return;
             var rep = row.RepresentativeTrack;
             if (rep == null) continue;
 
             var img = await System.Threading.Tasks.Task.Run(() => AlbumArtThumbnailHelper.LoadForTrack(rep))
                 .ConfigureAwait(false);
+            if (generation != _albumArtLoadGeneration) return;
             if (img != null)
-                await Dispatcher.InvokeAsync(() => row.AlbumArtSource = img);
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (generation == _albumArtLoadGeneration)
+                        row.AlbumArtSource = img;
+                });
         }
 
         foreach (var row in albumRows)
         {
+            if (generation != _albumArtLoadGeneration) return;
             var song = row.Album.Songs.FirstOrDefault();
             if (song == null) continue;
             var img = await System.Threading.Tasks.Task.Run(() => AlbumArtThumbnailHelper.LoadForTrack(song))
                 .ConfigureAwait(false);
+            if (generation != _albumArtLoadGeneration) return;
             if (img != null)
-                await Dispatcher.InvokeAsync(() => row.AlbumArtSource = img);
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (generation == _albumArtLoadGeneration)
+                        row.AlbumArtSource = img;
+                });
         }
 
         foreach (var row in songRows)
         {
+            if (generation != _albumArtLoadGeneration) return;
             var img = await System.Threading.Tasks.Task.Run(() => AlbumArtThumbnailHelper.LoadForTrack(row.Song))
                 .ConfigureAwait(false);
+            if (generation != _albumArtLoadGeneration) return;
             if (img != null)
-                await Dispatcher.InvokeAsync(() => row.AlbumArtSource = img);
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (generation == _albumArtLoadGeneration)
+                        row.AlbumArtSource = img;
+                });
         }
     }
 

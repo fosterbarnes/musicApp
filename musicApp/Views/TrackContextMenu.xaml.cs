@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using musicApp;
@@ -91,10 +92,13 @@ namespace musicApp.Views
                 view.RequestCreateNewPlaylistWithTrack(song);
         }
 
-        private static bool TryGetTrackListViewFromSubmenu(object eventSender, out TrackListView trackListView, out Song song)
+        private static bool TryGetTrackListViewFromSubmenu(
+            object eventSender,
+            [NotNullWhen(true)] out TrackListView? trackListView,
+            [NotNullWhen(true)] out Song? song)
         {
-            trackListView = null!;
-            song = null!;
+            trackListView = null;
+            song = null;
             if (eventSender is not MenuItem menuItem)
                 return false;
             var parentItem = menuItem.Parent as MenuItem;
@@ -102,22 +106,28 @@ namespace musicApp.Views
             return TryResolveFromContextMenu(contextMenu, out trackListView, out song);
         }
 
-        private static bool TryGetTrackListView(object eventSender, out TrackListView trackListView, out Song song)
+        private static bool TryGetTrackListView(
+            object eventSender,
+            [NotNullWhen(true)] out TrackListView? trackListView,
+            [NotNullWhen(true)] out Song? song)
         {
-            trackListView = null!;
-            song = null!;
+            trackListView = null;
+            song = null;
             if (eventSender is not MenuItem menuItem)
                 return false;
             var contextMenu = menuItem.Parent as ContextMenu;
             return TryResolveFromContextMenu(contextMenu, out trackListView, out song);
         }
 
-        private static bool TryResolveFromContextMenu(ContextMenu? contextMenu, out TrackListView trackListView, out Song song)
+        private static bool TryResolveFromContextMenu(
+            ContextMenu? contextMenu,
+            [NotNullWhen(true)] out TrackListView? trackListView,
+            [NotNullWhen(true)] out Song? song)
         {
-            trackListView = null!;
-            song = null!;
+            trackListView = null;
+            song = null;
             var listView = contextMenu?.PlacementTarget as ListView;
-            if (!TrackContextMenuHelper.TryGetSingleSelectedSong(listView, out var s) || s == null)
+            if (!TrackContextMenuHelper.TryGetSingleSelectedSong(listView, out var s))
                 return false;
             if (!TrackContextMenuHelper.TryFindTrackListView(listView, out var tl))
                 return false;

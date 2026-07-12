@@ -34,6 +34,8 @@ public sealed class AlbumGridItem : INotifyPropertyChanged
         _albumArtSource = img;
     }
 
+    public void NotifyAlbumArtBound() => OnPropertyChanged(nameof(AlbumArtSource));
+
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

@@ -107,10 +107,22 @@ namespace musicApp.Views
         public void SelectTrack(Song track, bool grabFocus = false)
         {
             if (track == null) return;
-            if (!string.Equals(ViewName, "Artists", StringComparison.OrdinalIgnoreCase)) return;
-            if (string.IsNullOrWhiteSpace(track.Artist)) return;
 
-            SelectArtist(track.Artist);
+            if (string.Equals(ViewName, "Artists", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(track.Artist)) return;
+                SelectArtist(track.Artist);
+            }
+            else if (string.Equals(ViewName, "Genres", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(track.Genre)) return;
+                SelectGenre(track.Genre);
+            }
+            else
+            {
+                return;
+            }
+
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 var matched = FindTrackInCurrentList(track);
@@ -124,10 +136,11 @@ namespace musicApp.Views
         {
             if (!string.Equals(ViewName, "Artists", StringComparison.OrdinalIgnoreCase)) return;
             if (string.IsNullOrWhiteSpace(name)) return;
-            if (_namesList.Contains(name))
+            var match = _namesList.FirstOrDefault(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
             {
-                lstArtistsOrGenres.SelectedItem = name;
-                lstArtistsOrGenres.ScrollIntoView(name);
+                lstArtistsOrGenres.SelectedItem = match;
+                lstArtistsOrGenres.ScrollIntoView(match);
             }
         }
 
@@ -136,10 +149,11 @@ namespace musicApp.Views
         {
             if (!string.Equals(ViewName, "Genres", StringComparison.OrdinalIgnoreCase)) return;
             if (string.IsNullOrWhiteSpace(name)) return;
-            if (_namesList.Contains(name))
+            var match = _namesList.FirstOrDefault(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
             {
-                lstArtistsOrGenres.SelectedItem = name;
-                lstArtistsOrGenres.ScrollIntoView(name);
+                lstArtistsOrGenres.SelectedItem = match;
+                lstArtistsOrGenres.ScrollIntoView(match);
             }
         }
 
@@ -172,15 +186,26 @@ namespace musicApp.Views
             var tracks = _allTracks.Cast<Song>().ToList();
             bool isArtists = string.Equals(ViewName, "Artists", StringComparison.OrdinalIgnoreCase);
 
-            var names = isArtists
-                ? tracks.Where(t => !string.IsNullOrWhiteSpace(t.Artist)).Select(t => t.Artist).Distinct().OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList()
-                : tracks.Where(t => !string.IsNullOrWhiteSpace(t.Genre)).Select(t => t.Genre).Distinct().OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+            var names = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var t in tracks)
+            {
+                var name = isArtists ? t.Artist : t.Genre;
+                if (string.IsNullOrWhiteSpace(name) || !seen.Add(name))
+                    continue;
+                names.Add(name);
+            }
+            names.Sort(StringComparer.OrdinalIgnoreCase);
 
             foreach (var name in names)
                 _namesList.Add(name);
 
-            if (!string.IsNullOrEmpty(prevSelected) && _namesList.Contains(prevSelected))
-                lstArtistsOrGenres.SelectedItem = prevSelected;
+            if (!string.IsNullOrEmpty(prevSelected))
+            {
+                var match = _namesList.FirstOrDefault(n => string.Equals(n, prevSelected, StringComparison.OrdinalIgnoreCase));
+                if (match != null)
+                    lstArtistsOrGenres.SelectedItem = match;
+            }
         }
 
         private void OnLibraryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -221,8 +246,8 @@ namespace musicApp.Views
             var tracks = _allTracks.Cast<Song>().ToList();
             bool isArtists = string.Equals(ViewName, "Artists", StringComparison.OrdinalIgnoreCase);
             var filtered = isArtists
-                ? tracks.Where(t => string.Equals(t.Artist, selectedName, StringComparison.Ordinal)).ToList()
-                : tracks.Where(t => string.Equals(t.Genre, selectedName, StringComparison.Ordinal)).ToList();
+                ? tracks.Where(t => string.Equals(t.Artist, selectedName, StringComparison.OrdinalIgnoreCase)).ToList()
+                : tracks.Where(t => string.Equals(t.Genre, selectedName, StringComparison.OrdinalIgnoreCase)).ToList();
 
             trackList.CurrentPlaylist = null;
             trackList.ItemsSource = filtered;

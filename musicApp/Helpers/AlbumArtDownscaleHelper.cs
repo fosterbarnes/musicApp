@@ -17,12 +17,16 @@ public static class AlbumArtDownscaleHelper
         try
         {
             using var stream = new MemoryStream(imageData, 0, imageData.Length, writable: false, publiclyVisible: true);
-            return TryDownscaleToBitmapSource(stream, targetSizePx);
+            var scaled = TryDownscaleMagicScaler(stream, targetSizePx);
+            if (scaled != null)
+                return scaled;
         }
         catch
         {
-            return null;
         }
+
+        // MagicScaler can fail on UI-thread WIC/STA or odd embeds; WPF decode matches flyout path.
+        return TryWpfDecodeScaled(imageData, targetSizePx);
     }
 
     /// <inheritdoc cref="TryDownscaleToBitmapSource(byte[]?, int)"/>
@@ -36,7 +40,18 @@ public static class AlbumArtDownscaleHelper
             var settings = BaseSettings(targetSizePx);
             settings = ProcessImageSettings.Calculate(settings, imageInfo);
             using var pipeline = MagicImageProcessor.BuildPipeline(filePath, settings);
-            return CopyPixelSourceToFrozenBitmap(pipeline.PixelSource);
+            var scaled = CopyPixelSourceToFrozenBitmap(pipeline.PixelSource);
+            if (scaled != null)
+                return scaled;
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            var bytes = File.ReadAllBytes(filePath);
+            return TryWpfDecodeScaled(bytes, targetSizePx);
         }
         catch
         {
@@ -44,7 +59,7 @@ public static class AlbumArtDownscaleHelper
         }
     }
 
-    private static BitmapSource? TryDownscaleToBitmapSource(Stream stream, int targetSizePx)
+    private static BitmapSource? TryDownscaleMagicScaler(Stream stream, int targetSizePx)
     {
         if (!stream.CanSeek)
             return null;
@@ -55,6 +70,33 @@ public static class AlbumArtDownscaleHelper
         stream.Position = 0;
         using var pipeline = MagicImageProcessor.BuildPipeline(stream, settings);
         return CopyPixelSourceToFrozenBitmap(pipeline.PixelSource);
+    }
+
+    private static BitmapSource? TryWpfDecodeScaled(byte[] imageData, int targetSizePx)
+    {
+        try
+        {
+            var bitmap = new BitmapImage();
+            using (var stream = new MemoryStream(imageData, 0, imageData.Length, writable: false, publiclyVisible: true))
+            {
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.StreamSource = stream;
+                if (targetSizePx > 0)
+                    bitmap.DecodePixelWidth = targetSizePx;
+                bitmap.EndInit();
+            }
+
+            if (bitmap.PixelWidth <= 0 || bitmap.PixelHeight <= 0)
+                return null;
+            if (bitmap.CanFreeze)
+                bitmap.Freeze();
+            return bitmap;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static ProcessImageSettings BaseSettings(int targetSizePx) => new()
@@ -112,4 +154,3 @@ public static class AlbumArtDownscaleHelper
         return false;
     }
 }
-

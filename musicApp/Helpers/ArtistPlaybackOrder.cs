@@ -15,7 +15,7 @@ internal static class ArtistPlaybackOrder
             return new List<Song>();
 
         var forArtist = allTracks
-            .Where(t => t != null && string.Equals(t.Artist, artist, StringComparison.Ordinal))
+            .Where(t => t != null && string.Equals(t.Artist, artist, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         if (forArtist.Count == 0)
@@ -38,6 +38,12 @@ internal static class ArtistPlaybackOrder
         if (ordered.Count == 0 || selected == null)
             return -1;
 
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            if (ReferenceEquals(ordered[i], selected))
+                return i;
+        }
+
         if (!string.IsNullOrWhiteSpace(selected.FilePath))
         {
             for (int i = 0; i < ordered.Count; i++)
@@ -46,12 +52,6 @@ internal static class ArtistPlaybackOrder
                 if (t != null && string.Equals(t.FilePath, selected.FilePath, StringComparison.OrdinalIgnoreCase))
                     return i;
             }
-        }
-
-        for (int i = 0; i < ordered.Count; i++)
-        {
-            if (ReferenceEquals(ordered[i], selected))
-                return i;
         }
 
         for (int i = 0; i < ordered.Count; i++)

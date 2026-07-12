@@ -252,8 +252,7 @@ public static class TrackMetadataSaver
 
     private static void SetCompilationTag(Track t, bool compilation)
     {
-        if (t.AdditionalFields == null)
-            return;
+        t.AdditionalFields ??= new Dictionary<string, string>();
 
         var value = compilation ? "1" : "0";
         t.AdditionalFields["TCMP"] = value;

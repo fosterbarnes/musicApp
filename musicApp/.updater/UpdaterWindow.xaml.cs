@@ -295,7 +295,9 @@ public partial class UpdaterWindow : Window
 
     private async Task RunUpdateAsync()
     {
-        if (!_updateAvailable || string.IsNullOrEmpty(_installRoot) || _remote.LatestVersion == null)
+        var installRoot = _installRoot;
+        var latestVersion = _remote.LatestVersion;
+        if (!_updateAvailable || string.IsNullOrEmpty(installRoot) || latestVersion == null)
             return;
 
         _postUpdateAutoCloseEligible = false;
@@ -320,12 +322,12 @@ public partial class UpdaterWindow : Window
             Progress.IsIndeterminate = false;
             Progress.Value = 0;
 
-            var tagName = !string.IsNullOrWhiteSpace(_remote.LatestTagName)
-                ? _remote.LatestTagName!
-                : $"v{_remote.LatestVersion}";
+            var tagName = _remote.LatestTagName;
+            if (string.IsNullOrWhiteSpace(tagName))
+                tagName = $"v{latestVersion}";
 
             var assetName = ReleaseDownloadService.ExpectedAssetName(
-                _remote.LatestVersion,
+                latestVersion,
                 _remote.LatestReleaseVersionTag,
                 _buildKind);
 
@@ -333,7 +335,7 @@ public partial class UpdaterWindow : Window
                 http,
                 tagName,
                 assetName,
-                _remote.LatestVersion,
+                latestVersion,
                 _buildKind,
                 token);
 
@@ -357,9 +359,9 @@ public partial class UpdaterWindow : Window
             await Task.Run(() =>
             {
                 if (_buildKind == VersionBuild.Portable)
-                    ApplyUpdateService.ApplyPortableZip(_installRoot!, packagePath, workDir, launchAfter);
+                    ApplyUpdateService.ApplyPortableZip(installRoot, packagePath, workDir, launchAfter);
                 else
-                    ApplyUpdateService.ApplyInstaller(_installRoot!, packagePath, launchAfter);
+                    ApplyUpdateService.ApplyInstaller(installRoot, packagePath, launchAfter);
             }, token);
 
             Progress.IsIndeterminate = false;

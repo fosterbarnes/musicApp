@@ -114,6 +114,8 @@ namespace musicApp
                         UpdateStatusBar();
                     });
                 }
+
+                await Dispatcher.InvokeAsync(() => StartThumbnailCacheBackfillIfNeeded());
             }
         }
 
@@ -144,7 +146,7 @@ namespace musicApp
                         var tracksToRemove = allTracks.Where(t => LibraryPathHelper.IsFileUnderMusicFolder(t.FilePath, folderToRemove)).ToList();
                         foreach (var track in tracksToRemove)
                         {
-                            RemoveTrackFromCollections(track, includeShuffled: false);
+                            RemoveTrackFromCollections(track, includeShuffled: true);
                         }
 
                         foreach (var playlist in playlists)

@@ -1,0 +1,9 @@
+v0.2.7 release (laughableFistin)
+
+Fixes:
+- App starts way faster on big libraries (like 8-20 seconds faster, it was bad)
+- Shuffle and queue should stop randomly reshuffling or wiping itself
+- Crossfade works if you turn it on mid-song
+- Skip during a crossfade goes to the next song (not the one already showing)
+- Status bar no longer gets stuck on “loading artwork”
+- Fix issue that caused some album artwork to not load after scanning on first run

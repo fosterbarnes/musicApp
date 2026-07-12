@@ -9,6 +9,13 @@ internal static class UpdaterPreferences
     private static string PreferencesPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "musicApp", "preferences.json");
 
+    private static void EnsurePreferencesDirectory()
+    {
+        var dir = Path.GetDirectoryName(PreferencesPath);
+        if (!string.IsNullOrEmpty(dir))
+            Directory.CreateDirectory(dir);
+    }
+
     public static bool ReadCheckForUpdates()
     {
         try
@@ -83,7 +90,7 @@ internal static class UpdaterPreferences
             else
             {
                 root = [];
-                Directory.CreateDirectory(Path.GetDirectoryName(PreferencesPath)!);
+                EnsurePreferencesDirectory();
             }
 
             root["general"] ??= new JsonObject();
@@ -117,7 +124,7 @@ internal static class UpdaterPreferences
             else
             {
                 root = [];
-                Directory.CreateDirectory(Path.GetDirectoryName(PreferencesPath)!);
+                EnsurePreferencesDirectory();
             }
 
             root["general"] ??= new JsonObject();
@@ -151,7 +158,7 @@ internal static class UpdaterPreferences
             else
             {
                 root = [];
-                Directory.CreateDirectory(Path.GetDirectoryName(PreferencesPath)!);
+                EnsurePreferencesDirectory();
             }
 
             root["general"] ??= new JsonObject();

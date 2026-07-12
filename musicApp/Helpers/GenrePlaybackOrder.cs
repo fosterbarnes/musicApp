@@ -15,7 +15,7 @@ internal static class GenrePlaybackOrder
             return new List<Song>();
 
         var forGenre = allTracks
-            .Where(t => t != null && string.Equals(t.Genre, genre, StringComparison.Ordinal))
+            .Where(t => t != null && string.Equals(t.Genre, genre, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         if (forGenre.Count == 0)

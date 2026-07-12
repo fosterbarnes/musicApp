@@ -57,19 +57,24 @@ namespace musicApp.Helpers
 
         public static List<string> CollapseOverlappingMusicRoots(IEnumerable<string> paths)
         {
-            var normalized = paths
-                .Select(TryNormalizePath)
-                .Where(p => !string.IsNullOrEmpty(p))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(p => p!.Length)
-                .ToList();
+            var normalized = new List<string>();
+            foreach (var raw in paths)
+            {
+                var p = TryNormalizePath(raw);
+                if (string.IsNullOrEmpty(p))
+                    continue;
+                if (!normalized.Exists(n => string.Equals(n, p, StringComparison.OrdinalIgnoreCase)))
+                    normalized.Add(p);
+            }
+
+            normalized.Sort((a, b) => a.Length.CompareTo(b.Length));
 
             var result = new List<string>();
-            foreach (var p in normalized!)
+            foreach (var p in normalized)
             {
-                if (result.Any(r => IsFolderUnderOrEqual(p!, r)))
+                if (result.Any(r => IsFolderUnderOrEqual(p, r)))
                     continue;
-                result.Add(p!);
+                result.Add(p);
             }
             return result;
         }

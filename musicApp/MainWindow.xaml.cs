@@ -44,8 +44,8 @@ namespace musicApp
         // ===========================================
         // DATA COLLECTIONS
         // ===========================================
-        private ObservableCollection<Song> allTracks = new ObservableCollection<Song>();
-        private ObservableCollection<Song> filteredTracks = new ObservableCollection<Song>();
+        private BulkObservableCollection<Song> allTracks = new BulkObservableCollection<Song>();
+        private BulkObservableCollection<Song> filteredTracks = new BulkObservableCollection<Song>();
         private ObservableCollection<Song> shuffledTracks = new ObservableCollection<Song>();
         private ObservableCollection<Playlist> playlists = new ObservableCollection<Playlist>();
         private ObservableCollection<Song> recentlyPlayed = new ObservableCollection<Song>();
@@ -70,6 +70,8 @@ namespace musicApp
         private SettingsManager.AppSettings appSettings = new SettingsManager.AppSettings();
         private DispatcherTimer? sidebarWidthSaveTimer;
         private bool isSidebarWidthDirty = false;
+        private DispatcherTimer? _volumeSaveTimer;
+        private double _pendingVolume0To100 = 100;
 
         private bool _shutdownCloseFinalized;
         private bool _pendingLaunchSettings;
@@ -438,6 +440,8 @@ namespace musicApp
 
                 UpdateUI();
 
+                PrewarmAlbumsGrid();
+
                 if (_pendingLaunchSettings)
                 {
                     _pendingLaunchSettings = false;
@@ -581,11 +585,8 @@ namespace musicApp
                     return (valid, needThumb);
                 });
 
-                foreach (var track in validTracks)
-                {
-                    allTracks.Add(track);
-                    filteredTracks.Add(track);
-                }
+                allTracks.AddRange(validTracks);
+                filteredTracks.AddRange(validTracks);
 
                 if (tracksNeedingThumbnails.Count > 0)
                 {
@@ -740,7 +741,8 @@ namespace musicApp
             {
                 foreach (var item in recentlyPlayedCache.RecentlyPlayed.OrderByDescending(x => x.LastPlayed).Take(20))
                 {
-                    var track = allTracks.FirstOrDefault(t => t.FilePath == item.FilePath);
+                    var track = allTracks.FirstOrDefault(t =>
+                        string.Equals(t.FilePath, item.FilePath, StringComparison.OrdinalIgnoreCase));
                     if (track != null)
                     {
                         recentlyPlayed.Add(track);
@@ -750,16 +752,58 @@ namespace musicApp
         }
 
         /// <summary>
+        /// Binds the albums grid in the background after library load so the grid and its
+        /// artwork are already built before the user first navigates to the Albums view.
+        /// </summary>
+        private void PrewarmAlbumsGrid()
+        {
+            if (albumsViewControl == null || allTracks.Count == 0)
+                return;
+
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (albumsViewControl != null && !albumsViewControl.IsGridCurrentFor(AlbumsBrowseMode.AllAlbums, allTracks))
+                    albumsViewControl.SetBrowseModeAndSource(AlbumsBrowseMode.AllAlbums, allTracks);
+            }, DispatcherPriority.Background);
+        }
+
+        /// <summary>
         /// Updates the UI after loading data
         /// </summary>
         private void UpdateUI()
         {
             RefreshAllViewDataSources();
             RefreshVisibleViews();
-            if (contentHost != null && ReferenceEquals(contentHost.Content, albumsViewControl))
+            // Rebuild albums even when not visible so first-run art isn't stuck after scan.
+            albumsViewControl?.RefreshAlbumGridFromLibrary();
+        }
+
+        private void StartThumbnailCacheBackfillIfNeeded()
+        {
+            var snapshot = allTracks
+                .Where(t => string.IsNullOrEmpty(t.ThumbnailCachePath) || !File.Exists(t.ThumbnailCachePath))
+                .ToList();
+            if (snapshot.Count == 0)
+                return;
+
+            _ = Task.Run(async () =>
             {
-                albumsViewControl?.RefreshAlbumGridFromLibrary();
-            }
+                var updates = new List<(Song track, string path)>(snapshot.Count);
+                foreach (var t in snapshot)
+                {
+                    var path = AlbumArtCacheManager.GenerateAndCache(t);
+                    if (!string.IsNullOrEmpty(path))
+                        updates.Add((t, path));
+                }
+
+                await Dispatcher.InvokeAsync(async () =>
+                {
+                    foreach (var (track, path) in updates)
+                        track.ThumbnailCachePath = path;
+                    await UpdateLibraryCacheAsync();
+                    RefreshTitleBarFromCurrentTrack();
+                });
+            });
         }
 
         /// <summary>
@@ -1033,9 +1077,13 @@ namespace musicApp
             artistsViewControl?.RefreshTrackListBindings();
             genresViewControl?.RefreshTrackListBindings();
 
-            if (contentHost != null && ReferenceEquals(contentHost.Content, albumsViewControl) && albumsViewControl != null)
+            // Always refresh albums after batch edits — navigating back with IsGridCurrentFor
+            // would otherwise keep first-run placeholder tiles.
+            if (albumsViewControl != null)
             {
-                if (!allowInPlaceAlbumPatch || updatedTrack == null || !albumsViewControl.TryRefreshAlbumGroupInPlace(updatedTrack))
+                var albumsIsContent = contentHost != null && ReferenceEquals(contentHost.Content, albumsViewControl);
+                if (!(albumsIsContent && allowInPlaceAlbumPatch && updatedTrack != null &&
+                      albumsViewControl.TryRefreshAlbumGroupInPlace(updatedTrack)))
                     albumsViewControl.RefreshAlbumGridFromLibrary();
             }
 
@@ -1344,26 +1392,19 @@ namespace musicApp
                     return;
                 }
 
+                if (shuffledTracks.Count > 1)
+                    ShuffleRangeUntilOrderDiffersFromLinear(shuffledTracks, filteredTracks, 0, shuffledTracks.Count - 1);
+
                 if (currentTrack != null)
                 {
-                    int li = filteredTracks.IndexOf(currentTrack);
-                    currentTrackIndex = li;
-                    currentShuffledIndex = li;
-                    if (li < 0)
-                    {
-                        ShuffleRangeUntilOrderDiffersFromLinear(shuffledTracks, filteredTracks, 0, shuffledTracks.Count - 1);
+                    currentTrackIndex = filteredTracks.IndexOf(currentTrack);
+                    currentShuffledIndex = FindTrackIndexInPlayQueue(shuffledTracks, currentTrack);
+                    if (currentShuffledIndex < 0)
                         currentShuffledIndex = 0;
-                    }
-                    else if (li < shuffledTracks.Count - 1)
-                    {
-                        ShuffleRangeUntilOrderDiffersFromLinear(shuffledTracks, filteredTracks, li + 1, shuffledTracks.Count - 1);
-                    }
                 }
                 else
                 {
                     currentShuffledIndex = -1;
-                    if (shuffledTracks.Count > 1)
-                        ShuffleRangeUntilOrderDiffersFromLinear(shuffledTracks, filteredTracks, 0, shuffledTracks.Count - 1);
                 }
 
                 if (contentHost?.Content == queueViewControl)
@@ -1385,6 +1426,77 @@ namespace musicApp
             }
         }
 
+        /// <summary>
+        /// Keeps library shuffle order stable when <see cref="filteredTracks"/> membership changes:
+        /// drop removed tracks, append newly added ones into the unplayed tail (after the playhead).
+        /// Full reshuffle only if the list was empty or the current track is missing.
+        /// </summary>
+        private void ReconcileLibraryShuffledTracks()
+        {
+            if (!titleBarPlayer.IsShuffleEnabled || HasContextualPlaybackQueue())
+                return;
+
+            if (filteredTracks == null || filteredTracks.Count == 0)
+            {
+                shuffledTracks.Clear();
+                currentShuffledIndex = -1;
+                return;
+            }
+
+            if (shuffledTracks.Count == 0)
+            {
+                RegenerateShuffledTracks();
+                return;
+            }
+
+            var filteredSet = new HashSet<Song>();
+            foreach (var t in filteredTracks)
+            {
+                if (t != null && !string.IsNullOrEmpty(t.FilePath))
+                    filteredSet.Add(t);
+            }
+
+            for (int i = shuffledTracks.Count - 1; i >= 0; i--)
+            {
+                var t = shuffledTracks[i];
+                if (t == null || !filteredSet.Contains(t))
+                    shuffledTracks.RemoveAt(i);
+            }
+
+            var shuffledSet = new HashSet<Song>(shuffledTracks);
+            var newcomers = new List<Song>();
+            foreach (var t in filteredTracks)
+            {
+                if (t != null && !string.IsNullOrEmpty(t.FilePath) && !shuffledSet.Contains(t))
+                    newcomers.Add(t);
+            }
+
+            if (newcomers.Count > 1)
+                FisherYatesRange(newcomers, 0, newcomers.Count - 1);
+
+            int insertAt = currentShuffledIndex >= 0 ? currentShuffledIndex + 1 : shuffledTracks.Count;
+            if (insertAt > shuffledTracks.Count)
+                insertAt = shuffledTracks.Count;
+
+            foreach (var t in newcomers)
+            {
+                shuffledTracks.Insert(insertAt, t);
+                insertAt++;
+            }
+
+            if (currentTrack != null)
+            {
+                currentTrackIndex = filteredTracks.IndexOf(currentTrack);
+                currentShuffledIndex = FindTrackIndexInPlayQueue(shuffledTracks, currentTrack);
+                if (currentShuffledIndex < 0)
+                    RegenerateShuffledTracks();
+            }
+            else
+            {
+                currentShuffledIndex = -1;
+            }
+        }
+
         private void ValidateAndSyncLibraryShuffleIndices(Song track)
         {
             if (track == null || filteredTracks == null)
@@ -1392,7 +1504,16 @@ namespace musicApp
 
             if (shuffledTracks.Count != filteredTracks.Count)
             {
-                RegenerateShuffledTracks();
+                ReconcileLibraryShuffledTracks();
+                if (shuffledTracks.Count != filteredTracks.Count)
+                    RegenerateShuffledTracks();
+                else
+                {
+                    int siAfter = FindTrackIndexInPlayQueue(shuffledTracks, track);
+                    if (siAfter >= 0)
+                        currentShuffledIndex = siAfter;
+                    currentTrackIndex = filteredTracks.IndexOf(track);
+                }
                 return;
             }
 
@@ -1404,7 +1525,7 @@ namespace musicApp
             }
             currentTrackIndex = li;
 
-            int si = shuffledTracks.IndexOf(track);
+            int si = FindTrackIndexInPlayQueue(shuffledTracks, track);
             if (si < 0)
             {
                 RegenerateShuffledTracks();
@@ -1424,11 +1545,14 @@ namespace musicApp
 
                 if (shuffledTracks.Count == 0 || shuffledTracks.Count != filteredTracks.Count)
                 {
-                    RegenerateShuffledTracks();
+                    if (shuffledTracks.Count == 0)
+                        RegenerateShuffledTracks();
+                    else
+                        ReconcileLibraryShuffledTracks();
                     return;
                 }
 
-                if (currentTrack != null && shuffledTracks.IndexOf(currentTrack) == -1)
+                if (currentTrack != null && FindTrackIndexInPlayQueue(shuffledTracks, currentTrack) == -1)
                 {
                     RegenerateShuffledTracks();
                     return;
@@ -1436,7 +1560,7 @@ namespace musicApp
 
                 if (currentTrack != null && currentShuffledIndex == -1)
                 {
-                    currentShuffledIndex = shuffledTracks.IndexOf(currentTrack);
+                    currentShuffledIndex = FindTrackIndexInPlayQueue(shuffledTracks, currentTrack);
                     if (currentShuffledIndex == -1)
                         RegenerateShuffledTracks();
                 }
@@ -1452,8 +1576,10 @@ namespace musicApp
         {
             if (titleBarPlayer.IsShuffleEnabled)
             {
-                if (shuffledTracks.Count != filteredTracks.Count)
+                if (shuffledTracks.Count == 0)
                     RegenerateShuffledTracks();
+                else if (shuffledTracks.Count != filteredTracks.Count)
+                    ReconcileLibraryShuffledTracks();
                 else
                     EnsureShuffledTracksInitialized();
             }
@@ -1576,12 +1702,30 @@ namespace musicApp
 
         private void TitleBarPlayer_VolumeChanged(object? sender, double volume0To100)
         {
-            if (!_useSoftwareSessionVolume || _sessionVolumeProvider == null)
-                return;
-            if (titleBarPlayer.IsMuted)
-                _sessionVolumeProvider.Volume = 0f;
-            else
-                _sessionVolumeProvider.Volume = (float)(volume0To100 / 100.0);
+            if (_useSoftwareSessionVolume && _sessionVolumeProvider != null)
+            {
+                if (titleBarPlayer.IsMuted)
+                    _sessionVolumeProvider.Volume = 0f;
+                else
+                    _sessionVolumeProvider.Volume = (float)(volume0To100 / 100.0);
+            }
+
+            _pendingVolume0To100 = volume0To100;
+            if (_volumeSaveTimer == null)
+            {
+                _volumeSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+                _volumeSaveTimer.Tick += async (_, _) =>
+                {
+                    _volumeSaveTimer.Stop();
+                    try
+                    {
+                        await SettingsManager.Instance.SetTitleBarVolume0To100Async(_pendingVolume0To100);
+                    }
+                    catch { }
+                };
+            }
+            _volumeSaveTimer.Stop();
+            _volumeSaveTimer.Start();
         }
 
         internal void HandlePlayPauseHotkey()
@@ -1603,46 +1747,105 @@ namespace musicApp
 
         internal void HandlePlaySelectedTrackHotkey()
         {
-            Song? selected = null;
+            if (!TryResolveTrackToPlayFromActiveView(out var selected, out var requestSource))
+                return;
+
+            if (selected != null)
+                PlayTrack(selected, requestSource);
+        }
+
+        private bool TryResolveTrackToPlayFromActiveView(out Song? track, out object? requestSource)
+        {
+            track = null;
+            requestSource = null;
             var current = contentHost?.Content;
 
             if (ReferenceEquals(current, songsView))
-                selected = songsView?.SelectedTrack;
-            else if (ReferenceEquals(current, queueViewControl))
-                selected = queueViewControl?.SelectedTrack;
-            else if (ReferenceEquals(current, artistsViewControl))
-                selected = artistsViewControl?.SelectedTrack;
-            else if (ReferenceEquals(current, playlistsViewControl))
-                selected = playlistsViewControl?.SelectedTrack;
-            else if (ReferenceEquals(current, recentlyPlayedViewControl))
-                selected = recentlyPlayedViewControl?.SelectedTrack;
-
-            if (selected != null)
             {
-                PlayTrack(selected);
+                requestSource = songsView;
+                track = songsView?.SelectedTrack
+                    ?? filteredTracks.FirstOrDefault()
+                    ?? allTracks.FirstOrDefault();
+                return track != null;
             }
+
+            if (ReferenceEquals(current, queueViewControl))
+            {
+                requestSource = queueViewControl;
+                track = queueViewControl?.SelectedTrack
+                    ?? GetCurrentPlayQueue()?.FirstOrDefault();
+                return track != null;
+            }
+
+            if (ReferenceEquals(current, artistsViewControl))
+            {
+                requestSource = artistsViewControl;
+                track = artistsViewControl?.SelectedTrack;
+                return track != null;
+            }
+
+            if (ReferenceEquals(current, genresViewControl))
+            {
+                requestSource = genresViewControl;
+                track = genresViewControl?.SelectedTrack;
+                return track != null;
+            }
+
+            if (ReferenceEquals(current, albumsViewControl))
+            {
+                requestSource = albumsViewControl;
+                track = albumsViewControl?.GetDefaultPlayTrack();
+                return track != null;
+            }
+
+            if (ReferenceEquals(current, playlistsViewControl))
+            {
+                requestSource = playlistsViewControl;
+                track = playlistsViewControl?.SelectedTrack
+                    ?? playlistsViewControl?.SelectedPlaylist?.Tracks?.FirstOrDefault();
+                return track != null;
+            }
+
+            if (ReferenceEquals(current, recentlyPlayedViewControl))
+            {
+                requestSource = recentlyPlayedViewControl;
+                track = recentlyPlayedViewControl?.SelectedTrack
+                    ?? recentlyPlayed.FirstOrDefault();
+                return track != null;
+            }
+
+            return false;
         }
 
         private void SelectCurrentTrackInActiveView(bool grabFocus = false)
         {
-            if (currentTrack == null) return;
+            var track = currentTrack;
+            if (track == null) return;
             var current = contentHost?.Content;
-            
+
             if (ReferenceEquals(current, songsView))
-                songsView?.SelectTrack(currentTrack, grabFocus);
+                songsView?.SelectTrack(track, grabFocus);
             else if (ReferenceEquals(current, queueViewControl))
-                queueViewControl?.SelectTrack(currentTrack, grabFocus);
+                queueViewControl?.SelectTrack(track, grabFocus);
             else if (ReferenceEquals(current, artistsViewControl))
-                artistsViewControl?.SelectTrack(currentTrack, grabFocus);
+                artistsViewControl?.SelectTrack(track, grabFocus);
+            else if (ReferenceEquals(current, genresViewControl))
+                genresViewControl?.SelectTrack(track, grabFocus);
+            else if (ReferenceEquals(current, albumsViewControl))
+                albumsViewControl?.SelectTrack(track, grabFocus);
+            else if (ReferenceEquals(current, playlistsViewControl))
+                playlistsViewControl?.SelectTrack(track, grabFocus);
+            else if (ReferenceEquals(current, recentlyPlayedViewControl))
+                recentlyPlayedViewControl?.SelectTrack(track, grabFocus);
         }
 
         private void TitleBarPlayer_PlayPauseRequested(object? sender, EventArgs e)
         {
             if (currentTrack == null)
             {
-                if (contentHost?.Content == songsView && songsView?.SelectedTrack is Song selectedSong)
+                if (TryResolveTrackToPlayFromActiveView(out var selected, out var requestSource) && selected != null)
                 {
-                    PlayTrack(selectedSong);
+                    PlayTrack(selected, requestSource);
                 }
                 else if (filteredTracks.Count > 0)
                 {
@@ -1663,10 +1866,13 @@ namespace musicApp
 
         private void TitleBarPlayer_PreviousTrackRequested(object? sender, EventArgs e)
         {
+            isManualNavigation = true;
+
+            // Title bar shows the incoming track during overlap — treat that as current
+            TryAdoptVisibleCrossfadeTrackAsCurrent();
+
             var currentQueue = GetCurrentPlayQueue();
             var currentIndex = GetCurrentTrackIndex();
-
-            isManualNavigation = true;
 
             var currentPosition = titleBarPlayer.CurrentPosition;
 
@@ -1721,17 +1927,19 @@ namespace musicApp
 
         private void TitleBarPlayer_NextTrackRequested(object? sender, EventArgs e)
         {
+            isManualNavigation = true;
+
+            // Title bar shows the incoming track during overlap — skip that, not the fade-out
+            TryAdoptVisibleCrossfadeTrackAsCurrent();
+
             var currentQueue = GetCurrentPlayQueue();
             var currentIndex = GetCurrentTrackIndex();
             var repeatMode = titleBarPlayer.RepeatMode;
 
-            isManualNavigation = true;
-
             if (HasContextualPlaybackQueue())
             {
-                if (TryManualAdvanceContextualSession())
+                if (TryAdvanceContextualSessionMovingFinishedToHistory(out var next) && next != null)
                 {
-                    var next = contextualPlaybackFuture![0];
                     bool wasPlaying = titleBarPlayer.IsPlaying;
                     LoadTrackWithoutPlayback(next);
                     if (wasPlaying)
@@ -2004,55 +2212,35 @@ namespace musicApp
             if (!IsValidTrackWithPath(track))
                 return;
 
-            if (HasContextualPlaybackQueue() && contextualSessionOrderedFull != null)
-            {
-                bool sameAsCurrent = currentTrack != null && SameSongPath(currentTrack, track);
-
-                if (!sameAsCurrent)
-                {
-                    RemoveFromSessionOrderedFullSkippingCurrent(track);
-                    RemoveFromShuffledFutureSkippingHead(track);
-
-                    int curIdx = currentTrack != null
-                        ? Helpers.ArtistPlaybackOrder.IndexOfTrackInOrderedList(contextualSessionOrderedFull, currentTrack)
-                        : -1;
-                    int insertIdx = curIdx + 1;
-                    if (insertIdx < 0 || insertIdx > contextualSessionOrderedFull.Count)
-                        insertIdx = contextualSessionOrderedFull.Count;
-                    contextualSessionOrderedFull.Insert(insertIdx, track);
-
-                    if (titleBarPlayer.IsShuffleEnabled)
-                    {
-                        int shInsert = contextualShuffledFuture.Count >= 1 ? 1 : 0;
-                        contextualShuffledFuture.Insert(shInsert, track);
-                    }
-                }
-
-                MarkUserQueued(track);
-                SetActivePlaybackFuture(currentTrack);
-                UpdateQueueView();
-                RefreshVisibleViews();
+            var session = GetOrPromoteContextualSessionForQueueEdit();
+            if (session == null)
                 return;
+
+            bool sameAsCurrent = currentTrack != null && SameSongPath(currentTrack, track);
+
+            if (!sameAsCurrent)
+            {
+                RemoveFromSessionOrderedFullSkippingCurrent(track);
+                RemoveFromShuffledFutureSkippingHead(track);
+
+                int curIdx = currentTrack != null
+                    ? Helpers.ArtistPlaybackOrder.IndexOfTrackInOrderedList(session, currentTrack)
+                    : -1;
+                int insertIdx = curIdx + 1;
+                if (insertIdx < 0 || insertIdx > session.Count)
+                    insertIdx = session.Count;
+                session.Insert(insertIdx, track);
+
+                if (titleBarPlayer.IsShuffleEnabled)
+                {
+                    int shInsert = contextualShuffledFuture.Count >= 1 ? 1 : 0;
+                    contextualShuffledFuture.Insert(shInsert, track);
+                    CaptureContextualShuffleWrapPathOrder();
+                }
             }
 
-            int insertAt = GetCurrentTrackIndex() + 1;
-            if (insertAt < 0)
-                insertAt = 0;
-
-            if (insertAt <= filteredTracks.Count)
-                filteredTracks.Insert(insertAt, track);
-            else
-                filteredTracks.Add(track);
-
-            int shuffleInsertAt = (titleBarPlayer.IsShuffleEnabled ? currentShuffledIndex : currentTrackIndex) + 1;
-            if (shuffleInsertAt < 0)
-                shuffleInsertAt = 0;
-            if (shuffleInsertAt <= shuffledTracks.Count)
-                shuffledTracks.Insert(shuffleInsertAt, track);
-            else
-                shuffledTracks.Add(track);
-
             MarkUserQueued(track);
+            SetActivePlaybackFuture(currentTrack);
             UpdateQueueView();
             RefreshVisibleViews();
         }
@@ -2065,31 +2253,27 @@ namespace musicApp
             if (!IsValidTrackWithPath(track))
                 return;
 
-            if (HasContextualPlaybackQueue() && contextualSessionOrderedFull != null)
-            {
-                bool sameAsCurrent = currentTrack != null && SameSongPath(currentTrack, track);
-
-                if (!sameAsCurrent)
-                {
-                    RemoveFromSessionOrderedFullSkippingCurrent(track);
-                    RemoveFromShuffledFutureSkippingHead(track);
-
-                    contextualSessionOrderedFull.Add(track);
-                    if (titleBarPlayer.IsShuffleEnabled)
-                        contextualShuffledFuture.Add(track);
-                }
-
-                MarkUserQueued(track);
-                SetActivePlaybackFuture(currentTrack);
-                UpdateQueueView();
-                RefreshVisibleViews();
+            var session = GetOrPromoteContextualSessionForQueueEdit();
+            if (session == null)
                 return;
+
+            bool sameAsCurrent = currentTrack != null && SameSongPath(currentTrack, track);
+
+            if (!sameAsCurrent)
+            {
+                RemoveFromSessionOrderedFullSkippingCurrent(track);
+                RemoveFromShuffledFutureSkippingHead(track);
+
+                session.Add(track);
+                if (titleBarPlayer.IsShuffleEnabled)
+                {
+                    contextualShuffledFuture.Add(track);
+                    CaptureContextualShuffleWrapPathOrder();
+                }
             }
 
-            filteredTracks.Add(track);
-            shuffledTracks.Add(track);
-
             MarkUserQueued(track);
+            SetActivePlaybackFuture(currentTrack);
             UpdateQueueView();
             RefreshVisibleViews();
         }
@@ -2133,16 +2317,21 @@ namespace musicApp
                     contextualShuffledFuture.RemoveAt(q);
                 else
                 {
-                    int sIdx = IndexOfBySongPath(contextualShuffledFuture, removed);
+                    int sIdx = contextualShuffledFuture.FindIndex(t => ReferenceEquals(t, removed));
+                    if (sIdx < 0)
+                        sIdx = IndexOfBySongPath(contextualShuffledFuture, removed);
                     if (sIdx >= 0)
                         contextualShuffledFuture.RemoveAt(sIdx);
                 }
 
-                for (int i = contextualSessionOrderedFull.Count - 1; i >= 0; i--)
-                {
-                    if (SameSongPath(contextualSessionOrderedFull[i], removed))
-                        contextualSessionOrderedFull.RemoveAt(i);
-                }
+                if (titleBarPlayer.IsShuffleEnabled)
+                    CaptureContextualShuffleWrapPathOrder();
+
+                int sessionIdx = contextualSessionOrderedFull.FindIndex(t => ReferenceEquals(t, removed));
+                if (sessionIdx < 0)
+                    sessionIdx = IndexOfBySongPath(contextualSessionOrderedFull, removed);
+                if (sessionIdx >= 0)
+                    contextualSessionOrderedFull.RemoveAt(sessionIdx);
 
                 ClearInjectedFlagFor(removed);
 
@@ -2633,6 +2822,7 @@ namespace musicApp
                         {
                             progressBarFill.Visibility = Visibility.Collapsed;
                             progressBarFill.Width = 0;
+                            StartThumbnailCacheBackfillIfNeeded();
                         }
                         UpdateStatusBar();
                     }

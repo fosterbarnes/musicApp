@@ -569,6 +569,15 @@ namespace musicApp.Views
             return (scrollRatio, scrollOffsetPixels, mergedPending);
         }
 
+        /// <summary>
+        /// IProgress that invokes the handler on the reporting thread. Unlike Progress&lt;T&gt;,
+        /// reports are not posted asynchronously, so they can't arrive after a later status update.
+        /// </summary>
+        private sealed class SynchronousProgress<T>(Action<T> handler) : IProgress<T>
+        {
+            public void Report(T value) => handler(value);
+        }
+
         private async Task RebuildAlbumItemsAsync(bool preserveViewState = true)
         {
             _isRebuilding = true;
@@ -672,7 +681,9 @@ namespace musicApp.Views
                 var prefixAlbums = albumsOnly.Take(prefixGoal).ToList();
                 var remainingAlbums = albumsOnly.Skip(prefixGoal).ToList();
 
-                var hydrateProgress = new Progress<(int done, int total)>(p =>
+                // Synchronous reporter: ReportPhase already marshals to the dispatcher, and
+                // reporting inline keeps LoadingArtwork updates ordered before the final Complete.
+                var hydrateProgress = new SynchronousProgress<(int done, int total)>(p =>
                     ReportPhase(AlbumsGridRebuildPhase.LoadingArtwork, prefixAlbums.Count + p.done, albumsOnly.Count));
 
                 // Await ONLY the prefix albums to make startup instant
@@ -681,10 +692,36 @@ namespace musicApp.Views
                     await Task.Run(() => HydrateAllAlbumGridItems(prefixAlbums, targetArtPx, ct, null), ct).ConfigureAwait(false);
                 }
 
-                // Fire and forget the rest in the background
+                // Fire and forget the rest in the background; it outlives this method, so it
+                // must report Complete itself or the status bar sticks on "loading artwork".
                 if (remainingAlbums.Count > 0)
                 {
-                    _ = Task.Run(() => HydrateAllAlbumGridItems(remainingAlbums, targetArtPx, ct, hydrateProgress), ct);
+                    _ = Task.Run(async () =>
+                    {
+                        HydrateAllAlbumGridItems(remainingAlbums, targetArtPx, ct, hydrateProgress);
+                        if (ct.IsCancellationRequested)
+                            return;
+
+                        // Prebind runs off-UI and skips PropertyChanged; notify so DataTriggers re-evaluate.
+                        try
+                        {
+                            await Dispatcher.InvokeAsync(() =>
+                            {
+                                foreach (var item in remainingAlbums)
+                                {
+                                    if (item.AlbumArtSource != null)
+                                        item.NotifyAlbumArtBound();
+                                }
+                            }, DispatcherPriority.Background).Task.ConfigureAwait(false);
+                        }
+                        catch (TaskCanceledException)
+                        {
+                            return;
+                        }
+
+                        if (!ct.IsCancellationRequested)
+                            ReportPhase(AlbumsGridRebuildPhase.Complete);
+                    }, ct);
                 }
             }
             catch (OperationCanceledException)

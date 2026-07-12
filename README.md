@@ -11,7 +11,7 @@ Currently in a pre-release state, so not all intended features or behaviors have
 **132 / 169 tasks complete (78.1%)**
 [Tasks.md](https://github.com/fosterbarnes/musicApp/blob/main/.md/Tasks.md#main-window)
 
-[37,407](https://github.com/fosterbarnes/musicApp/blob/main/.md/scc.txt) lines of code and counting...
+[37,986](https://github.com/fosterbarnes/musicApp/blob/main/.md/scc.txt) lines of code and counting...
 
 
 ## Downloads
@@ -21,12 +21,12 @@ This project is in early development, bugs are expected. Windows only (for now).
 <table border="0">
 <tbody>
 <tr>
-<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.2.6/musicApp-v0.2.6-nuggetsEverdark-x64-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/musicApp/refs/heads/main/.resources/svg/download_x64.svg" width="180" height="auto" alt="x64 installer"/></a></td>
-<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.2.6/musicApp-v0.2.6-nuggetsEverdark-x86-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/musicApp/refs/heads/main/.resources/svg/download_x86.svg" width="180" height="auto" alt="x86 installer"/></a></td>
-<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.2.6/musicApp-v0.2.6-nuggetsEverdark-arm64-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/musicApp/refs/heads/main/.resources/svg/download_arm.svg" width="180" height="auto" alt="arm64 installer"/></a></td>
+<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.2.7/musicApp-v0.2.7-laughableFistin-x64-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/musicApp/refs/heads/main/.resources/svg/download_x64.svg" width="180" height="auto" alt="x64 installer"/></a></td>
+<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.2.7/musicApp-v0.2.7-laughableFistin-x86-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/musicApp/refs/heads/main/.resources/svg/download_x86.svg" width="180" height="auto" alt="x86 installer"/></a></td>
+<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.2.7/musicApp-v0.2.7-laughableFistin-arm64-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/musicApp/refs/heads/main/.resources/svg/download_arm.svg" width="180" height="auto" alt="arm64 installer"/></a></td>
 </tr>
 <tr>
-<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.2.6/musicApp-v0.2.6-nuggetsEverdark-portable.zip"><img src="https://raw.githubusercontent.com/fosterbarnes/musicApp/refs/heads/main/.resources/svg/download_portable.svg" width="180" height="auto" alt="portable .zip"/></a></td>
+<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.2.7/musicApp-v0.2.7-laughableFistin-portable.zip"><img src="https://raw.githubusercontent.com/fosterbarnes/musicApp/refs/heads/main/.resources/svg/download_portable.svg" width="180" height="auto" alt="portable .zip"/></a></td>
 </tr>
 </tbody>
 </table>

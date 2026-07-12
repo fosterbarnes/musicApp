@@ -43,7 +43,9 @@ public static class AlbumArtLoader
 
                 if (embeddedPictures != null && embeddedPictures.Count > 0)
                 {
-                    return AlbumArtDownscaleHelper.TryDownscaleToBitmapSource(embeddedPictures[0].PictureData, targetSizePx);
+                    var bmp = AlbumArtDownscaleHelper.TryDownscaleToBitmapSource(embeddedPictures[0].PictureData, targetSizePx);
+                    if (bmp != null)
+                        return bmp;
                 }
             }
             catch (Exception ex)
@@ -53,9 +55,7 @@ public static class AlbumArtLoader
 
             var directory = Path.GetDirectoryName(track.FilePath);
             if (directory == null)
-            {
                 return null;
-            }
 
             var imageFiles = Directory.GetFiles(directory, "*.*")
                 .Where(file => ImageExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))

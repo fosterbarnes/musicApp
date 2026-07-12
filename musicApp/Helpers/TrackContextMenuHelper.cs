@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -20,7 +21,7 @@ internal static class TrackContextMenuHelper
         return null;
     }
 
-    public static bool TryGetSingleSelectedSong(ListView? listView, out Song? song)
+    public static bool TryGetSingleSelectedSong(ListView? listView, [NotNullWhen(true)] out Song? song)
     {
         song = null;
         if (listView == null || listView.SelectedItems.Count != 1)
@@ -46,9 +47,9 @@ internal static class TrackContextMenuHelper
         return songs.Count > 0;
     }
 
-    public static bool TryFindTrackListView(ListView? listView, out TrackListView trackListView)
+    public static bool TryFindTrackListView(ListView? listView, [NotNullWhen(true)] out TrackListView? trackListView)
     {
-        trackListView = null!;
+        trackListView = null;
         if (listView == null)
             return false;
         DependencyObject? parent = listView;

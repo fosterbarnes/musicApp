@@ -72,7 +72,7 @@ internal static class LaunchArgsParser
     private static bool TryMatchSectionFlag(
         string arg,
         (string Long, string Short, string Section)[] table,
-        out string section)
+        out string? section)
     {
         foreach (var (longForm, shortForm, sec) in table)
         {
@@ -83,7 +83,7 @@ internal static class LaunchArgsParser
             }
         }
 
-        section = null!;
+        section = null;
         return false;
     }
 

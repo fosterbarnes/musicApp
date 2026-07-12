@@ -56,7 +56,7 @@ namespace musicApp
 
         public void AddTrack(Song track)
         {
-            if (!Tracks.Any(t => t.FilePath == track.FilePath))
+            if (!Tracks.Any(t => string.Equals(t.FilePath, track.FilePath, StringComparison.OrdinalIgnoreCase)))
             {
                 Tracks.Add(track);
                 TrackFilePaths.Add(track.FilePath);
@@ -84,11 +84,10 @@ namespace musicApp
             Tracks.Clear();
             foreach (var filePath in TrackFilePaths)
             {
-                var track = availableTracks.FirstOrDefault(t => t.FilePath == filePath);
+                var track = availableTracks.FirstOrDefault(t =>
+                    string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
                 if (track != null)
-                {
                     Tracks.Add(track);
-                }
             }
         }
     }
