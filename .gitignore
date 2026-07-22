@@ -11,12 +11,8 @@ musicApp/.updater/obj
 musicApp/.updater.swap/obj
 .installer/Output/
 .vs/
-.web/mainPage/public/
-.web/mainPage/resources/
-.web/mainPage/*.lock
 obj/
-.buildNotes.md
-buildNotes.md
+*.md
 .resources/exe/yapBot.json
 .md/YapBot.json
 desktop.ini

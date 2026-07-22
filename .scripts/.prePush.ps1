@@ -4,6 +4,5 @@
 & $scripts\writeFeatures.ps1
 & $scripts\updateReleaseLink.ps1
 & $scripts\countCode.ps1
-& $webScripts\versionSync.ps1
-& $webScripts\exportWebsite.ps1
+& $scripts\syncWeb.ps1
 Write-Host "`nPre-push tasks completed." -ForegroundColor Green

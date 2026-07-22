@@ -1,308 +1,32 @@
-
-
-
-
-
-
-
-
-
 <!doctype html>
-
-
-
-
-
-
 <html    lang="en-us" >
-
-    
-
-
-
-
-    
-
-    
-        
-
-        
-            
-        
-    
-
-
-
-
 <head>
-	<meta name="generator" content="Hugo 0.164.0">
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
 <meta charset="utf-8">
 <meta content="musicApp" name="apple-mobile-web-app-title">
-
-
-
-
     <meta content="Lightweight music player for Windows. Free and open source." name="description">
-
-
-
-
 <meta content="#0d6efd" name="theme-color">
 <meta content="width=device-width, initial-scale=1" name="viewport">
-
 <meta property="og:url" content="https://musicapp.info/">
 	<meta property="og:site_name" content="musicApp">
 	<meta property="og:title" content="musicApp">
 	<meta property="og:description" content="GitHub">
 	<meta property="og:locale" content="en_us">
 	<meta property="og:type" content="website">
-
-
 	<meta name="twitter:card" content="summary">
 	<meta name="twitter:title" content="musicApp">
 	<meta name="twitter:description" content="GitHub">
-
-
-
-    
         <title>musicApp</title>
-    
-
-    
-
-
-
-
-
-
-
     <link href="/apple-touch-icon.png" rel="apple-touch-icon" sizes="180x180">
-
-
-
     <link href="/favicon-96x96.png" rel="icon" sizes="96x96" type="image/png">
-
-
-
     <link href="/favicon.ico" rel="shortcut icon">
-
-
-
     <link href="/favicon.svg" rel="icon" type="image/svg+xml">
-
-
-
     <link href="/web-app-manifest-192x192.png" rel="icon" type="image/png">
-
-
-
     <link href="/web-app-manifest-512x512.png" rel="icon" type="image/png">
-
-
-
     <link href="/site.webmanifest" rel="manifest">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-        
-
-        
-        
-        
-        
-
-        
-
-        
-    
-
-    
-
-    
-
-    
-    
-
-
 <link  crossorigin="anonymous"  href="/css/paige/paige.9289c472a110ae6f4f2d3770d1e0cf9dd412770f.min.52c97a72b4275ed01b7703dd68934d86531557d699bdcad43047d850ce93393e.css"  integrity="sha256-Usl6crQnXtAbdwPdaJNNhlMVV9aZvcrUMEfYUM6TOT4="   referrerpolicy="no-referrer"  rel="stylesheet">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-        
-
-        
-        
-        
-        
-
-        
-
-        
-    
-
-    
-        
-
-        
-    
-
-    
-
-    
-    
-
-
 <link  crossorigin="anonymous"  href="/css/paige/bootstrap/paige.37b3fc66686a7163af8180c5fb0fc6ab835321eb.min.f090a42ffd1b27ac2b84dc9992e6b0848ee61ddd12e97c7931328b7140da2532.css"  integrity="sha256-8JCkL/0bJ6wrhNyZkuawhI7mHd0S6Xx5MTKLcUDaJTI="   referrerpolicy="no-referrer"  rel="stylesheet">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-    
-
-    
-
-    
-    
-
-
 <link  crossorigin="anonymous"  href="/css/paige/bootstrap-icons/bootstrap-icons.min.93276a5444db3cc8ad19a40f7d58eee71b335d21a674536a7d078bc6417c610e.css"  integrity="sha256-kydqVETbPMitGaQPfVju5xszXSGmdFNqfQeLxkF8YQ4="   referrerpolicy="no-referrer"  rel="stylesheet">
-
-
-
-
-
     <link href="/rss.xml" rel="alternate" type="application/rss&#43;xml">
-
-
-
-    
         <style>:root { --bs-body-font-family: "Segoe UI", "Segoe UI Variable", system-ui, -apple-system, sans-serif; }
 #paige-site-title {
   font-size: 2.3rem !important;
@@ -403,6 +127,15 @@
   padding-top: clamp(2rem, 10vw, 4.5rem);
   box-sizing: border-box;
 }
+.screenshot-stack__inner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--bs-secondary-bg, #e9ecef), var(--bs-tertiary-bg, #f8f9fa));
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
 .screenshot-stack .screenshot-stack__layer,
 #paige-page-content .screenshot-stack img.screenshot-stack__layer {
   position: absolute;
@@ -411,12 +144,19 @@
   width: 88%;
   max-width: 88% !important;
   height: auto;
+  aspect-ratio: 2630 / 1704;
   margin: 0 !important;
   display: block;
   border-radius: 6px;
   transform-origin: center center;
   opacity: 1;
   will-change: transform, opacity;
+}
+.screenshot-stack--loading .screenshot-stack__inner::before {
+  opacity: 1;
+}
+.screenshot-stack--loading .screenshot-stack__layer {
+  opacity: 0;
 }
 .screenshot-stack .screenshot-stack__layer[data-depth],
 #paige-page-content .screenshot-stack img.screenshot-stack__layer[data-depth] {
@@ -443,547 +183,20 @@
   animation: none !important;
 }
 </style>
-    
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-
 </head>
-
     <body>
-
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-
-
         <div class="container">
             <div class="row">
                 <div class="col mt-3" id="paige-site" >
-                    
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-
-                    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-
-
-
-
-    
-
-
-
     <header id="paige-site-header">
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-
-
-        
             <div class="display-1 fw-bold  text-center" id="paige-site-title">
                 <a class="text-body text-decoration-none" href="/">musicApp</a>
             </div>
-        
-
-        
             <div class="lead paige-row-tall text-center" id="paige-site-description">Lightweight music player for Windows. Free and open source.</div>
-        
-
-        
-
-        
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-
     </header>
-
-
-                    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-
-
-    
-        
-    
-
-
-
-
 <article class=" align-items-center d-flex flex-column  paige-kind-home paige-status-published" id="paige-page">
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     <main class="mw-100" id="paige-page-content" >
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-
-
-        
             <div class="home-main-flow">
-
 <div class="home-downloads-block">
   <p class="home-downloads-links">
     <a class="home-download-btn" href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.1/musicApp-v0.3.1-capitalUzi-x64-installer.exe" aria-label="Download x64 installer (.exe)"><img class="home-download-btn-img" src="/svg/download_x64.svg" width="2628" height="784" alt="" decoding="async" loading="lazy"></a>
@@ -992,13 +205,12 @@
     <a class="home-download-btn" href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.1/musicApp-v0.3.1-capitalUzi-portable.zip" aria-label="Download portable (.zip)"><img class="home-download-btn-img" src="/svg/download_portable.svg" width="2628" height="784" alt="" decoding="async" loading="lazy"></a>
   </p>
 </div>
-
 <div class="screenshot-stack-host">
-<div class="screenshot-stack" role="region" aria-label="App screenshots - click an image to change the front">
+<div class="screenshot-stack screenshot-stack--loading" role="region" aria-label="App screenshots - click an image to change the front" aria-busy="true">
 <div class="screenshot-stack__inner">
-<img class="screenshot-stack__layer" src="/scr/albums.webp" alt="Albums View" decoding="async" data-depth="front">
-<img class="screenshot-stack__layer" src="/scr/artists.webp" alt="Artists View" decoding="async" data-depth="middle">
-<img class="screenshot-stack__layer" src="/scr/songs.webp" alt="Songs View" decoding="async" data-depth="back">
+<img class="screenshot-stack__layer" src="/scr/albums-800.webp" srcset="/scr/albums-800.webp 800w, /scr/albums-1600.webp 1600w" sizes="(max-width: 923px) 81vw, 748px" width="2630" height="1704" alt="Albums View" decoding="async" fetchpriority="high" data-depth="front">
+<img class="screenshot-stack__layer" src="/scr/artists-800.webp" srcset="/scr/artists-800.webp 800w, /scr/artists-1600.webp 1600w" sizes="(max-width: 923px) 81vw, 748px" width="2630" height="1704" alt="Artists View" decoding="async" data-depth="middle">
+<img class="screenshot-stack__layer" src="/scr/songs-800.webp" srcset="/scr/songs-800.webp 800w, /scr/songs-1600.webp 1600w" sizes="(max-width: 923px) 81vw, 748px" width="2630" height="1704" alt="Songs View" decoding="async" data-depth="back">
 </div>
 </div>
 <script>
@@ -1013,11 +225,24 @@
   var cycleFallbackMs = 1200;
   var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
   var cycling = false;
-
+  function revealWhenReady() {
+    function waitFor(layer) {
+      if (layer.complete) return Promise.resolve();
+      return new Promise(function (resolve) {
+        layer.addEventListener('load', resolve, { once: true });
+        layer.addEventListener('error', resolve, { once: true });
+      });
+    }
+    Promise.all(layers.map(waitFor)).then(function () {
+      window.requestAnimationFrame(function () {
+        root.classList.remove('screenshot-stack--loading');
+        root.setAttribute('aria-busy', 'false');
+      });
+    });
+  }
   function reduced() {
     return mq.matches;
   }
-
   function findDepth(d, excludeAnimating) {
     for (var i = 0; i < layers.length; i++) {
       var L = layers[i];
@@ -1027,12 +252,10 @@
     }
     return null;
   }
-
   function animNameMatches(e, name) {
     var n = e.animationName || '';
     return n.indexOf(name) !== -1;
   }
-
   function rotateInstant() {
     var front = findDepth('front', false);
     var mid = findDepth('middle', false);
@@ -1042,7 +265,6 @@
     mid.setAttribute('data-depth', 'front');
     back.setAttribute('data-depth', 'middle');
   }
-
   function advanceAnimated() {
     if (cycling || reduced()) return;
     var front = findDepth('front', true);
@@ -1052,10 +274,8 @@
     cycling = true;
     front.removeAttribute('data-depth');
     front.classList.add('is-exiting');
-
     mid.setAttribute('data-depth', 'front');
     back.setAttribute('data-depth', 'middle');
-
     var done = false;
     var fallback;
     function finishCycle() {
@@ -1067,7 +287,6 @@
       front.setAttribute('data-depth', 'back');
       cycling = false;
     }
-
     function onCycleEnd(e) {
       if (e.target !== front || !animNameMatches(e, 'ssCycleFrontToBack')) return;
       if (done) return;
@@ -1078,11 +297,9 @@
       front.setAttribute('data-depth', 'back');
       cycling = false;
     }
-
     front.addEventListener('animationend', onCycleEnd);
     fallback = window.setTimeout(finishCycle, cycleFallbackMs);
   }
-
   function onAdvanceClick() {
     if (reduced()) {
       rotateInstant();
@@ -1091,474 +308,35 @@
     if (cycling) return;
     advanceAnimated();
   }
-
   function syncReduceClass() {
     root.classList.toggle('screenshot-stack--motion-off', reduced());
   }
-
   inner.addEventListener('click', function (e) {
     if (e.target.closest('img')) onAdvanceClick();
   });
   inner.style.cursor = 'pointer';
-
   function onMq() {
     syncReduceClass();
   }
-
   syncReduceClass();
+  revealWhenReady();
   if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onMq);
   else if (typeof mq.addListener === 'function') mq.addListener(onMq);
 })();
 </script>
+<noscript><style>.screenshot-stack--loading .screenshot-stack__layer { opacity: 1; } .screenshot-stack--loading .screenshot-stack__inner::before { opacity: 0; }</style></noscript>
 </div>
-
-
 </div>
-
-<p><div class="hugo-spacer" style="height:5.5rem;min-height:5.5rem" aria-hidden="true"></div>
-
-
-
-
-
-
-
-
-
-
-
+<p><div class="site-spacer" style="height:5.5rem;min-height:5.5rem" aria-hidden="true"></div>
 <span class="paige-shortcode-icon"><a href="https://github.com/fosterbarnes/musicApp"  target="_blank" ><i class="bi bi-github"  title="GitHub" ><span class="visually-hidden">GitHub</span></i></a></span>
 </p>
-
-        
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-
     </main>
-
-    
-
-
-
-
-
-
-
-
-
-    
-
-    
-
-
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-
 </article>
-
-
-
-
-
-
-
-
-
-
-    
-        
-    
-        
-    
-
-
-
-
-
-    
-    
-
-
-
-
-
-
-
-
-
-                    
-
-
-
-
-
-
-
-
-
-    
-
-
-
-
-
-
-                    
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-
                 </div>
             </div>
         </div>
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-    
-    
-
-
 <script  crossorigin="anonymous"   defer  integrity="sha256-rJF61ZriZrRi/FZim6w1a1dHEvCKpqo8ProZWeZv9Ng="   referrerpolicy="no-referrer"  src="/js/paige/bootstrap/bootstrap.bundle.min.ac917ad59ae266b462fc56629bac356b574712f08aa6aa3c3eba1959e66ff4d8.js" ></script>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-    
-    
-    
-
-    
-        
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-        
-    
-
-    
-
-    
-
-    
-
-    
-        
-    
-
-    
-
-    
-        
-    
-
     <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","abstract":" function reduced() { return mq.matches; }\nfunction findDepth(d, excludeAnimating) { for (var i = 0; i \u003c layers.length; i++) { var L = layers[i]; if (L.getAttribute(‘data-depth’) !== d) continue; if (excludeAnimating \u0026\u0026 L.classList.contains(‘is-exiting’)) continue; return L; } return null; }\nfunction animNameMatches(e, name) { var n = e.animationName || ‘’; return n.indexOf(name) !== -1; }\nfunction rotateInstant() { var front = findDepth(‘front’, false); var mid = findDepth(‘middle’, false); var back = findDepth(‘back’, false); if (!front || !mid || !back) return; front.setAttribute(‘data-depth’, ‘back’); mid.setAttribute(‘data-depth’, ‘front’); back.setAttribute(‘data-depth’, ‘middle’); }\nfunction advanceAnimated() { if (cycling || reduced()) return; var front = findDepth(‘front’, true); var mid = findDepth(‘middle’, true); var back = findDepth(‘back’, true); if (!front || !mid || !back) return; cycling = true; front.removeAttribute(‘data-depth’); front.classList.add(‘is-exiting’);\nmid.setAttribute('data-depth', 'front');\rback.setAttribute('data-depth', 'middle');\rvar done = false;\rvar fallback;\rfunction finishCycle() {\rif (done) return;\rdone = true;\rfront.removeEventListener('animationend', onCycleEnd);\rclearTimeout(fallback);\rfront.classList.remove('is-exiting');\rfront.setAttribute('data-depth', 'back');\rcycling = false;\r}\rfunction onCycleEnd(e) {\rif (e.target !== front || !animNameMatches(e, 'ssCycleFrontToBack')) return;\rif (done) return;\rdone = true;\rclearTimeout(fallback);\rfront.removeEventListener('animationend', onCycleEnd);\rfront.classList.remove('is-exiting');\rfront.setAttribute('data-depth', 'back');\rcycling = false;\r}\rfront.addEventListener('animationend', onCycleEnd);\rfallback = window.setTimeout(finishCycle, cycleFallbackMs);\r}\nfunction onAdvanceClick() { if (reduced()) { rotateInstant(); return; } if (cycling) return; advanceAnimated(); }\nfunction syncReduceClass() { root.classList.toggle(‘screenshot-stack–motion-off’, reduced()); }\ninner.addEventListener(‘click’, function (e) { if (e.target.closest(‘img’)) onAdvanceClick(); }); inner.style.cursor = ‘pointer’;\nfunction onMq() { syncReduceClass(); }\nsyncReduceClass(); if (typeof mq.addEventListener === ‘function’) mq.addEventListener(‘change’, onMq); else if (typeof mq.addListener === ‘function’) mq.addListener(onMq); })(); GitHub","inLanguage":"en-us","timeRequired":"PT1M","url":"https://musicapp.info/","wordCount":1}</script>
-
-
-
 <noscript>JavaScript is required</noscript>
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-
-    
-
-    
-
-
     </body>
 </html>

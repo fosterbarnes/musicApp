@@ -1,3 +1,0 @@
-{{- $d := .Destination -}}
-{{- $remote := or (strings.HasPrefix $d "http://") (strings.HasPrefix $d "https://") (strings.HasPrefix $d "//") -}}
-<a href="{{ $d | safeURL }}"{{ with .Title }} title="{{ . }}"{{ end }}{{ if $remote }} target="_blank" rel="noopener noreferrer"{{ end }}>{{ .Text }}</a>
