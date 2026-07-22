@@ -1,5 +1,6 @@
 # ![Icon](https://i.postimg.cc/d3c9vxzF/Music-App-Icon24x24.png) musicApp - an offline music player
 
+https://musicapp.info/
 
 Desktop music player for Windows with a focus on functionality, efficiency, clean UI, and customization.
 
