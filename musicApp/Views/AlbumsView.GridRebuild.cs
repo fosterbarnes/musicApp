@@ -387,30 +387,6 @@ namespace musicApp.Views
             return true;
         }
 
-        private static ImageSource? TryInitialAlbumArtForGrid(Song rep, string gridAlbum, string gridArtist)
-        {
-            if (!string.IsNullOrEmpty(rep.ThumbnailCachePath))
-            {
-                var fromStored = AlbumArtCacheManager.LoadFromCachePath(rep.ThumbnailCachePath);
-                if (fromStored != null)
-                    return fromStored;
-            }
-
-            var fromKey = AlbumArtCacheManager.TryGetCached(gridAlbum, gridArtist, decodePixelWidth: 0);
-            if (fromKey != null)
-                return fromKey;
-
-            var repArtist = rep.Artist ?? string.Empty;
-            if (!string.Equals(gridArtist, repArtist, StringComparison.Ordinal))
-            {
-                var legacy = AlbumArtCacheManager.TryGetCached(gridAlbum, repArtist, decodePixelWidth: 0);
-                if (legacy != null)
-                    return legacy;
-            }
-
-            return null;
-        }
-
         private static void HydrateAllAlbumGridItems(
             IReadOnlyList<AlbumGridItem> items,
             int targetPx,
@@ -472,8 +448,7 @@ namespace musicApp.Views
                 .Select(g =>
                 {
                     var rep = g.First();
-                    var art = TryInitialAlbumArtForGrid(rep, g.Key.Album, g.Key.Artist);
-                    return new AlbumGridItem(g.Key.Album, g.Key.Artist, rep, art);
+                    return new AlbumGridItem(g.Key.Album, g.Key.Artist, rep, null);
                 });
 
             query = sortMode switch
@@ -511,8 +486,7 @@ namespace musicApp.Views
                 {
                     var maxAdded = g.Max(t => t.DateAdded).Date;
                     var rep = g.OrderByDescending(t => t.DateAdded).First();
-                    var art = TryInitialAlbumArtForGrid(rep, g.Key.Album, g.Key.Artist);
-                    return (new AlbumGridItem(g.Key.Album, g.Key.Artist, rep, art), maxAdded);
+                    return (new AlbumGridItem(g.Key.Album, g.Key.Artist, rep, null), maxAdded);
                 })
                 .OrderByDescending(x => x.Item2)
                 .ThenBy(x => x.Item1.AlbumTitle, StringComparer.OrdinalIgnoreCase)

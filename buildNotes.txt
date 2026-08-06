@@ -1,4 +1,4 @@
-v0.3.1 release (capitalUzi)
+v0.3.2 release (kitBunga)
 
 - Fix 'Add to Queue' not working if there's no running queue
 - Re-scanning library no longer resets 'recently added' dates play count, or favorite status

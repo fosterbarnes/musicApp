@@ -52,6 +52,9 @@ namespace musicApp
 
         private readonly object _libraryPathRegistryLock = new();
         private readonly HashSet<string> _registeredLibraryNormalizedPaths = new(StringComparer.OrdinalIgnoreCase);
+        private readonly SemaphoreSlim _libraryCacheUpdateGate = new(1, 1);
+        private readonly object _thumbnailBackfillLock = new();
+        private Task? _thumbnailBackfillTask;
 
         /// <summary>Playlists pinned to the sidebar; used for the dynamic pinned section.</summary>
         public ObservableCollection<Playlist> PinnedPlaylists { get; } = new ObservableCollection<Playlist>();
@@ -481,6 +484,8 @@ namespace musicApp
             foreach (var folderPath in existingFolders)
                 await LoadMusicFromCacheAsync(folderPath, libraryCache);
 
+            StartThumbnailCacheBackfillIfNeeded();
+
             // Reconcile with disk after the UI has painted; never blocks startup.
             _ = Dispatcher.InvokeAsync(
                 () => _ = ReconcileLibraryFoldersWithDiskAsync(existingFolders, libraryCache),
@@ -671,10 +676,9 @@ namespace musicApp
                     .ToList();
 
                 // File.Exists + metadata patching on background thread
-                var (validTracks, tracksNeedingThumbnails) = await Task.Run(() =>
+                var validTracks = await Task.Run(() =>
                 {
                     var valid = new List<Song>(cachedTracks.Count);
-                    var needThumb = new List<Song>();
 
                     foreach (var track in cachedTracks)
                     {
@@ -706,36 +710,13 @@ namespace musicApp
 
                         valid.Add(track);
 
-                        if (string.IsNullOrEmpty(track.ThumbnailCachePath) || !File.Exists(track.ThumbnailCachePath))
-                            needThumb.Add(track);
                     }
 
-                    return (valid, needThumb);
+                    return valid;
                 });
 
                 allTracks.AddRange(validTracks);
                 filteredTracks.AddRange(validTracks);
-
-                if (tracksNeedingThumbnails.Count > 0)
-                {
-                    var snapshot = tracksNeedingThumbnails;
-                    _ = Task.Run(async () =>
-                    {
-                        var updates = new List<(Song track, string path)>(snapshot.Count);
-                        foreach (var t in snapshot)
-                        {
-                            var path = AlbumArtCacheManager.GenerateAndCache(t);
-                            updates.Add((t, path));
-                        }
-
-                        await Dispatcher.InvokeAsync(async () =>
-                        {
-                            foreach (var (track, path) in updates)
-                                track.ThumbnailCachePath = path;
-                            await UpdateLibraryCacheAsync();
-                        });
-                    });
-                }
 
                 UpdateShuffledTracks();
 
@@ -908,30 +889,58 @@ namespace musicApp
 
         private void StartThumbnailCacheBackfillIfNeeded()
         {
+            lock (_thumbnailBackfillLock)
+            {
+                if (_thumbnailBackfillTask is { IsCompleted: false })
+                    return;
+            }
+
             var snapshot = allTracks
-                .Where(t => string.IsNullOrEmpty(t.ThumbnailCachePath) || !File.Exists(t.ThumbnailCachePath))
+                .GroupBy(AlbumArtCacheManager.GetCachedPathForTrack, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.OrderByDescending(t => string.Equals(t.AlbumArtPath, "embedded", StringComparison.OrdinalIgnoreCase)).First())
                 .ToList();
             if (snapshot.Count == 0)
                 return;
 
-            _ = Task.Run(async () =>
+            var task = Task.Run(async () =>
             {
-                var updates = new List<(Song track, string path)>(snapshot.Count);
-                foreach (var t in snapshot)
+                try
                 {
-                    var path = AlbumArtCacheManager.GenerateAndCache(t);
-                    if (!string.IsNullOrEmpty(path))
-                        updates.Add((t, path));
-                }
+                    var updates = new List<(Song track, string path)>();
+                    var updateLock = new object();
+                    var options = new ParallelOptions { MaxDegreeOfParallelism = 2 };
+                    await Parallel.ForEachAsync(snapshot, options, (track, _) =>
+                    {
+                        var previousPath = track.ThumbnailCachePath;
+                        var path = AlbumArtCacheManager.GenerateAndCache(track);
+                        if (!string.IsNullOrEmpty(path) &&
+                            !string.Equals(previousPath, path, StringComparison.OrdinalIgnoreCase))
+                        {
+                            lock (updateLock)
+                                updates.Add((track, path));
+                        }
+                        return ValueTask.CompletedTask;
+                    });
 
-                await Dispatcher.InvokeAsync(async () =>
+                    if (updates.Count == 0)
+                        return;
+
+                    await Dispatcher.InvokeAsync(async () =>
+                    {
+                        foreach (var (track, path) in updates)
+                            track.ThumbnailCachePath = path;
+                        await UpdateLibraryCacheAsync();
+                        RefreshTitleBarFromCurrentTrack();
+                    });
+                }
+                catch (Exception ex)
                 {
-                    foreach (var (track, path) in updates)
-                        track.ThumbnailCachePath = path;
-                    await UpdateLibraryCacheAsync();
-                    RefreshTitleBarFromCurrentTrack();
-                });
+                    Debug.WriteLine($"Thumbnail cache backfill failed: {ex.Message}");
+                }
             });
+
+            lock (_thumbnailBackfillLock)
+                _thumbnailBackfillTask = task;
         }
 
         /// <summary>
@@ -2856,7 +2865,8 @@ namespace musicApp
             string folderPath,
             bool saveToSettings = false,
             bool runPostScanSystemArtworkIfEnabled = false,
-            IReadOnlyDictionary<string, Song>? priorLibraryByPath = null)
+            IReadOnlyDictionary<string, Song>? priorLibraryByPath = null,
+            bool reloadExistingTracks = false)
         {
             try
             {
@@ -2963,13 +2973,16 @@ namespace musicApp
                             Song? track = null;
                             try
                             {
-                                if (TryRegisterLibraryPath(file))
+                                var key = LibraryPathHelper.TryNormalizePath(file);
+                                Song? prior = null;
+                                var hasPrior = key != null && priorMap.TryGetValue(key, out prior);
+                                if (reloadExistingTracks && hasPrior && prior != null)
                                 {
-                                    Song? prior = null;
-                                    var key = LibraryPathHelper.TryNormalizePath(file);
-                                    if (key != null)
-                                        priorMap.TryGetValue(key, out prior);
-
+                                    TrackMetadataLoader.ReloadTagFieldsFromFile(prior);
+                                    track = null;
+                                }
+                                else if (TryRegisterLibraryPath(file))
+                                {
                                     track = TrackMetadataLoader.LoadSong(file, prior);
                                     if (track == null)
                                         ReleaseRegisteredLibraryPath(file);
@@ -3046,15 +3059,20 @@ namespace musicApp
 
         private async Task UpdateLibraryCacheAsync()
         {
+            await _libraryCacheUpdateGate.WaitAsync();
             try
             {
-                var libraryCache = await libraryManager.LoadLibraryCacheAsync();
+                var libraryCache = new LibraryManager.LibraryCache();
                 libraryCache.Tracks = allTracks.ToList();
                 await libraryManager.SaveLibraryCacheAsync(libraryCache);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error updating library cache: {ex.Message}");
+            }
+            finally
+            {
+                _libraryCacheUpdateGate.Release();
             }
         }
 
@@ -3290,6 +3308,9 @@ namespace musicApp
                     {
                         appSettings.WindowState.SidebarWidth = sidebarColumn.ActualWidth;
                     }
+
+                    if (_miniPlayerWindow != null)
+                        CaptureMiniPlayerWindowState(_miniPlayerWindow);
 
                     await settingsManager.SaveSettingsAsync(appSettings).ConfigureAwait(true);
                 }

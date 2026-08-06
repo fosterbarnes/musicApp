@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using musicApp.Dialogs;
@@ -107,6 +108,7 @@ namespace musicApp
             }
 
             var w = new MiniPlayerWindow { Owner = this };
+            RestoreMiniPlayerWindowState(w, appSettings.MiniPlayerWindow);
             _miniPlayerWindow = w;
             w.PlayPauseRequested += TitleBarPlayer_PlayPauseRequested;
             w.PreviousTrackRequested += TitleBarPlayer_PreviousTrackRequested;
@@ -130,13 +132,110 @@ namespace musicApp
             w.DeleteRequested += OnDeleteRequested;
             w.ArtistNavigationRequested += TitleBarPlayer_ArtistNavigationRequested;
             w.AlbumNavigationRequested += TitleBarPlayer_AlbumNavigationRequested;
-            w.Closed += (_, _) =>
-            {
-                if (ReferenceEquals(_miniPlayerWindow, w))
-                    _miniPlayerWindow = null;
-            };
+            w.Closed += MiniPlayerWindow_Closed;
             w.Show();
             PushMiniPlayerState(w);
+        }
+
+        private void RestoreMiniPlayerWindowState(MiniPlayerWindow window, SettingsManager.MiniPlayerWindowStateSettings state)
+        {
+            if (state == null || !state.Left.HasValue || !state.Top.HasValue ||
+                !double.IsFinite(state.Width) || !double.IsFinite(state.Height) ||
+                !double.IsFinite(state.Left.Value) || !double.IsFinite(state.Top.Value))
+                return;
+
+            var workArea = GetMiniPlayerWorkArea(state.Left.Value, state.Top.Value);
+            double width = Math.Clamp(state.Width, window.MinWidth, workArea.Width);
+            double height = Math.Clamp(state.Height, window.MinHeight, workArea.Height);
+            double left = Math.Clamp(state.Left.Value, workArea.Left, workArea.Right - width);
+            double top = Math.Clamp(state.Top.Value, workArea.Top, workArea.Bottom - height);
+
+            window.WindowStartupLocation = WindowStartupLocation.Manual;
+            window.Width = width;
+            window.Height = height;
+            window.Left = left;
+            window.Top = top;
+        }
+
+        private static Rect GetMiniPlayerWorkArea(double left, double top)
+        {
+            var monitor = MonitorFromPoint(new POINT((int)Math.Round(left), (int)Math.Round(top)), MonitorDefaultToNearest);
+            if (monitor != IntPtr.Zero)
+            {
+                var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+                if (GetMonitorInfo(monitor, ref info))
+                {
+                    return new Rect(
+                        info.rcWork.Left,
+                        info.rcWork.Top,
+                        info.rcWork.Right - info.rcWork.Left,
+                        info.rcWork.Bottom - info.rcWork.Top);
+                }
+            }
+
+            return SystemParameters.WorkArea;
+        }
+
+        private const uint MonitorDefaultToNearest = 2;
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromPoint(POINT point, uint flags);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private readonly struct POINT(int x, int y)
+        {
+            public readonly int X = x;
+            public readonly int Y = y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MONITORINFO
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public int dwFlags;
+        }
+
+        private async void MiniPlayerWindow_Closed(object? sender, EventArgs e)
+        {
+            if (sender is not MiniPlayerWindow window)
+                return;
+
+            if (!ReferenceEquals(_miniPlayerWindow, window))
+                return;
+
+            CaptureMiniPlayerWindowState(window);
+            _miniPlayerWindow = null;
+            await settingsManager.SaveSettingsAsync(appSettings);
+        }
+
+        private void CaptureMiniPlayerWindowState(MiniPlayerWindow window)
+        {
+            if (window.WindowState != WindowState.Normal ||
+                !double.IsFinite(window.Width) || !double.IsFinite(window.Height) ||
+                !double.IsFinite(window.Left) || !double.IsFinite(window.Top))
+                return;
+
+            appSettings.MiniPlayerWindow = new SettingsManager.MiniPlayerWindowStateSettings
+            {
+                Width = window.Width,
+                Height = window.Height,
+                Left = window.Left,
+                Top = window.Top
+            };
         }
 
         private void MiniPlayer_SongPlayRequested(object? sender, Song song)

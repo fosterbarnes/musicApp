@@ -33,6 +33,17 @@ public static class AlbumArtLoader
                     return cached;
             }
 
+            var artist = AlbumArtCacheManager.GetThumbnailCacheArtistKey(track);
+            var byAlbum = AlbumArtCacheManager.TryGetCached(track.Album ?? "", artist, targetSizePx);
+            if (byAlbum != null)
+                return byAlbum;
+            if (!string.Equals(artist, track.Artist ?? "", StringComparison.Ordinal))
+            {
+                var legacy = AlbumArtCacheManager.TryGetCached(track.Album ?? "", track.Artist ?? "", targetSizePx);
+                if (legacy != null)
+                    return legacy;
+            }
+
             try
             {
                 var embedded = AlbumArtSourceResolver.TryLoadEmbeddedBytes(track.FilePath);

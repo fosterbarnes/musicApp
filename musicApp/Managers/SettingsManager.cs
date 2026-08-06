@@ -16,8 +16,17 @@ namespace musicApp
         public class AppSettings
         {
             public WindowStateSettings WindowState { get; set; } = new WindowStateSettings();
+            public MiniPlayerWindowStateSettings MiniPlayerWindow { get; set; } = new MiniPlayerWindowStateSettings();
             public PlayerSettings Player { get; set; } = new PlayerSettings();
             public string LastActiveView { get; set; } = "Library";
+        }
+
+        public class MiniPlayerWindowStateSettings
+        {
+            public double Width { get; set; } = 300;
+            public double Height { get; set; } = 900;
+            public double? Left { get; set; }
+            public double? Top { get; set; }
         }
 
         public class PlayerSettings
@@ -102,6 +111,7 @@ namespace musicApp
                     {
                         settings.Player ??= new PlayerSettings();
                         settings.WindowState ??= new WindowStateSettings();
+                        settings.MiniPlayerWindow ??= new MiniPlayerWindowStateSettings();
                         MigrateLegacySidebarWidth(settings.WindowState);
                         return settings;
                     }
@@ -135,6 +145,7 @@ namespace musicApp
                     {
                         settings.Player ??= new PlayerSettings();
                         settings.WindowState ??= new WindowStateSettings();
+                        settings.MiniPlayerWindow ??= new MiniPlayerWindowStateSettings();
                         MigrateLegacySidebarWidth(settings.WindowState);
                         return settings;
                     }

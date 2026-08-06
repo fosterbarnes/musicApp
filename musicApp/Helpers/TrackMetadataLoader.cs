@@ -207,6 +207,9 @@ public static class TrackMetadataLoader
                 AlbumArtCacheManager.InvalidateAlbum(prevAlbum, prevCanon);
             }
 
+            var currentCanon = AlbumArtCacheManager.GetThumbnailCacheArtistKey(track);
+            AlbumArtCacheManager.InvalidateAlbum(track.Album ?? "", currentCanon);
+
             track.ThumbnailCachePath = AlbumArtCacheManager.GenerateAndCache(track);
 
             track.PlayCount = playCount;

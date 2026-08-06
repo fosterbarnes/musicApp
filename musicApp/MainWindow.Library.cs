@@ -67,11 +67,31 @@ namespace musicApp
                     {
                         if (Directory.Exists(folderPath))
                         {
-                            await LoadMusicFromFolderAsync(folderPath, false);
+                            await LoadMusicFromFolderAsync(folderPath, false, false, null, reloadExistingTracks: true);
                             totalNewTracks += allTracks.Count(t => LibraryPathHelper.IsFileUnderMusicFolder(t.FilePath, folderPath));
                         }
                     }
 
+                    var supportedExtensions = new[] { ".mp3", ".wav", ".flac", ".m4a", ".aac" };
+                    foreach (var folderPath in musicFolders)
+                    {
+                        if (!Directory.Exists(folderPath))
+                            continue;
+
+                        var diskPaths = Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories)
+                            .Where(file => supportedExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+                            .Select(file => LibraryPathHelper.TryNormalizePath(file) ?? "")
+                            .Where(path => path.Length > 0)
+                            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                        var missing = allTracks
+                            .Where(t => LibraryPathHelper.IsFileUnderMusicFolder(t.FilePath, folderPath))
+                            .Where(t => !diskPaths.Contains(LibraryPathHelper.TryNormalizePath(t.FilePath) ?? ""))
+                            .ToList();
+                        foreach (var track in missing)
+                            RemoveTrackFromCollections(track, includeShuffled: true);
+                    }
+
+                    await UpdateLibraryCacheAsync();
                     UpdateUI();
                     await MaybeRunPostScanSystemArtworkCacheAsync();
                 }

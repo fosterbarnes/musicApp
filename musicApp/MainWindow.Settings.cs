@@ -177,6 +177,10 @@ namespace musicApp
                 titleBarPlayer.SetTrackInfo("No track selected", "", "");
                 ClearMiniPlayerTrack();
 
+                var miniPlayer = _miniPlayerWindow;
+                _miniPlayerWindow = null;
+                miniPlayer?.Close();
+
                 appSettings = new SettingsManager.AppSettings();
                 windowManager.ResetWindowState();
 

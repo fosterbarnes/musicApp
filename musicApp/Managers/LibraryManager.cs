@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Threading;
 using musicApp.Helpers;
 
 namespace musicApp
@@ -48,6 +49,7 @@ namespace musicApp
 
         private static LibraryManager? _instance;
         private static readonly object _lock = new object();
+        private static readonly SemaphoreSlim JsonWriteGate = new(1, 1);
 
         public static LibraryManager Instance
         {
@@ -75,11 +77,17 @@ namespace musicApp
             string path, T value, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
         {
             var tempPath = path + ".tmp";
-            using (var stream = File.Create(tempPath))
+            await JsonWriteGate.WaitAsync();
+            try
             {
-                await JsonSerializer.SerializeAsync(stream, value, typeInfo);
+                using (var stream = File.Create(tempPath))
+                    await JsonSerializer.SerializeAsync(stream, value, typeInfo);
+                File.Move(tempPath, path, overwrite: true);
             }
-            File.Move(tempPath, path, overwrite: true);
+            finally
+            {
+                JsonWriteGate.Release();
+            }
         }
 
         #region Library Cache Management

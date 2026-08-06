@@ -29,6 +29,7 @@ public static class AlbumArtCacheManager
 
     private const int MemoryCacheMaxEntries = 512;
     private static readonly ConcurrentDictionary<string, BitmapSource?> _memoryCache = new();
+    private static readonly ConcurrentDictionary<string, byte> _noArtworkCache = new();
 
     /// <summary>Limits parallel on-disk thumbnail generation (decode + MagicScaler + JPEG encode).</summary>
     private static readonly SemaphoreSlim ThumbnailGenerationSemaphore = new(2, 2);
@@ -91,12 +92,14 @@ public static class AlbumArtCacheManager
     /// </summary>
     public static BitmapSource? LoadFromCachePath(string cachePath, int decodePixelWidth = 0)
     {
-        if (string.IsNullOrEmpty(cachePath) || !File.Exists(cachePath))
+        if (string.IsNullOrEmpty(cachePath))
             return null;
 
         var cacheKey = cachePath + "|" + decodePixelWidth;
         if (_memoryCache.TryGetValue(cacheKey, out var cached))
             return cached;
+        if (!File.Exists(cachePath))
+            return null;
 
         for (int attempt = 0; attempt < 4; attempt++)
         {
@@ -160,8 +163,16 @@ public static class AlbumArtCacheManager
 
         var cachePath = GetCachedPathForTrack(track);
 
+        if (!string.Equals(track.AlbumArtPath, "embedded", StringComparison.OrdinalIgnoreCase) &&
+            _noArtworkCache.ContainsKey(cachePath))
+        {
+            return "";
+        }
+
         if (File.Exists(cachePath))
+        {
             return cachePath;
+        }
 
         try { Directory.CreateDirectory(ThumbnailFolder); } catch { return ""; }
 
@@ -197,7 +208,10 @@ public static class AlbumArtCacheManager
                 }
 
                 if (source == null)
+                {
+                    _noArtworkCache.TryAdd(cachePath, 0);
                     return "";
+                }
 
                 using (source)
                 {
@@ -223,7 +237,9 @@ public static class AlbumArtCacheManager
     public static void InvalidateAll()
     {
         AlbumArtThumbnailHelper.ClearFullSizeCache();
+        AlbumArtSourceResolver.ClearDirectoryCoverCache();
         _memoryCache.Clear();
+        _noArtworkCache.Clear();
         try
         {
             if (Directory.Exists(ThumbnailFolder))
@@ -241,6 +257,17 @@ public static class AlbumArtCacheManager
     public static void InvalidateAlbum(string album, string artist)
     {
         var path = GetCachedPath(album, artist);
+        var pathLock = ThumbnailPathLocks.GetOrAdd(path, _ => new object());
+        lock (pathLock)
+        {
+            InvalidateCachedPath(path);
+        }
+    }
+
+    private static void InvalidateCachedPath(string path)
+    {
+        _noArtworkCache.TryRemove(path, out _);
+        AlbumArtSourceResolver.ClearDirectoryCoverCache();
 
         var keysToRemove = _memoryCache.Keys
             .Where(k => k.StartsWith(path, StringComparison.OrdinalIgnoreCase))
@@ -248,12 +275,7 @@ public static class AlbumArtCacheManager
         foreach (var key in keysToRemove)
             _memoryCache.TryRemove(key, out _);
 
-        try
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
-        catch { }
+        try { if (File.Exists(path)) File.Delete(path); } catch { }
     }
 
     /// <summary>Clears the in-memory bitmap cache without touching disk files.</summary>
@@ -261,6 +283,7 @@ public static class AlbumArtCacheManager
     {
         AlbumArtThumbnailHelper.ClearFullSizeCache();
         _memoryCache.Clear();
+        _noArtworkCache.Clear();
     }
 
     private static bool LooksLikeRasterImageHeader(ReadOnlySpan<byte> data)
