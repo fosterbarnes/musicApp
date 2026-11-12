@@ -15,13 +15,8 @@ public static class SeekBarInteractionHelper
         return TimeSpan.FromSeconds(progress * totalDuration.TotalSeconds);
     }
 
-    public static double ProgressFillWidth(TimeSpan current, TimeSpan total, double barWidth)
-    {
-        if (total.TotalSeconds <= 0 || barWidth <= 0)
-            return 0;
-        double progress = current.TotalSeconds / total.TotalSeconds;
-        return Math.Max(0, Math.Min(barWidth, barWidth * progress));
-    }
+    public static double ProgressFraction(TimeSpan current, TimeSpan total) =>
+        total.TotalSeconds <= 0 ? 0 : Clamp(current.TotalSeconds / total.TotalSeconds, 0, 1);
 
     public static bool HasPassedMoveDelay(DateTime mouseDownUtc, int delayMs) =>
         (DateTime.Now - mouseDownUtc).TotalMilliseconds >= delayMs;

@@ -55,7 +55,8 @@
                         Cursor="Hand"
                         ToolTip="Close miniplayer"
                         Click="BtnClose_Click"
-                        WindowChrome.IsHitTestVisibleInChrome="True">
+                        WindowChrome.IsHitTestVisibleInChrome="True"
+                        Panel.ZIndex="2">
                     <Button.Style>
                         <Style TargetType="Button">
                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -88,6 +89,69 @@
                         </ControlTemplate>
                     </Button.Template>
                 </Button>
+                <Border x:Name="artVolumeOverlay"
+                        VerticalAlignment="Bottom"
+                        HorizontalAlignment="Stretch"
+                        Height="40"
+                        Padding="10,0,10,0"
+                        Panel.ZIndex="1">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#00000000" Offset="0"/>
+                            <GradientStop Color="#AA000000" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Opacity" Value="0"/>
+                            <Setter Property="IsHitTestVisible" Value="False"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=ArtHost}" Value="True">
+                                    <Setter Property="Opacity" Value="1"/>
+                                    <Setter Property="IsHitTestVisible" Value="True"/>
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.18"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.ExitActions>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider x:Name="sliderVolume"
+                                Minimum="0"
+                                Maximum="100"
+                                Value="100"
+                                VerticalAlignment="Center"
+                                ValueChanged="SliderVolume_ValueChanged"
+                                Style="{StaticResource CustomVolumeSlider}"
+                                Foreground="White"
+                                Background="Transparent"/>
+                        <Border Grid.Column="1"
+                                Background="Transparent"
+                                Padding="8,0,0,0"
+                                VerticalAlignment="Center"
+                                Margin="8,0,0,0"
+                                MouseLeftButtonDown="IconVolume_MouseLeftButtonDown"
+                                Cursor="Hand">
+                            <materialDesign:PackIcon x:Name="iconVolume" Kind="VolumeHigh" Foreground="White" Width="18" Height="18"/>
+                        </Border>
+                    </Grid>
+                </Border>
             </Grid>
 
             <StackPanel Grid.Row="1" Margin="12,10,12,4">
@@ -161,12 +225,14 @@
                         MouseMove="SeekBar_MouseMove"
                         MouseLeftButtonUp="SeekBar_MouseLeftButtonUp"
                         MouseLeave="SeekBar_MouseLeave"
-                        Cursor="Hand"
-                        SizeChanged="SeekBarTrack_SizeChanged">
+                        Cursor="Hand">
                     <Border x:Name="progressFill"
                             Background="{StaticResource TextPrimary-brush}"
-                            HorizontalAlignment="Left"
-                            Width="0"/>
+                            RenderTransformOrigin="0,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="progressFillScale" ScaleX="0"/>
+                        </Border.RenderTransform>
+                    </Border>
                 </Border>
                 <Border Grid.Column="1"
                         Height="20"
@@ -189,7 +255,7 @@
             </Grid>
 
             <Grid Grid.Row="3"
-                  Margin="12,6,12,8"
+                  Margin="12,2,12,8"
                   Height="44">
                 <StackPanel Orientation="Horizontal"
                             HorizontalAlignment="Center"

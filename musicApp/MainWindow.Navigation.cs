@@ -132,7 +132,10 @@ namespace musicApp
             w.DeleteRequested += OnDeleteRequested;
             w.ArtistNavigationRequested += TitleBarPlayer_ArtistNavigationRequested;
             w.AlbumNavigationRequested += TitleBarPlayer_AlbumNavigationRequested;
+            w.VolumeChanged += TitleBarPlayer_VolumeChanged;
+            w.SwapCurrentNextRequested += (_, _) => TrySwapCurrentAndNext();
             w.Closed += MiniPlayerWindow_Closed;
+            try { w.SetVolumeWithoutNotify(titleBarPlayer.Volume); } catch { }
             w.Show();
             PushMiniPlayerState(w);
         }
@@ -144,7 +147,13 @@ namespace musicApp
                 !double.IsFinite(state.Left.Value) || !double.IsFinite(state.Top.Value))
                 return;
 
-            var workArea = GetMiniPlayerWorkArea(state.Left.Value, state.Top.Value);
+            // Monitor APIs use device pixels; WPF window bounds are DIPs.
+            if (PresentationSource.FromVisual(this)?.CompositionTarget is not { } target)
+                return;
+            var saved = new Rect(state.Left.Value, state.Top.Value, state.Width, state.Height);
+            if (!TryGetWorkAreaPx(Rect.Transform(saved, target.TransformToDevice), out var workPx))
+                return;
+            var workArea = Rect.Transform(workPx, target.TransformFromDevice);
             double width = Math.Clamp(state.Width, window.MinWidth, workArea.Width);
             double height = Math.Clamp(state.Height, window.MinHeight, workArea.Height);
             double left = Math.Clamp(state.Left.Value, workArea.Left, workArea.Right - width);
@@ -157,39 +166,34 @@ namespace musicApp
             window.Top = top;
         }
 
-        private static Rect GetMiniPlayerWorkArea(double left, double top)
+        private static bool TryGetWorkAreaPx(Rect boundsPx, out Rect workArea)
         {
-            var monitor = MonitorFromPoint(new POINT((int)Math.Round(left), (int)Math.Round(top)), MonitorDefaultToNearest);
-            if (monitor != IntPtr.Zero)
+            var rect = new RECT
             {
-                var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-                if (GetMonitorInfo(monitor, ref info))
-                {
-                    return new Rect(
-                        info.rcWork.Left,
-                        info.rcWork.Top,
-                        info.rcWork.Right - info.rcWork.Left,
-                        info.rcWork.Bottom - info.rcWork.Top);
-                }
+                Left = (int)Math.Round(boundsPx.Left),
+                Top = (int)Math.Round(boundsPx.Top),
+                Right = (int)Math.Round(boundsPx.Right),
+                Bottom = (int)Math.Round(boundsPx.Bottom)
+            };
+            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            if (!GetMonitorInfo(MonitorFromRect(ref rect, MonitorDefaultToNearest), ref info))
+            {
+                workArea = default;
+                return false;
             }
 
-            return SystemParameters.WorkArea;
+            workArea = new Rect(info.rcWork.Left, info.rcWork.Top,
+                info.rcWork.Right - info.rcWork.Left, info.rcWork.Bottom - info.rcWork.Top);
+            return true;
         }
 
         private const uint MonitorDefaultToNearest = 2;
 
         [DllImport("user32.dll")]
-        private static extern IntPtr MonitorFromPoint(POINT point, uint flags);
+        private static extern IntPtr MonitorFromRect(ref RECT rect, uint flags);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private readonly struct POINT(int x, int y)
-        {
-            public readonly int X = x;
-            public readonly int Y = y;
-        }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT

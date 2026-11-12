@@ -17,11 +17,15 @@
                            BasedOn="{StaticResource TrackContextMenuSeparatorStyle}"/>
                 </ContextMenu.Resources>
                 <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
-                          Header="Play Next"
-                          Click="QueueContextMenu_PlayNextClick"/>
+                           Header="Swap with Current"
+                           Click="QueueContextMenu_SwapWithCurrentClick"/>
+                <Separator/>
                 <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
-                          Header="Add to Queue"
-                          Click="QueueContextMenu_AddToQueueClick"/>
+                           Header="Play Next"
+                           Click="QueueContextMenu_PlayNextClick"/>
+                <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                           Header="Add to Queue"
+                           Click="QueueContextMenu_AddToQueueClick"/>
                 <Separator/>
                 <MenuItem Style="{StaticResource TrackContextMenuItemWithSubmenuStyle}"
                           Header="Add to Playlist"

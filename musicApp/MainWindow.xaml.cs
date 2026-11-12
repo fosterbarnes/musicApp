@@ -75,6 +75,7 @@ namespace musicApp
         private bool isSidebarWidthDirty = false;
         private DispatcherTimer? _volumeSaveTimer;
         private double _pendingVolume0To100 = 100;
+        private bool _syncingVolume;
 
         private bool _shutdownCloseFinalized;
         private bool _pendingLaunchSettings;
@@ -1288,6 +1289,7 @@ namespace musicApp
             w.SetAudioObjects(waveOut, audioFileReader);
             w.SetQueue(BuildQueueView(UILayoutConstants.CompactQueueListMaxItems));
             w.SetQueueUndoAvailable(CanUndoPreviousQueue());
+            try { w.SetVolumeWithoutNotify(titleBarPlayer.Volume); } catch { }
         }
 
         private void RefreshAfterMetadataEdit(Song updatedTrack)
@@ -1889,30 +1891,46 @@ namespace musicApp
 
         private void TitleBarPlayer_VolumeChanged(object? sender, double volume0To100)
         {
-            if (_useSoftwareSessionVolume && _sessionVolumeProvider != null)
+            if (_syncingVolume) return;
+            _syncingVolume = true;
+            try
             {
-                if (titleBarPlayer.IsMuted)
-                    _sessionVolumeProvider.Volume = 0f;
-                else
-                    _sessionVolumeProvider.Volume = (float)(volume0To100 / 100.0);
-            }
-
-            _pendingVolume0To100 = volume0To100;
-            if (_volumeSaveTimer == null)
-            {
-                _volumeSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
-                _volumeSaveTimer.Tick += async (_, _) =>
+                if (_useSoftwareSessionVolume && _sessionVolumeProvider != null)
                 {
-                    _volumeSaveTimer.Stop();
-                    try
+                    bool isMuted = sender is TitleBarPlus.TitleBar tb ? tb.IsMuted : sender is Views.MiniPlayerWindow mp ? mp.IsMuted : titleBarPlayer.IsMuted;
+                    if (isMuted)
+                        _sessionVolumeProvider.Volume = 0f;
+                    else
+                        _sessionVolumeProvider.Volume = (float)(volume0To100 / 100.0);
+                }
+
+                if (sender is not TitleBarPlus.TitleBar)
+                {
+                    try { titleBarPlayer.Volume = volume0To100; } catch { }
+                }
+                if (sender is not Views.MiniPlayerWindow && _miniPlayerWindow != null)
+                {
+                    try { _miniPlayerWindow.SetVolumeWithoutNotify(volume0To100); } catch { }
+                }
+
+                _pendingVolume0To100 = volume0To100;
+                if (_volumeSaveTimer == null)
+                {
+                    _volumeSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+                    _volumeSaveTimer.Tick += async (_, _) =>
                     {
-                        await SettingsManager.Instance.SetTitleBarVolume0To100Async(_pendingVolume0To100);
-                    }
-                    catch { }
-                };
+                        _volumeSaveTimer.Stop();
+                        try
+                        {
+                            await SettingsManager.Instance.SetTitleBarVolume0To100Async(_pendingVolume0To100);
+                        }
+                        catch { }
+                    };
+                }
+                _volumeSaveTimer.Stop();
+                _volumeSaveTimer.Start();
             }
-            _volumeSaveTimer.Stop();
-            _volumeSaveTimer.Start();
+            finally { _syncingVolume = false; }
         }
 
         internal void HandlePlayPauseHotkey()

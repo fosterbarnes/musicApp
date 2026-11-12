@@ -13,6 +13,6 @@ musicApp/.updater.swap/obj
 .vs/
 obj/
 *.md
-.resources/exe/yapBot.json
+.res/exe/yapBot.json
 .md/YapBot.json
 desktop.ini

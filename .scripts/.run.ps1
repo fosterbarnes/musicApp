@@ -1,10 +1,12 @@
-# Dev runner: forwards args to `dotnet run ... -- <args>`. Use -h or --help for launch flags.
+#requires -Version 7.0
 param(
     [Alias('h')]
     [switch]$Help,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$AppLaunchArgs
 )
+$ErrorActionPreference = 'Stop'
+if ($Help) { Write-Host '.run.ps1 [-x86|-x64|-arm64|-portable] [-- app args...]'; return }
 
 function Show-RunHelp {
     Write-Host @"
@@ -23,7 +25,7 @@ Launch menu on startup:
   --settings_playback , --sp
   --settings_library , --sl
   --settings_shortcuts , --ss
-  --settings_theme , --st    
+  --settings_theme , --st
   --settings_about , --sa
 
   --info, --i                           Open Song info menu
@@ -40,12 +42,8 @@ Run Options:
 "@
 }
 
-if ($Help) {
-    Show-RunHelp
-    exit 0
-}
-
-. "$PSScriptRoot\scriptHelper.ps1"; Set-Location $appRoot
+. "$PSScriptRoot\scriptHelper.ps1"
+Set-Location -LiteralPath $repoRoot
 
 $RunPlatform = 'portable'
 $forward = @()
@@ -53,10 +51,7 @@ foreach ($a in @($AppLaunchArgs) + @($args)) {
     if ($null -eq $a -or [string]::IsNullOrWhiteSpace($a)) { continue }
     $t = $a.Trim()
     switch -Regex ($t) {
-        '^(?i)(--help|--h|-h)$' {
-            Show-RunHelp
-            exit 0
-        }
+        '^(?i)(--help|--h|-h)$' { Show-RunHelp; return }
         '^(?i)(--x86|--86|-x86|-86)$' { $RunPlatform = 'x86'; continue }
         '^(?i)(--x64|--64|-x64|-64)$' { $RunPlatform = 'x64'; continue }
         '^(?i)(--arm64|--arm|-arm64|-arm)$' { $RunPlatform = 'arm64'; continue }
@@ -67,11 +62,11 @@ foreach ($a in @($AppLaunchArgs) + @($args)) {
 
 $keepRunning = $true
 while ($keepRunning) {
-    Set-VersionBuildPlatform $RunPlatform
-
+    setVerBuildPlatform $RunPlatform
     $dotnetArgs = @(
         'run',
-        '--project', $musicAppCsproj,
+        '--project', $csproj,
+        '--framework', $dotnetFramework,
         '-c', 'Release',
         "-p:Platform=$RunPlatform"
     )
@@ -83,26 +78,28 @@ while ($keepRunning) {
     $proc = Start-Process `
         -FilePath 'dotnet' `
         -ArgumentList $dotnetArgs `
-        -WorkingDirectory $appRoot `
+        -WorkingDirectory $repoRoot `
         -NoNewWindow `
         -PassThru
 
-    Write-Host "musicApp is running. Type 'q' to stop, 'r' or '￪' to restart."
+    Write-Host "=== running $projectName... === `nq = quit `nr , up arrow = restart"
 
     $restartRequested = $false
     $lineBuffer = ''
 
     while (-not $proc.HasExited) {
         Start-Sleep -Milliseconds 50
-        try {
-            if (-not [Console]::KeyAvailable) { continue }
-        } catch {
-            continue
-        }
+        try { if (-not [Console]::KeyAvailable) { continue } } catch { continue }
 
         $key = [Console]::ReadKey($true)
-        if ($key.Key -eq [ConsoleKey]::UpArrow) {
-            Write-Host 'Restarting musicApp...'
+        if ($key.Key -eq [ConsoleKey]::Q) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            Stop-Process -Name 'musicApp' -Force -ErrorAction SilentlyContinue
+            $keepRunning = $false
+            break
+        }
+        if ($key.Key -eq [ConsoleKey]::R -or $key.Key -eq [ConsoleKey]::UpArrow) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
             Stop-Process -Name 'musicApp' -Force -ErrorAction SilentlyContinue
             $restartRequested = $true
             break
@@ -112,13 +109,13 @@ while ($keepRunning) {
             $userInput = $lineBuffer.Trim()
             $lineBuffer = ''
             if ($userInput -in @('q', 'quit', 'exit')) {
-                Write-Host 'Stopping musicApp and exiting script...'
+                Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
                 Stop-Process -Name 'musicApp' -Force -ErrorAction SilentlyContinue
                 $keepRunning = $false
                 break
             }
             if ($userInput -in @('r', 'restart')) {
-                Write-Host 'Restarting musicApp...'
+                Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
                 Stop-Process -Name 'musicApp' -Force -ErrorAction SilentlyContinue
                 $restartRequested = $true
                 break
@@ -139,14 +136,14 @@ while ($keepRunning) {
     }
 
     if ($proc.HasExited) {
-        Write-Host 'musicApp stopped.'
         try {
             $code = $proc.ExitCode
             if ($null -ne $code -and $code -ne 0) {
-                Write-Host "dotnet exit code: $code" -ForegroundColor Red
+                Write-Host "dotnet exit code: $code"
             }
         } catch { }
     }
 
     if (-not $keepRunning -or -not $restartRequested) { break }
 }
+closeOut 0

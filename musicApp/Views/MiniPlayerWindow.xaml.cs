@@ -20,11 +20,14 @@ public partial class MiniPlayerWindow : Window
     private TimeSpan _totalDuration;
     private bool _isUpdatingAudioObjects;
     private bool _isDragging;
-    private double _currentSeekBarWidth;
     private TimeSpan _dragTargetPosition;
     private DateTime _lastMouseDownTime;
     private const int MouseMoveDelayMs = 50;
     private const double MousePositionTolerance = 100;
+    private const double VOLUME_MAX = 100;
+    private double previousVolume = 100;
+    private bool isMuted;
+    private bool _suppressVolumeEvent;
 
     public MiniPlayerWindow()
     {
@@ -56,6 +59,7 @@ public partial class MiniPlayerWindow : Window
         q.ShowInExplorerRequested += (s, t) => ShowInExplorerRequested?.Invoke(this, t);
         q.RemoveFromLibraryRequested += (s, t) => RemoveFromLibraryRequested?.Invoke(this, t);
         q.DeleteRequested += (s, t) => DeleteRequested?.Invoke(this, t);
+        q.SwapCurrentNextRequested += (s, t) => SwapCurrentNextRequested?.Invoke(this, t);
     }
 
     public event EventHandler? PlayPauseRequested;
@@ -80,6 +84,8 @@ public partial class MiniPlayerWindow : Window
     public event EventHandler<Song>? DeleteRequested;
     public event EventHandler<string>? ArtistNavigationRequested;
     public event EventHandler<string>? AlbumNavigationRequested;
+    public event EventHandler<double>? VolumeChanged;
+    public event EventHandler<Song>? SwapCurrentNextRequested;
 
     public int GetAlbumArtTargetPixelSize()
     {
@@ -183,6 +189,75 @@ public partial class MiniPlayerWindow : Window
         btnQueueUndo.Visibility = available ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    public double Volume
+    {
+        get => sliderVolume?.Value ?? 100;
+        set
+        {
+            if (sliderVolume == null) return;
+            _suppressVolumeEvent = true;
+            try { sliderVolume.Value = Math.Max(0, Math.Min(VOLUME_MAX, value)); }
+            finally { _suppressVolumeEvent = false; }
+            UpdateVolumeIcon();
+        }
+    }
+
+    public bool IsMuted
+    {
+        get => isMuted;
+        set { isMuted = value; UpdateVolumeIcon(); }
+    }
+
+    public void SetVolumeWithoutNotify(double volume0To100)
+    {
+        if (sliderVolume == null) return;
+        _suppressVolumeEvent = true;
+        try { sliderVolume.Value = Math.Max(0, Math.Min(VOLUME_MAX, volume0To100)); }
+        finally { _suppressVolumeEvent = false; }
+        if (volume0To100 <= 0) isMuted = true;
+        else isMuted = false;
+        UpdateVolumeIcon();
+    }
+
+    private void UpdateVolumeIcon()
+    {
+        if (iconVolume == null) return;
+        if (isMuted || (sliderVolume != null && sliderVolume.Value <= 0))
+            iconVolume.Kind = PackIconKind.VolumeOff;
+        else
+            iconVolume.Kind = PackIconKind.VolumeHigh;
+    }
+
+    private void SliderVolume_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_suppressVolumeEvent) return;
+        if (e.NewValue <= 0) isMuted = true;
+        else isMuted = false;
+        UpdateVolumeIcon();
+        VolumeChanged?.Invoke(this, e.NewValue);
+    }
+
+    private void IconVolume_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sliderVolume == null) return;
+        if (isMuted)
+        {
+            isMuted = false;
+            iconVolume.Kind = PackIconKind.VolumeHigh;
+            SetVolumeWithoutNotify(previousVolume > 0 ? previousVolume : VOLUME_MAX);
+            VolumeChanged?.Invoke(this, sliderVolume.Value);
+        }
+        else
+        {
+            isMuted = true;
+            previousVolume = sliderVolume.Value;
+            iconVolume.Kind = PackIconKind.VolumeOff;
+            SetVolumeWithoutNotify(0);
+            VolumeChanged?.Invoke(this, 0);
+        }
+        e.Handled = true;
+    }
+
     private void ArtHost_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         if (ArtHost.ActualWidth > 0)
@@ -193,7 +268,7 @@ public partial class MiniPlayerWindow : Window
     {
         if (e.ChangedButton != MouseButton.Left)
             return;
-        if (e.OriginalSource is DependencyObject src && IsDescendantOf(src, btnClose))
+        if (e.OriginalSource is DependencyObject src && (IsDescendantOf(src, btnClose) || IsDescendantOf(src, artVolumeOverlay) || IsDescendantOf(src, sliderVolume) || IsDescendantOf(src, iconVolume)))
             return;
 
         if (e.ClickCount == 1)
@@ -224,16 +299,6 @@ public partial class MiniPlayerWindow : Window
     private void BtnQueueUndo_Click(object sender, RoutedEventArgs e) =>
         QueueUndoRequested?.Invoke(this, EventArgs.Empty);
 
-    private void SeekBarTrack_SizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        _currentSeekBarWidth = seekBarTrack.ActualWidth;
-        if (_audioFileReader != null && _totalDuration > TimeSpan.Zero && !_isDragging)
-        {
-            try { UpdateSeekBar(_audioFileReader.CurrentTime, _totalDuration); }
-            catch { }
-        }
-    }
-
     private void UpdateSeekBar(TimeSpan currentTime, TimeSpan totalTime)
     {
         txtCurrentTime.Text = PlaybackDisplayText.FormatTimeSpan(currentTime);
@@ -245,17 +310,12 @@ public partial class MiniPlayerWindow : Window
             if (remaining < TimeSpan.Zero)
                 remaining = TimeSpan.Zero;
             txtRemainingTime.Text = "-" + PlaybackDisplayText.FormatTimeSpan(remaining);
-
-            if (_currentSeekBarWidth <= 0)
-                _currentSeekBarWidth = seekBarTrack.ActualWidth;
-
-            double progress = currentTime.TotalSeconds / totalTime.TotalSeconds;
-            progressFill.Width = SeekBarInteractionHelper.ProgressFillWidth(currentTime, totalTime, _currentSeekBarWidth);
+            progressFillScale.ScaleX = SeekBarInteractionHelper.ProgressFraction(currentTime, totalTime);
         }
         else
         {
             txtRemainingTime.Text = "-0:00";
-            progressFill.Width = 0;
+            progressFillScale.ScaleX = 0;
         }
     }
 
@@ -320,14 +380,12 @@ public partial class MiniPlayerWindow : Window
         if (_audioFileReader == null || _totalDuration.TotalSeconds <= 0)
             return;
 
-        if (_currentSeekBarWidth <= 0)
-            _currentSeekBarWidth = seekBarTrack.ActualWidth;
-
+        double barWidth = seekBarTrack.ActualWidth;
         var clickPoint = e.GetPosition(seekBarTrack);
-        double clickPosition = SeekBarInteractionHelper.Clamp(clickPoint.X, 0, _currentSeekBarWidth);
+        double clickPosition = SeekBarInteractionHelper.Clamp(clickPoint.X, 0, barWidth);
         _lastMouseDownTime = DateTime.Now;
 
-        _dragTargetPosition = SeekBarInteractionHelper.TimeFromSeekX(clickPosition, _currentSeekBarWidth, _totalDuration);
+        _dragTargetPosition = SeekBarInteractionHelper.TimeFromSeekX(clickPosition, barWidth, _totalDuration);
         UpdateSeekBar(_dragTargetPosition, _totalDuration);
 
         _isDragging = true;
@@ -343,12 +401,13 @@ public partial class MiniPlayerWindow : Window
         if (!SeekBarInteractionHelper.HasPassedMoveDelay(_lastMouseDownTime, MouseMoveDelayMs))
             return;
 
+        double barWidth = seekBarTrack.ActualWidth;
         double currentPosition = e.GetPosition(seekBarTrack).X;
-        if (!SeekBarInteractionHelper.IsWithinDragTolerance(currentPosition, _currentSeekBarWidth, MousePositionTolerance))
+        if (!SeekBarInteractionHelper.IsWithinDragTolerance(currentPosition, barWidth, MousePositionTolerance))
             return;
 
-        currentPosition = SeekBarInteractionHelper.Clamp(currentPosition, 0, _currentSeekBarWidth);
-        _dragTargetPosition = SeekBarInteractionHelper.TimeFromSeekX(currentPosition, _currentSeekBarWidth, _totalDuration);
+        currentPosition = SeekBarInteractionHelper.Clamp(currentPosition, 0, barWidth);
+        _dragTargetPosition = SeekBarInteractionHelper.TimeFromSeekX(currentPosition, barWidth, _totalDuration);
         UpdateSeekBar(_dragTargetPosition, _totalDuration);
     }
 

@@ -1,4 +1,7 @@
-. "$PSScriptRoot\scriptHelper.ps1"; Set-Location $root
+#requires -Version 7.0
+$ErrorActionPreference = 'Stop'
+. "$PSScriptRoot\scriptHelper.ps1"
+Set-Location -LiteralPath $repoRoot
 
 function Clear-EmptyToDoSectionHeaders {
     param([string[]]$Lines)
@@ -41,8 +44,7 @@ function Clear-EmptyToDoSectionHeaders {
     @($lst.ToArray())
 }
 
-Write-Host "`nCounting tasks..." -ForegroundColor Yellow
-$lines = @(Get-Content -LiteralPath "$root\.md\Tasks.md" -Encoding UTF8)
+$lines = @(Get-Content -LiteralPath $tasks -Encoding UTF8)
 $todoOut = [System.Collections.ArrayList]::new()
 [void]$todoOut.Add('# ToDo')
 [void]$todoOut.Add('')
@@ -69,14 +71,12 @@ Write-Host "$completed/$total tasks completed ($pct%)"
 if ($notDone -eq 0) {
     $todoOut = @('# ToDo', '', '_No undone tasks._')
 } else {
-    Write-Host "`nClearing empty ToDo section headers..." -ForegroundColor Yellow
     $todoOut = [Collections.ArrayList]@(Clear-EmptyToDoSectionHeaders @($todoOut))
 }
-Write-Host "`nUpdating ToDo.md..." -ForegroundColor Yellow
 
 $nl = [Environment]::NewLine
-Write-RepoUtf8NoBomFile -LiteralPath "$root\.md\ToDo.md" -Content ((@($todoOut) -join $nl) + $nl)
-Write-Host "`nUpdating README.md..." -ForegroundColor Yellow
+$todoPath = "$repoRoot\.md\ToDo.md"
+writeFileNoBom -LiteralPath $todoPath -Content ((@($todoOut) -join $nl) + $nl)
 
 $newReadme = @(Get-Content -LiteralPath $readme -Encoding UTF8)
 $pctInt = [int][math]::Round($pct)
@@ -88,4 +88,4 @@ while ($newReadme.Count -gt 0 -and $newReadme[$newReadme.Count - 1] -match '^\s*
     if ($newReadme.Count -eq 1) { $newReadme = @(); break }
     $newReadme = $newReadme[0..($newReadme.Count - 2)]
 }
-Write-RepoUtf8NoBomFile -LiteralPath $readme -Content $(if ($newReadme.Count -eq 0) { '' } else { ($newReadme -join $nl) + $nl })
+writeFileNoBom -LiteralPath $readme -Content $(if ($newReadme.Count -eq 0) { '' } else { ($newReadme -join $nl) + $nl })

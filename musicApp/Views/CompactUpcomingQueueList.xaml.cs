@@ -63,6 +63,7 @@ public partial class CompactUpcomingQueueList : UserControl
     public event EventHandler<Song>? ShowInExplorerRequested;
     public event EventHandler<IReadOnlyList<Song>>? RemoveFromLibraryRequested;
     public event EventHandler<Song>? DeleteRequested;
+    public event EventHandler<Song>? SwapCurrentNextRequested;
 
     public void SetQueue(IEnumerable? tracks)
     {
@@ -291,10 +292,16 @@ public partial class CompactUpcomingQueueList : UserControl
             return;
 
         if (EnableMultiSelect && CountSelectedRows() > 1)
+        {
+            UpdateSwapMenuItemVisibility(menu, show: false);
             return;
+        }
 
         if (!TrackContextMenuHelper.TryResolveSong(placement, out var song) || song == null)
+        {
+            UpdateSwapMenuItemVisibility(menu, show: false);
             return;
+        }
 
         _contextMenuSong = song;
         var mainWindow = Application.Current?.MainWindow as MainWindow;
@@ -304,6 +311,34 @@ public partial class CompactUpcomingQueueList : UserControl
             _contextMenuSong,
             mainWindow?.Playlists,
             QueueContextMenu_PlaylistSubmenuClick);
+
+        bool isFirstRow = IsFirstRowSong(song);
+        UpdateSwapMenuItemVisibility(menu, show: isFirstRow);
+    }
+
+    private bool IsFirstRowSong(Song song)
+    {
+        if (QueueItemsList.ItemsSource is not ObservableCollection<SongRowViewModel> rows || rows.Count == 0)
+            return false;
+        var first = rows[0].Song;
+        if (first == null || song == null) return false;
+        return SongIdentity.Matches(first, song);
+    }
+
+    private static void UpdateSwapMenuItemVisibility(ContextMenu menu, bool show)
+    {
+        foreach (var item in menu.Items)
+        {
+            if (item is MenuItem mi && string.Equals(mi.Header as string, "Swap with Current", StringComparison.Ordinal))
+            {
+                mi.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+                // also collapse the following separator when hidden
+                int idx = menu.Items.IndexOf(item);
+                if (idx + 1 < menu.Items.Count && menu.Items[idx + 1] is Separator sep)
+                    sep.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+                break;
+            }
+        }
     }
 
     private void QueueContextMenu_PlaylistSubmenuClick(object sender, RoutedEventArgs e)
@@ -311,6 +346,11 @@ public partial class CompactUpcomingQueueList : UserControl
         if (_contextMenuSong == null || sender is not MenuItem mi || mi.Tag is not Playlist playlist)
             return;
         AddTrackToPlaylistRequested?.Invoke(this, (_contextMenuSong, playlist));
+    }
+
+    private void QueueContextMenu_SwapWithCurrentClick(object sender, RoutedEventArgs e)
+    {
+        if (_contextMenuSong != null) SwapCurrentNextRequested?.Invoke(this, _contextMenuSong);
     }
 
     private void QueueContextMenu_PlayNextClick(object sender, RoutedEventArgs e)

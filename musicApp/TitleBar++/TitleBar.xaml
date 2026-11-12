@@ -435,10 +435,13 @@
                                 MouseLeftButtonUp="SeekBar_MouseLeftButtonUp"
                                 MouseLeave="SeekBar_MouseLeave"
                                 Cursor="Hand">
-                            <Border x:Name="progressFill" 
+                            <Border x:Name="progressFill"
                                     Background="{StaticResource TextPrimary-brush}"
-                                    HorizontalAlignment="Left" 
-                                    Width="0"/>
+                                    RenderTransformOrigin="0,0.5">
+                                <Border.RenderTransform>
+                                    <ScaleTransform x:Name="progressFillScale" ScaleX="0"/>
+                                </Border.RenderTransform>
+                            </Border>
                         </Border>
 
                         <!-- Extended Clickable Area (Invisible) -->

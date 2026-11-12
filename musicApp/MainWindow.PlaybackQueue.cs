@@ -1039,4 +1039,74 @@ public partial class MainWindow
         UpdateQueueView();
         RefreshVisibleViews();
     }
+
+    private bool TrySwapCurrentAndNext()
+    {
+        if (currentTrack == null)
+            return false;
+        bool wasPlaying = titleBarPlayer.IsPlaying;
+
+        if (HasContextualPlaybackQueue() && contextualPlaybackFuture != null && contextualPlaybackFuture.Count >= 2)
+        {
+            var next = contextualPlaybackFuture[1];
+            if (next == null) return false;
+
+            if (titleBarPlayer.IsShuffleEnabled)
+            {
+                if (contextualShuffledFuture.Count < 2) return false;
+                (contextualShuffledFuture[0], contextualShuffledFuture[1]) = (contextualShuffledFuture[1], contextualShuffledFuture[0]);
+                CaptureContextualShuffleWrapPathOrder();
+                SetActivePlaybackFuture(next);
+            }
+            else
+            {
+                if (contextualSessionOrderedFull == null) return false;
+                int absCurrent = SongIdentity.IndexOf(contextualSessionOrderedFull, currentTrack);
+                int absNext = SongIdentity.IndexOf(contextualSessionOrderedFull, next);
+                if (absCurrent < 0 || absNext < 0) return false;
+                var tmp = contextualSessionOrderedFull[absCurrent];
+                contextualSessionOrderedFull[absCurrent] = contextualSessionOrderedFull[absNext];
+                contextualSessionOrderedFull[absNext] = tmp;
+                SetActivePlaybackFuture(next);
+            }
+
+            UpdateQueueView();
+            PushMiniPlayerQueue();
+            RefreshVisibleViews();
+            LoadTrackWithoutPlayback(next);
+            if (wasPlaying) ResumePlayback();
+            return true;
+        }
+
+        if (titleBarPlayer.IsShuffleEnabled)
+        {
+            if (shuffledTracks.Count == 0 || currentShuffledIndex < 0 || currentShuffledIndex + 1 >= shuffledTracks.Count)
+                return false;
+            var next = shuffledTracks[currentShuffledIndex + 1];
+            if (next == null) return false;
+            shuffledTracks.Move(currentShuffledIndex + 1, currentShuffledIndex);
+            currentTrackIndex = filteredTracks.IndexOf(next);
+            UpdateQueueView();
+            PushMiniPlayerQueue();
+            RefreshVisibleViews();
+            LoadTrackWithoutPlayback(next);
+            if (wasPlaying) ResumePlayback();
+            return true;
+        }
+        else
+        {
+            if (filteredTracks.Count == 0 || currentTrackIndex < 0 || currentTrackIndex + 1 >= filteredTracks.Count)
+                return false;
+            var next = filteredTracks[currentTrackIndex + 1];
+            if (next == null) return false;
+            filteredTracks.Move(currentTrackIndex + 1, currentTrackIndex);
+            currentShuffledIndex = shuffledTracks.IndexOf(next);
+            UpdateQueueView();
+            PushMiniPlayerQueue();
+            RefreshVisibleViews();
+            LoadTrackWithoutPlayback(next);
+            if (wasPlaying) ResumePlayback();
+            return true;
+        }
+    }
 }

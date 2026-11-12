@@ -1,13 +1,15 @@
+#requires -Version 7.0
+$ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\scriptHelper.ps1"
+Set-Location -LiteralPath $repoRoot
 
-$siteIndex = "$root\musicApp.info\index.html"
+$siteIndex = "$repoRoot\musicApp.info\index.html"
 if (-not (Test-Path -LiteralPath $siteIndex)) {
     throw "Website index not found: $siteIndex"
 }
 
-$tag = "v$($versionContents.Trim())"
-$segment = Get-ReleaseTagSegment -Tag $versionTagContents
-$base = "https://github.com/fosterbarnes/musicApp/releases/download/$tag/musicApp-$tag-$segment"
+$releaseTagSegment = getReleaseTagSegment -Tag $versionTagContents
+$base = "https://github.com/fosterbarnes/musicApp/releases/download/$releaseTag/musicApp-$releaseTag-$releaseTagSegment"
 $downloads = @(
     [pscustomobject]@{ Label = 'Download x64 installer (.exe)'; Url = "$base-x64-installer.exe" }
     [pscustomobject]@{ Label = 'Download x86 installer (.exe)'; Url = "$base-x86-installer.exe" }
@@ -15,7 +17,7 @@ $downloads = @(
     [pscustomobject]@{ Label = 'Download portable (.zip)'; Url = "$base-portable.zip" }
 )
 
-$html = [System.IO.File]::ReadAllText($siteIndex)
+$html = [IO.File]::ReadAllText($siteIndex)
 $originalHtml = $html
 foreach ($download in $downloads) {
     $suffix = '" aria-label="' + $download.Label + '"'
@@ -29,6 +31,5 @@ foreach ($download in $downloads) {
 }
 
 if ($html -ne $originalHtml) {
-    Write-RepoUtf8NoBomFile -LiteralPath $siteIndex -Content $html
-    Write-Host 'Synced website download links.' -ForegroundColor Green
+    writeFileNoBom -LiteralPath $siteIndex -Content $html
 }

@@ -11,7 +11,7 @@
     <AssemblyTitle>musicApp Updater</AssemblyTitle>
     <Product>musicApp</Product>
     <Company>musicApp</Company>
-    <ApplicationIcon>..\..\.resources\icon\musicApp Icon.ico</ApplicationIcon>
+    <ApplicationIcon>..\..\.res\icon\musicApp Icon.ico</ApplicationIcon>
     <Platforms>portable;x64;x86;arm64</Platforms>
     <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
@@ -34,11 +34,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="..\..\.resources\icon\musicApp Icon.ico" Link="Resources\icon\musicApp Icon.ico" />
+    <Resource Include="..\..\.res\icon\musicApp Icon.ico" Link="Resources\icon\musicApp Icon.ico" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\Version" Link="Version" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\.version\version" Link="Version" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

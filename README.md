@@ -4,6 +4,8 @@ https://musicapp.info/
 
 Desktop music player for Windows with a focus on functionality, efficiency, clean UI, and customization.
 
+Agent rules and automation: see `AGENTS.md` and `.scripts\` (`SCRIPTS.md`).
+
 Currently in a pre-release state, so not all intended features or behaviors have been added or thoroughly tested. You can track the current progress below.
 ## Progress
 
@@ -11,7 +13,7 @@ Currently in a pre-release state, so not all intended features or behaviors have
 **136 / 169 tasks complete (80.5%)**
 [Tasks.md](https://github.com/fosterbarnes/musicApp/blob/main/.md/Tasks.md#main-window)
 
-[34,737](https://github.com/fosterbarnes/musicApp/blob/main/.md/scc.txt) lines of code and counting...
+[35,249](https://github.com/fosterbarnes/musicApp/blob/main/.md/scc.txt) lines of code and counting...
 
 
 ## Downloads
@@ -21,12 +23,12 @@ This project is in early development, bugs are expected. Windows only (for now).
 <table border="0">
 <tbody>
 <tr>
-<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.2/musicApp-v0.3.2-kitBunga-x64-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/musicApp/refs/heads/main/.resources/svg/download_x64.svg" width="180" height="auto" alt="x64 installer"/></a></td>
-<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.2/musicApp-v0.3.2-kitBunga-x86-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/musicApp/refs/heads/main/.resources/svg/download_x86.svg" width="180" height="auto" alt="x86 installer"/></a></td>
-<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.2/musicApp-v0.3.2-kitBunga-arm64-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/musicApp/refs/heads/main/.resources/svg/download_arm.svg" width="180" height="auto" alt="arm64 installer"/></a></td>
+<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.4/musicApp-v0.3.4-sandiegoTaters-x64-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/res/refs/heads/main/btn/x64Installer.svg" width="180" height="auto" alt="x64 installer"/></a></td>
+<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.4/musicApp-v0.3.4-sandiegoTaters-x86-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/res/refs/heads/main/btn/x86Installer.svg" width="180" height="auto" alt="x86 installer"/></a></td>
+<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.4/musicApp-v0.3.4-sandiegoTaters-arm64-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/res/refs/heads/main/btn/arm64.svg" width="180" height="auto" alt="arm64 installer"/></a></td>
 </tr>
 <tr>
-<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.2/musicApp-v0.3.2-kitBunga-portable.zip"><img src="https://raw.githubusercontent.com/fosterbarnes/musicApp/refs/heads/main/.resources/svg/download_portable.svg" width="180" height="auto" alt="portable .zip"/></a></td>
+<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.4/musicApp-v0.3.4-sandiegoTaters-portable.zip"><img src="https://raw.githubusercontent.com/fosterbarnes/res/refs/heads/main/btn/portable.svg" width="180" height="auto" alt="portable .zip"/></a></td>
 </tr>
 </tbody>
 </table>
@@ -35,42 +37,42 @@ This project is in early development, bugs are expected. Windows only (for now).
 
 | <h3>Albums</h3> |
 |:---:|
-| ![Albums](./.resources/scr/albums.png) |
+| ![Albums](./.res/scr/albums.png) |
 
 | <h3>Songs</h3> |
 |:---:|
-| ![Songs](./.resources/scr/songs.png) |
+| ![Songs](./.res/scr/songs.png) |
 
 | <h3>Artists</h3> |
 |:---:|
-| ![Artists](./.resources/scr/artists.png) |
+| ![Artists](./.res/scr/artists.png) |
 
 <details>
 <summary>More Screenshots:</summary>
 
 | <h3>Genres</h3> |
 |:---:|
-| ![Genres](./.resources/scr/genres.png) |
+| ![Genres](./.res/scr/genres.png) |
 
 | <h3>Playlists</h3> |
 |:---:|
-| ![Playlists](./.resources/scr/playlists.png) |
+| ![Playlists](./.res/scr/playlists.png) |
 
 | <h3>Recently Played</h3> |
 |:---:|
-| ![Recently Played](./.resources/scr/recent.png) |
+| ![Recently Played](./.res/scr/recent.png) |
 
 | <h3>Queue</h3> |
 |:---:|
-| ![Queue](./.resources/scr/queue.png) |
+| ![Queue](./.res/scr/queue.png) |
 
 | <h3>Search</h3> |
 |:---:|
-| ![Search](./.resources/scr/search.png) |
+| ![Search](./.res/scr/search.png) |
 
 | <h3>Info</h3> |
 |:---:|
-| ![Info](./.resources/scr/info.png) |
+| ![Info](./.res/scr/info.png) |
 
 </details>
 

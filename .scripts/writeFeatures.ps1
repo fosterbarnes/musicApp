@@ -1,5 +1,8 @@
+#requires -Version 7.0
 # Regenerates Features.md from Tasks.md (README is not modified).
-. "$PSScriptRoot\scriptHelper.ps1"; Set-Location $root
+$ErrorActionPreference = 'Stop'
+. "$PSScriptRoot\scriptHelper.ps1"
+Set-Location -LiteralPath $repoRoot
 
 $newLine = [Environment]::NewLine
 $taskLines = Trim-TrailingBlankLines (Normalize-MarkdownLineArray -Lines $tasksRaw)
@@ -14,6 +17,4 @@ if (-not ($featureLines -match '^\s*##\s+Settings Menu\s*$')) {
 }
 
 $newFeatureText = (($renderedLines -join $newLine) -replace '~~', '')
-
-Write-Host "`nUpdating Features.md..." -ForegroundColor Yellow
-Write-RepoUtf8NoBomFile -LiteralPath $features -Content ($newFeatureText + $newLine)
+writeFileNoBom -LiteralPath $features -Content ($newFeatureText + $newLine)

@@ -1,5 +1,9 @@
-v0.3.2 release (kitBunga)
+v0.3.4 sandiegoTaters [feat. > miniplayer volume; fix > lost miniplayer]
 
+- Miniplayer has a volume slider at the bottom of the album art that fades in on hover and stays in sync with the main window
+- Right-click the top track in the miniplayer queue and choose Swap with Current to play it right away in place of the current song
+- The miniplayer no longer opens invisibly off the edge of the screen on multi-monitor setups with display scaling. If it is lost now, it comes back the next time you open it
+- The time bar fill now matches the time shown after the window is snapped, maximized, or resized by another app
 - Fix 'Add to Queue' not working if there's no running queue
 - Re-scanning library no longer resets 'recently added' dates play count, or favorite status
 - Miniplayer artist & album are clickable

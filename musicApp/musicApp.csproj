@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <ApplicationIcon>..\.resources\icon\musicApp Icon.ico</ApplicationIcon>
+    <ApplicationIcon>..\.res\icon\musicApp Icon.ico</ApplicationIcon>
     <AssemblyTitle>musicApp</AssemblyTitle>
     <Product>musicApp</Product>
     <Company>musicApp</Company>
@@ -32,17 +32,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="..\.resources\svg\*.xaml" Link="Resources\svg\%(Filename)%(Extension)" />
+    <Resource Include="..\.res\svg\*.xaml" Link="Resources\svg\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="..\.resources\icon\musicApp Icon.ico" Link="Resources\icon\musicApp Icon.ico" />
-    <Resource Include="..\.resources\icon\musicApp Icon.png" Link="Resources\icon\musicApp Icon.png" />
-    <Resource Include="..\.resources\icon\musicApp Icon (Desaturated).png" Link="Resources\icon\musicApp Icon (Desaturated).png" />
+    <Resource Include="..\.res\icon\musicApp Icon.ico" Link="Resources\icon\musicApp Icon.ico" />
+    <Resource Include="..\.res\icon\musicApp Icon.png" Link="Resources\icon\musicApp Icon.png" />
+    <Resource Include="..\.res\icon\musicApp Icon (Desaturated).png" Link="Resources\icon\musicApp Icon (Desaturated).png" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Version" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\.version\version" Link="Version" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

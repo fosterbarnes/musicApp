@@ -284,7 +284,6 @@ namespace musicApp.TitleBarPlus
                 }
 
                 _ = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
-                    UpdateSeekBarWidth();
                     UpdateGradientMask();
                     var window = Window.GetWindow(this);
                     if (window != null)
@@ -333,23 +332,7 @@ namespace musicApp.TitleBarPlus
             try
             {
                 UpdateSongInfoWidth();
-                UpdateSeekBarWidth();
                 UpdateGradientMask();
-
-                if (audioFileReader != null && totalDuration.TotalSeconds > 0)
-                {
-                    try
-                    {
-                        if (progressFill != null)
-                        {
-                            double progress = audioFileReader.CurrentTime.TotalSeconds / totalDuration.TotalSeconds;
-                            double progressWidth = currentSeekBarWidth * progress;
-                            progressFill.Width = Math.Max(0, Math.Min(currentSeekBarWidth, progressWidth));
-                        }
-                    }
-                    catch (ObjectDisposedException) { }
-                    catch (NullReferenceException) { }
-                }
             }
             catch (Exception ex)
             {
@@ -770,14 +753,6 @@ namespace musicApp.TitleBarPlus
             UpdateControlSpacing(windowWidth);
         }
 
-        private void UpdateSeekBarWidth()
-        {
-            if (seekBarBackground != null)
-            {
-                currentSeekBarWidth = seekBarBackground.ActualWidth;
-            }
-        }
-
         private void UpdateSongInfoPosition(double windowWidth, double songInfoWidth)
         {
             var songInfoBorder = this.FindName("songInfoBorder") as Border;
@@ -923,10 +898,7 @@ namespace musicApp.TitleBarPlus
 
                 totalDuration = totalTime;
 
-                if (progressFill != null)
-                {
-                    progressFill.Width = SeekBarInteractionHelper.ProgressFillWidth(currentTime, totalTime, currentSeekBarWidth);
-                }
+                progressFillScale.ScaleX = SeekBarInteractionHelper.ProgressFraction(currentTime, totalTime);
             }
             catch (Exception ex)
             {
@@ -1057,7 +1029,6 @@ namespace musicApp.TitleBarPlus
 
         // === Seek Bar Interaction Events ===
         private bool isDragging = false;
-        private double currentSeekBarWidth = 0;
         private bool wasMutedBeforeDrag = false;
         private double volumeBeforeDrag = 100;
         private System.Windows.Point lastValidMousePosition;
@@ -1068,13 +1039,14 @@ namespace musicApp.TitleBarPlus
         {
             if (audioFileReader == null || totalDuration.TotalSeconds <= 0) return;
 
+            double barWidth = seekBarBackground.ActualWidth;
             System.Windows.Point clickPoint = e.GetPosition(seekBarBackground);
-            double clickPosition = SeekBarInteractionHelper.Clamp(clickPoint.X, 0, currentSeekBarWidth);
+            double clickPosition = SeekBarInteractionHelper.Clamp(clickPoint.X, 0, barWidth);
 
             lastValidMousePosition = clickPoint;
             lastMouseDownTime = DateTime.Now;
 
-            dragTargetPosition = SeekBarInteractionHelper.TimeFromSeekX(clickPosition, currentSeekBarWidth, totalDuration);
+            dragTargetPosition = SeekBarInteractionHelper.TimeFromSeekX(clickPosition, barWidth, totalDuration);
 
             if (audioFileReader != null && totalDuration.TotalSeconds > 0)
             {
@@ -1109,16 +1081,17 @@ namespace musicApp.TitleBarPlus
             if (!SeekBarInteractionHelper.HasPassedMoveDelay(lastMouseDownTime, MOUSE_MOVE_DELAY_MS))
                 return;
 
+            double barWidth = seekBarBackground.ActualWidth;
             System.Windows.Point currentPoint = e.GetPosition(seekBarBackground);
             double currentPosition = currentPoint.X;
 
-            if (!SeekBarInteractionHelper.IsWithinDragTolerance(currentPosition, currentSeekBarWidth, MOUSE_POSITION_TOLERANCE))
+            if (!SeekBarInteractionHelper.IsWithinDragTolerance(currentPosition, barWidth, MOUSE_POSITION_TOLERANCE))
                 return;
 
-            currentPosition = SeekBarInteractionHelper.Clamp(currentPosition, 0, currentSeekBarWidth);
+            currentPosition = SeekBarInteractionHelper.Clamp(currentPosition, 0, barWidth);
             lastValidMousePosition = currentPoint;
 
-            dragTargetPosition = SeekBarInteractionHelper.TimeFromSeekX(currentPosition, currentSeekBarWidth, totalDuration);
+            dragTargetPosition = SeekBarInteractionHelper.TimeFromSeekX(currentPosition, barWidth, totalDuration);
 
             if (audioFileReader != null && totalDuration.TotalSeconds > 0)
             {

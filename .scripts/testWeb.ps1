@@ -1,10 +1,13 @@
+#requires -Version 7.0
 param(
     [ValidateRange(1, 65535)]
     [int]$Port = 1313
 )
+$ErrorActionPreference = 'Stop'
+. "$PSScriptRoot\scriptHelper.ps1"
+Set-Location -LiteralPath $repoRoot
 
-$root = Split-Path -Path $PSScriptRoot -Parent
-$siteRoot = "$root\musicApp.info"
+$siteRoot = "$repoRoot\musicApp.info"
 if (-not (Test-Path -LiteralPath $siteRoot -PathType Container)) {
     throw "Website folder not found: $siteRoot"
 }
@@ -26,29 +29,23 @@ function Start-WebsiteServer {
 $keepRunning = $true
 while ($keepRunning) {
     $server = Start-WebsiteServer
-    Write-Host "Serving musicApp.info at $siteUrl. Type 'q' to stop, 'r' or '￪' to refresh." -ForegroundColor Green
+    Write-Host "=== running $projectName.info... === `nq = quit `nr , up arrow = refresh"
 
     $restartRequested = $false
     $lineBuffer = ''
     while (-not $server.HasExited) {
         Start-Sleep -Milliseconds 50
-        try {
-            if (-not [Console]::KeyAvailable) { continue }
-        } catch {
-            continue
-        }
+        try { if (-not [Console]::KeyAvailable) { continue } } catch { continue }
 
         $key = [Console]::ReadKey($true)
-        if ($key.Key -eq [ConsoleKey]::UpArrow) {
-            Write-Host 'Refreshing website...'
-            Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
-            $restartRequested = $true
-            break
-        }
-        if ($key.KeyChar -eq 'q') {
-            Write-Host 'Stopping website server and exiting script...'
+        if ($key.Key -eq [ConsoleKey]::Q) {
             Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
             $keepRunning = $false
+            break
+        }
+        if ($key.Key -eq [ConsoleKey]::R -or $key.Key -eq [ConsoleKey]::UpArrow) {
+            Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+            $restartRequested = $true
             break
         }
         if ($key.Key -eq [ConsoleKey]::Enter) {
@@ -56,13 +53,11 @@ while ($keepRunning) {
             $userInput = $lineBuffer.Trim()
             $lineBuffer = ''
             if ($userInput -in @('q', 'quit', 'exit')) {
-                Write-Host 'Stopping website server and exiting script...'
                 Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
                 $keepRunning = $false
                 break
             }
             if ($userInput -in @('r', 'restart')) {
-                Write-Host 'Refreshing website...'
                 Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
                 $restartRequested = $true
                 break
@@ -83,13 +78,10 @@ while ($keepRunning) {
     }
 
     if (-not $server.HasExited) {
-        Stop-Process -Id $server.Id -Force
+        Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
         $server.WaitForExit()
     }
-    if ($restartRequested) {
-        continue
-    }
-    if ($keepRunning) {
-        Write-Host 'Website server stopped.'
-    }
+    if ($restartRequested) { continue }
+    if (-not $keepRunning) { break }
 }
+closeOut 0

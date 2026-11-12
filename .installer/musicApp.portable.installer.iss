@@ -39,7 +39,7 @@ LicenseFile=C:\Users\Foster\Documents\GitHub\musicApp\LICENSE
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=commandline
 OutputBaseFilename=musicApp-portable-installer
-SetupIconFile=..\.resources\icon\musicApp Icon.ico
+SetupIconFile=..\.res\icon\musicApp Icon.ico
 SolidCompression=yes
 WizardStyle=classic dark
 
