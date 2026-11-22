@@ -6,19 +6,17 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MaterialDesignThemes.Wpf;
-using NAudio.Wave;
 using musicApp;
 using musicApp.Helpers;
+using musicApp.Playback;
 
 namespace musicApp.Views;
 
 public partial class MiniPlayerWindow : Window
 {
-    private IWavePlayer? _waveOut;
-    private AudioFileReader? _audioFileReader;
+    private Player? _player;
     private DispatcherTimer? _seekBarTimer;
     private TimeSpan _totalDuration;
-    private bool _isUpdatingAudioObjects;
     private bool _isDragging;
     private TimeSpan _dragTargetPosition;
     private DateTime _lastMouseDownTime;
@@ -66,7 +64,6 @@ public partial class MiniPlayerWindow : Window
     public event EventHandler? PreviousTrackRequested;
     public event EventHandler? NextTrackRequested;
     public event EventHandler? QueueUndoRequested;
-    public event EventHandler? PlaybackPositionCommitted;
     public event EventHandler<Song>? SongPlayRequested;
     public event EventHandler? QueueRemoveRequested;
     public event EventHandler<(int fromViewIndex, int toViewIndex)>? TracksReordered;
@@ -137,47 +134,29 @@ public partial class MiniPlayerWindow : Window
         e.Handled = true;
     }
 
-    public void SetAudioObjects(IWavePlayer? waveOut, AudioFileReader? audioFileReader)
+    public void AttachPlayer(Player player)
     {
-        _isUpdatingAudioObjects = true;
-        try
-        {
-            _seekBarTimer?.Stop();
-            _waveOut = waveOut;
-            _audioFileReader = audioFileReader;
+        _player = player;
+        RefreshPlaybackState();
+    }
 
-            if (waveOut == null || audioFileReader == null)
-            {
-                _totalDuration = TimeSpan.Zero;
-                UpdateSeekBar(TimeSpan.Zero, TimeSpan.Zero);
-                UpdatePlayPauseIcon(false);
-            }
-            else
-            {
-                try
-                {
-                    _totalDuration = audioFileReader.TotalTime;
-                    var pos = audioFileReader.CurrentTime;
-                    if (pos < TimeSpan.Zero)
-                        pos = TimeSpan.Zero;
-                    if (_totalDuration > TimeSpan.Zero && pos > _totalDuration)
-                        pos = _totalDuration;
-                    UpdateSeekBar(pos, _totalDuration);
-                    UpdatePlayPauseIcon(waveOut.PlaybackState == PlaybackState.Playing);
-                }
-                catch (ObjectDisposedException)
-                {
-                    _totalDuration = TimeSpan.Zero;
-                    UpdateSeekBar(TimeSpan.Zero, TimeSpan.Zero);
-                    UpdatePlayPauseIcon(false);
-                }
-            }
-        }
-        finally
+    /// <summary>Resyncs the seek bar after a track, play state, or output change.</summary>
+    public void RefreshPlaybackState()
+    {
+        _seekBarTimer?.Stop();
+        if (!HasLoadedTrack)
         {
-            _isUpdatingAudioObjects = false;
-            UpdateSeekBarTimer();
+            _totalDuration = TimeSpan.Zero;
+            UpdateSeekBar(TimeSpan.Zero, TimeSpan.Zero);
+            UpdatePlayPauseIcon(false);
+            return;
         }
+
+        _totalDuration = _player!.Duration;
+        if (!_isDragging)
+            UpdateSeekBar(_player.Position, _totalDuration);
+        UpdatePlayPauseIcon(_player.IsPlaying);
+        _seekBarTimer?.Start();
     }
 
     public int GetSelectedViewIndex() => UpcomingQueue.GetSelectedViewIndex();
@@ -322,62 +301,27 @@ public partial class MiniPlayerWindow : Window
     private void UpdatePlayPauseIcon(bool isPlaying) =>
         iconPlayPause.Kind = isPlaying ? PackIconKind.Pause : PackIconKind.Play;
 
-    private bool AreAudioObjectsValid()
-    {
-        try
-        {
-            if (_audioFileReader == null)
-                return false;
-            _ = _audioFileReader.TotalTime;
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private void UpdateSeekBarTimer()
-    {
-        if (_isUpdatingAudioObjects || _seekBarTimer == null)
-            return;
-        _seekBarTimer.Stop();
-        if (AreAudioObjectsValid())
-            _seekBarTimer.Start();
-    }
+    private bool HasLoadedTrack => _player?.CurrentTrack != null && _player.Duration > TimeSpan.Zero;
 
     private void SeekBarTimer_Tick(object? sender, EventArgs e)
     {
-        if (_isUpdatingAudioObjects || _isDragging)
+        if (_isDragging)
             return;
 
-        if (!AreAudioObjectsValid())
+        if (!HasLoadedTrack)
         {
             _seekBarTimer?.Stop();
             UpdatePlayPauseIcon(false);
             return;
         }
 
-        try
-        {
-            bool playing = _waveOut?.PlaybackState == PlaybackState.Playing;
-            UpdatePlayPauseIcon(playing);
-            if (_audioFileReader != null)
-                UpdateSeekBar(_audioFileReader.CurrentTime, _totalDuration);
-        }
-        catch (ObjectDisposedException)
-        {
-            _seekBarTimer?.Stop();
-        }
-        catch
-        {
-            _seekBarTimer?.Stop();
-        }
+        UpdatePlayPauseIcon(_player!.IsPlaying);
+        UpdateSeekBar(_player.Position, _totalDuration);
     }
 
     private void SeekBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (_audioFileReader == null || _totalDuration.TotalSeconds <= 0)
+        if (!HasLoadedTrack || _totalDuration.TotalSeconds <= 0)
             return;
 
         double barWidth = seekBarTrack.ActualWidth;
@@ -395,7 +339,7 @@ public partial class MiniPlayerWindow : Window
 
     private void SeekBar_MouseMove(object sender, MouseEventArgs e)
     {
-        if (!_isDragging || _audioFileReader == null || _totalDuration.TotalSeconds <= 0)
+        if (!_isDragging || !HasLoadedTrack || _totalDuration.TotalSeconds <= 0)
             return;
 
         if (!SeekBarInteractionHelper.HasPassedMoveDelay(_lastMouseDownTime, MouseMoveDelayMs))
@@ -423,20 +367,13 @@ public partial class MiniPlayerWindow : Window
 
     private void EndDragOperation()
     {
-        if (_audioFileReader != null && _totalDuration.TotalSeconds > 0)
+        if (HasLoadedTrack && _totalDuration.TotalSeconds > 0)
         {
-            try
-            {
-                _audioFileReader.CurrentTime = _dragTargetPosition;
-                UpdateSeekBar(_dragTargetPosition, _totalDuration);
-            }
-            catch (ObjectDisposedException)
-            {
-            }
+            _player!.Seek(_dragTargetPosition);
+            UpdateSeekBar(_dragTargetPosition, _totalDuration);
         }
 
         _isDragging = false;
         seekBarTrack.ReleaseMouseCapture();
-        PlaybackPositionCommitted?.Invoke(this, EventArgs.Empty);
     }
 }

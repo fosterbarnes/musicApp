@@ -44,6 +44,7 @@ Run Options:
 
 . "$PSScriptRoot\scriptHelper.ps1"
 Set-Location -LiteralPath $repoRoot
+removeMacMetadata
 
 $RunPlatform = 'portable'
 $forward = @()

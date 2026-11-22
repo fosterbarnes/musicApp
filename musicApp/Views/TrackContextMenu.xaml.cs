@@ -26,6 +26,12 @@ namespace musicApp.Views
                 view.RequestAddToQueue(song);
         }
 
+        private void RemoveFromQueueMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (TryGetTrackListView(sender, out var view, out _))
+                view.RequestRemoveFromQueue();
+        }
+
         private void InfoMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (TryGetTrackListView(sender, out var view, out var song))

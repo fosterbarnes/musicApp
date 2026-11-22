@@ -933,174 +933,221 @@
                         </Grid>
                     </ScrollViewer>
                 </Grid>
-                <Grid x:Name="KeyboardShortcutsSectionPanel" Visibility="Collapsed"
-                      Margin="{StaticResource SettingsGeneralContentMargin-thk}"
-                      Grid.IsSharedSizeScope="True">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                <Grid x:Name="KeyboardShortcutsSectionPanel" Visibility="Collapsed">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Grid Margin="{StaticResource SettingsGeneralContentMargin-thk}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0"
-                               Text="In-app shortcuts"
-                               Style="{StaticResource FieldLabelStyle}"
-                               VerticalAlignment="Bottom"
-                               Margin="{StaticResource Bottom8-thk}" />
+                            <TextBlock Grid.Row="0"
+                                       Text="In-app shortcuts"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       VerticalAlignment="Bottom"
+                                       Margin="{StaticResource Bottom8-thk}" />
 
-                    <!-- In-app shortcuts table -->
-                    <Border Grid.Row="1"
-                            BorderBrush="{StaticResource BorderDefault-brush}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource Sm-cr}"
-                            Background="{StaticResource ControlBackgroundAlt-brush}"
-                            ClipToBounds="True">
-                        <StackPanel>
-                            <!-- Header row -->
-                            <Grid Background="{StaticResource PanelBackground-brush}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="KeyCol" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
-                                           Text="Key"
-                                           FontWeight="SemiBold"
-                                           FontSize="12"
-                                           Foreground="{StaticResource TextSecondary-brush}"
-                                           HorizontalAlignment="Center"
-                                           Margin="15,6" />
-                                <Border Grid.Column="0"
-                                        Width="1"
-                                        HorizontalAlignment="Right"
-                                        Background="{StaticResource BorderDefault-brush}" />
-                                <TextBlock Grid.Column="1"
-                                           Text="Action"
-                                           FontWeight="SemiBold"
-                                           FontSize="12"
-                                           Foreground="{StaticResource TextSecondary-brush}"
-                                           Padding="10,6" />
-                            </Grid>
-                            <!-- Header / body divider -->
-                            <Border Height="1" Background="{StaticResource BorderDefault-brush}" SnapsToDevicePixels="True" />
-                            <!-- Rows -->
-                            <ItemsControl x:Name="KeyboardShortcutsInAppListView">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel>
-                                            <Grid Height="34">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" SharedSizeGroup="KeyCol" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0"
-                                                           Text="{Binding Shortcut}"
-                                                           FontFamily="Consolas, Courier New"
-                                                           FontSize="16"
-                                                           VerticalAlignment="Center"
-                                                           HorizontalAlignment="Center"
-                                                           Margin="15,0"
-                                                           Foreground="{StaticResource TextPrimary-brush}" />
-                                                <Border Grid.Column="0"
-                                                        Width="1"
-                                                        HorizontalAlignment="Right"
-                                                        Background="{StaticResource BorderDefault-brush}" />
-                                                <TextBlock Grid.Column="1"
-                                                           Text="{Binding Action}"
-                                                           Foreground="{StaticResource TextPrimary-brush}"
-                                                           Padding="10,7" />
-                                            </Grid>
-                                            <Border Height="1"
-                                                    Background="{StaticResource BorderDefault-brush}"
-                                                    SnapsToDevicePixels="True" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
+                            <!-- In-app shortcuts table -->
+                            <Border Grid.Row="1"
+                                    BorderBrush="{StaticResource BorderDefault-brush}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource Sm-cr}"
+                                    Background="{StaticResource ControlBackgroundAlt-brush}"
+                                    ClipToBounds="True">
+                                <StackPanel>
+                                    <!-- Header row -->
+                                    <Grid Background="{StaticResource PanelBackground-brush}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
+                                                   Text="Action"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource TextSecondary-brush}"
+                                                   Padding="10,6" />
+                                        <Border Grid.Column="0"
+                                                Width="1"
+                                                HorizontalAlignment="Right"
+                                                Background="{StaticResource BorderDefault-brush}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="Key"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource TextSecondary-brush}"
+                                                   Padding="10,6" />
+                                    </Grid>
+                                    <!-- Header / body divider -->
+                                    <Border Height="1" Background="{StaticResource BorderDefault-brush}" SnapsToDevicePixels="True" />
+                                    <!-- Rows -->
+                                    <ItemsControl x:Name="KeyboardShortcutsInAppListView">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel>
+                                                    <Grid Height="34">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{Binding Name}"
+                                                                   Foreground="{StaticResource TextPrimary-brush}"
+                                                                   VerticalAlignment="Center"
+                                                                   Padding="10,0" />
+                                                        <Border Grid.Column="0"
+                                                                Width="1"
+                                                                HorizontalAlignment="Right"
+                                                                Background="{StaticResource BorderDefault-brush}" />
+                                                        <!-- Click to rebind; fixed rows are display only -->
+                                                        <Button Grid.Column="1"
+                                                                Tag="{Binding}"
+                                                                Click="ShortcutKeyButton_Click"
+                                                                LostKeyboardFocus="ShortcutKeyButton_LostKeyboardFocus">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button">
+                                                                    <Setter Property="Foreground" Value="{StaticResource TextPrimary-brush}" />
+                                                                    <Setter Property="Background" Value="Transparent" />
+                                                                    <Setter Property="BorderBrush" Value="Transparent" />
+                                                                    <Setter Property="Cursor" Value="Hand" />
+                                                                    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                                                                    <Setter Property="ToolTip" Value="Click, then press the new key. Esc cancels, Backspace clears." />
+                                                                    <Setter Property="Template">
+                                                                        <Setter.Value>
+                                                                            <ControlTemplate TargetType="Button">
+                                                                                <Border Background="{TemplateBinding Background}"
+                                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                                        BorderThickness="1">
+                                                                                    <ContentPresenter HorizontalAlignment="Left"
+                                                                                                      VerticalAlignment="Center"
+                                                                                                      Margin="9,0" />
+                                                                                </Border>
+                                                                            </ControlTemplate>
+                                                                        </Setter.Value>
+                                                                    </Setter>
+                                                                    <Style.Triggers>
+                                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                                            <Setter Property="Background" Value="{StaticResource PanelBackground-brush}" />
+                                                                        </Trigger>
+                                                                        <Trigger Property="IsKeyboardFocused" Value="True">
+                                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentPrimary-brush}" />
+                                                                        </Trigger>
+                                                                        <DataTrigger Binding="{Binding IsCapturing}" Value="True">
+                                                                            <Setter Property="Background" Value="{StaticResource PanelBackground-brush}" />
+                                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentPrimary-brush}" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding IsEditable}" Value="False">
+                                                                            <Setter Property="IsHitTestVisible" Value="False" />
+                                                                            <Setter Property="Focusable" Value="False" />
+                                                                            <Setter Property="ToolTip" Value="{x:Null}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                            <TextBlock Text="{Binding Shortcut}" />
+                                                        </Button>
+                                                    </Grid>
+                                                    <Border Height="1"
+                                                            Background="{StaticResource BorderDefault-brush}"
+                                                            SnapsToDevicePixels="True" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
 
-                    <TextBlock Grid.Row="2"
-                               Text="Global shortcuts"
-                               Style="{StaticResource FieldLabelStyle}"
-                               VerticalAlignment="Bottom"
-                               Margin="{StaticResource FileInfoSectionBreakValueMargin-thk}" />
+                            <TextBlock Grid.Row="2"
+                                       x:Name="KeyboardShortcutsStatusText"
+                                       Visibility="Collapsed"
+                                       Style="{StaticResource SettingsPlaybackAuxTextStyle}"
+                                       TextWrapping="Wrap"
+                                       Margin="{StaticResource Top10-thk}" />
 
-                    <!-- Global shortcuts table -->
-                    <Border Grid.Row="3"
-                            BorderBrush="{StaticResource BorderDefault-brush}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource Sm-cr}"
-                            Background="{StaticResource ControlBackgroundAlt-brush}"
-                            ClipToBounds="True">
-                        <StackPanel>
-                            <!-- Header row -->
-                            <Grid Background="{StaticResource PanelBackground-brush}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
-                                           Text="Key"
-                                           FontWeight="SemiBold"
-                                           FontSize="12"
-                                           Foreground="{StaticResource TextSecondary-brush}"
-                                           HorizontalAlignment="Center"
-                                           Margin="15,6" />
-                                <Border Grid.Column="0"
-                                        Width="1"
-                                        HorizontalAlignment="Right"
-                                        Background="{StaticResource BorderDefault-brush}" />
-                                <TextBlock Grid.Column="1"
-                                           Text="Action"
-                                           FontWeight="SemiBold"
-                                           FontSize="12"
-                                           Foreground="{StaticResource TextSecondary-brush}"
-                                           Padding="10,6" />
-                            </Grid>
-                            <!-- Header / body divider -->
-                            <Border Height="1" Background="{StaticResource BorderDefault-brush}" SnapsToDevicePixels="True" />
-                            <!-- Rows -->
-                            <ItemsControl x:Name="KeyboardShortcutsGlobalListView">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel>
-                                            <Grid Height="34">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" SharedSizeGroup="KeyCol" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0"
-                                                           Text="{Binding Shortcut}"
-                                                           FontFamily="Consolas, Courier New"
-                                                           FontSize="16"
-                                                           VerticalAlignment="Center"
-                                                           HorizontalAlignment="Center"
-                                                           Margin="15,0"
-                                                           Foreground="{StaticResource TextPrimary-brush}" />
-                                                <Border Grid.Column="0"
-                                                        Width="1"
-                                                        HorizontalAlignment="Right"
-                                                        Background="{StaticResource BorderDefault-brush}" />
-                                                <TextBlock Grid.Column="1"
-                                                           Text="{Binding Action}"
-                                                           Foreground="{StaticResource TextPrimary-brush}"
-                                                           Padding="10,7" />
-                                            </Grid>
-                                            <Border Height="1"
-                                                    Background="{StaticResource BorderDefault-brush}"
-                                                    SnapsToDevicePixels="True" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <!-- Empty state (shown when no global shortcuts are registered) -->
-                            <TextBlock Text="No global shortcuts configured."
-                                       Foreground="{StaticResource TextMuted-brush}"
-                                       FontSize="12"
-                                       Padding="10,8" />
-                        </StackPanel>
-                    </Border>
+                            <TextBlock Grid.Row="3"
+                                       Text="Global shortcuts"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       VerticalAlignment="Bottom"
+                                       Margin="{StaticResource FileInfoSectionBreakValueMargin-thk}" />
+
+                            <!-- Global shortcuts table -->
+                            <Border Grid.Row="4"
+                                    BorderBrush="{StaticResource BorderDefault-brush}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource Sm-cr}"
+                                    Background="{StaticResource ControlBackgroundAlt-brush}"
+                                    ClipToBounds="True">
+                                <StackPanel>
+                                    <!-- Header row -->
+                                    <Grid Background="{StaticResource PanelBackground-brush}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
+                                                   Text="Action"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource TextSecondary-brush}"
+                                                   Padding="10,6" />
+                                        <Border Grid.Column="0"
+                                                Width="1"
+                                                HorizontalAlignment="Right"
+                                                Background="{StaticResource BorderDefault-brush}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="Key"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource TextSecondary-brush}"
+                                                   Padding="10,6" />
+                                    </Grid>
+                                    <!-- Header / body divider -->
+                                    <Border Height="1" Background="{StaticResource BorderDefault-brush}" SnapsToDevicePixels="True" />
+                                    <!-- Rows -->
+                                    <ItemsControl x:Name="KeyboardShortcutsGlobalListView">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel>
+                                                    <Grid Height="34">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{Binding Name}"
+                                                                   Foreground="{StaticResource TextPrimary-brush}"
+                                                                   VerticalAlignment="Center"
+                                                                   Padding="10,0" />
+                                                        <Border Grid.Column="0"
+                                                                Width="1"
+                                                                HorizontalAlignment="Right"
+                                                                Background="{StaticResource BorderDefault-brush}" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding Shortcut}"
+                                                                   VerticalAlignment="Center"
+                                                                   Padding="10,0"
+                                                                   Foreground="{StaticResource TextPrimary-brush}" />
+                                                    </Grid>
+                                                    <Border Height="1"
+                                                            Background="{StaticResource BorderDefault-brush}"
+                                                            SnapsToDevicePixels="True" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <!-- Empty state (shown when no global shortcuts are registered) -->
+                                    <TextBlock Text="No global shortcuts configured."
+                                               Foreground="{StaticResource TextMuted-brush}"
+                                               FontSize="12"
+                                               Padding="10,8" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </ScrollViewer>
                 </Grid>
 
                 <Grid x:Name="AboutSectionPanel" Visibility="Collapsed">

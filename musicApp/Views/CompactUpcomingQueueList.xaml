@@ -26,6 +26,9 @@
                 <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
                            Header="Add to Queue"
                            Click="QueueContextMenu_AddToQueueClick"/>
+                <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                           Header="Remove from Queue"
+                           Click="QueueContextMenu_RemoveFromQueueClick"/>
                 <Separator/>
                 <MenuItem Style="{StaticResource TrackContextMenuItemWithSubmenuStyle}"
                           Header="Add to Playlist"

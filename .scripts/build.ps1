@@ -5,6 +5,7 @@ if ($Help) { Write-Host 'build.ps1 [-x86|-x64|-arm64]'; return }
 . "$PSScriptRoot\scriptHelper.ps1"
 Write-Host "=== building $projectName... ==="
 Set-Location -LiteralPath $repoRoot
+removeMacMetadata
 checkVerBuild $Architecture
 $targetArchitecture = getArchitecture @($Architecture)
 runNativeCommand dotnet @('restore', $csproj) 'dotnet restore'

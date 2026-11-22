@@ -13,13 +13,11 @@ public static class UILayoutConstants
     /// <summary>Sidebar column min width; also the default width when no saved width applies.</summary>
     public const double SidebarMinWidth = 180;
 
-    // Playback and state debounce
-    public const int ManualNavigationResetDelayMs = 100;
+    // State debounce
     public static readonly TimeSpan SidebarWidthSaveDelay = TimeSpan.FromSeconds(0.5);
     public static readonly TimeSpan ColumnWidthSaveDelay = TimeSpan.FromSeconds(0.5);
 
     // Playback navigation thresholds
-    public const double PreviousTrackRestartThresholdSeconds = 3.0;
     public const double PreviousTrackEdgeThresholdSeconds = 2.0;
 
     // Shared image sizing

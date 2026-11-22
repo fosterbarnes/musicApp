@@ -12,39 +12,16 @@ namespace musicApp
     {
         public void ApplyPlaybackPreferences()
         {
-            try
-            {
-                var prefs = PreferencesManager.Instance.LoadPreferencesSync();
-                PreferencesManager.EnsureInitialized(prefs);
-                ApplyCrossfadePreferenceSeconds(prefs.Playback.CrossfadeSeconds);
-                ApplyCrossfadeRampSeconds(prefs.Playback.CrossfadeRampSeconds);
-
-                _cachedAudioBackend = prefs.Playback.AudioBackend;
-                _useSoftwareSessionVolume = prefs.Playback.UseSoftwareSessionVolume;
-                _cachedOutputSampleRateHz = prefs.Playback.OutputSampleRateHz;
-                _cachedOutputBits = prefs.Playback.OutputBits;
-
-                bool backendChanged = _playbackOutputPrefsSyncedOnce && _lastAppliedAudioBackend != _cachedAudioBackend;
-                bool volModeChanged = _playbackOutputPrefsSyncedOnce && _lastAppliedUseSoftwareSessionVolume != _useSoftwareSessionVolume;
-                bool sampleRateChanged = _playbackOutputPrefsSyncedOnce &&
-                    _lastAppliedOutputSampleRateHz != _cachedOutputSampleRateHz;
-                bool outputBitsChanged = _playbackOutputPrefsSyncedOnce && _lastAppliedOutputBits != _cachedOutputBits;
-
-                if ((backendChanged || volModeChanged || sampleRateChanged || outputBitsChanged) &&
-                    audioFileReader != null && currentTrack != null)
-                    RecreateAudioOutputForPreferencesChange();
-
-                _lastAppliedAudioBackend = _cachedAudioBackend;
-                _lastAppliedUseSoftwareSessionVolume = _useSoftwareSessionVolume;
-                _lastAppliedOutputSampleRateHz = _cachedOutputSampleRateHz;
-                _lastAppliedOutputBits = _cachedOutputBits;
-                _playbackOutputPrefsSyncedOnce = true;
-            }
-            catch
-            {
-                ApplyCrossfadePreferenceSeconds(0);
-                ApplyCrossfadeRampSeconds(0);
-            }
+            var prefs = PreferencesManager.Instance.LoadPreferencesSync();
+            PreferencesManager.EnsureInitialized(prefs);
+            var playback = prefs.Playback;
+            _player.ApplySettings(new Playback.EngineSettings(
+                playback.AudioBackend,
+                playback.UseSoftwareSessionVolume,
+                playback.OutputSampleRateHz,
+                playback.OutputBits,
+                Math.Clamp(playback.CrossfadeSeconds, 0, 15),
+                Math.Clamp(playback.CrossfadeRampSeconds, 0, 120d)));
         }
 
         public List<string> CopyLibraryFilePathsForLoudnormStats()
@@ -125,9 +102,7 @@ namespace musicApp
                     return;
                 }
 
-                var appDataPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "musicApp");
+                var appDataPath = Helpers.AppPaths.AppDataDirectory;
 
                 if (!Directory.Exists(appDataPath))
                 {
@@ -162,20 +137,9 @@ namespace musicApp
                 allTracks.Clear();
                 ResetLibraryPathRegistry();
                 filteredTracks.Clear();
-                shuffledTracks.Clear();
                 playlists.Clear();
                 recentlyPlayed.Clear();
-
-                currentTrack = null;
-                currentTrackIndex = -1;
-                currentShuffledIndex = -1;
-                ClearContextualPlaybackQueue(offerUndo: false);
-                ClearQueueUndoOffer();
-
-                StopPlayback(clearQueue: false);
-
-                titleBarPlayer.SetTrackInfo("No track selected", "", "");
-                ClearMiniPlayerTrack();
+                _player.ClearAll();
 
                 var miniPlayer = _miniPlayerWindow;
                 _miniPlayerWindow = null;

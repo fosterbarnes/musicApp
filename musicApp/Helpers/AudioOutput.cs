@@ -59,12 +59,52 @@ public static class PlaybackResampler
             return source;
         return new WdlResamplingSampleProvider(source, targetSampleRate);
     }
+}
 
-    public static IWaveProvider ToOutputWaveProvider(AudioFileReader reader, int targetSampleRate)
+// Fades out on pause and back in on resume so neither clicks. While closed it reads nothing,
+// so the track position holds and whatever the device still has buffered is silence.
+public sealed class PauseGateSampleProvider : ISampleProvider
+{
+    private readonly ISampleProvider _source;
+    private readonly float _step;
+    private float _gain = 1f;
+    private volatile bool _open = true;
+
+    public PauseGateSampleProvider(ISampleProvider source, double fadeMs = 15)
     {
-        targetSampleRate = NormalizeOutputSampleRateHz(targetSampleRate);
-        var sp = ResampleIfNeeded(reader.ToSampleProvider(), reader.WaveFormat, targetSampleRate);
-        return new SampleToWaveProvider(sp);
+        _source = source;
+        _step = 1f / Math.Max(1, (int)(source.WaveFormat.SampleRate * fadeMs / 1000));
+    }
+
+    public WaveFormat WaveFormat => _source.WaveFormat;
+
+    public bool IsOpen
+    {
+        get => _open;
+        set => _open = value;
+    }
+
+    public int Read(float[] buffer, int offset, int count)
+    {
+        bool open = _open;
+        if (!open && _gain <= 0f)
+        {
+            Array.Clear(buffer, offset, count);
+            return count;
+        }
+
+        int read = _source.Read(buffer, offset, count);
+        if (open && _gain >= 1f)
+            return read;
+
+        int channels = WaveFormat.Channels;
+        for (int i = 0; i < read; i += channels)
+        {
+            _gain = open ? Math.Min(1f, _gain + _step) : Math.Max(0f, _gain - _step);
+            for (int c = 0; c < channels && i + c < read; c++)
+                buffer[offset + i + c] *= _gain;
+        }
+        return read;
     }
 }
 

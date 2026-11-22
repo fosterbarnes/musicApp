@@ -13,6 +13,10 @@
         <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
                   Header="Add to Queue"
                   Click="AddToQueueMenuItem_Click" />
+        <MenuItem Style="{StaticResource TrackContextMenuItemStyle}"
+                  Header="Remove from Queue"
+                  Click="RemoveFromQueueMenuItem_Click"
+                  Visibility="Collapsed" />
         <Separator />
         <MenuItem Style="{StaticResource TrackContextMenuItemWithSubmenuStyle}"
                   Header="Add to Playlist"

@@ -23,9 +23,7 @@ public static class AlbumArtCacheManager
 {
     public const int CacheThumbnailSize = 250;
 
-    private static readonly string ThumbnailFolder = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "musicApp", "thumbnails");
+    private static readonly string ThumbnailFolder = Path.Combine(AppPaths.AppDataDirectory, "thumbnails");
 
     private const int MemoryCacheMaxEntries = 512;
     private static readonly ConcurrentDictionary<string, BitmapSource?> _memoryCache = new();

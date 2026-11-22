@@ -1,14 +1,20 @@
-v0.3.4 sandiegoTaters [feat. > miniplayer volume; fix > lost miniplayer]
+v0.3.5 profesionalTugboat [fix > crossfade, queue; feat. > rebind keys]
 
-- Miniplayer has a volume slider at the bottom of the album art that fades in on hover and stays in sync with the main window
-- Right-click the top track in the miniplayer queue and choose Swap with Current to play it right away in place of the current song
-- The miniplayer no longer opens invisibly off the edge of the screen on multi-monitor setups with display scaling. If it is lost now, it comes back the next time you open it
-- The time bar fill now matches the time shown after the window is snapped, maximized, or resized by another app
-- Fix 'Add to Queue' not working if there's no running queue
-- Re-scanning library no longer resets 'recently added' dates play count, or favorite status
-- Miniplayer artist & album are clickable
-- Fix issue where selecting "Go to album" wouldn't always place the item on screen
-- Add undo button to miniplayer for when the queue gets reset. Restores previous queue state
-- Play errors or missing files no longer wipe the whole queue
-- Mouse wheel & trackpad scrolling speed dialed down
-- Fix 'excessive loading' on app startup for lack of a better term
+- Crossfades are smoother and now work between mono and stereo songs and when Repeat All loops back to the start
+- Repeat One now stays on the same song when crossfade is on
+- Seeking during a crossfade now works, and the player switches to the new song as soon as the fade starts
+- Pausing in WASAPI exclusive mode is now silent instead of repeating a short piece of the song or buzzing
+- Pause and resume fade very briefly, so they no longer click
+- Starting shuffle from the middle of a list now includes the whole list
+- Editing the queue no longer changes the order of your library
+- Songs added to your library during playback no longer join the current queue
+- Songs with identical tags, like several "Unknown Title" files, are no longer mixed up in the queue
+- A queued song loses its queued highlight once it starts playing
+- Undo no longer brings back songs you removed from the library
+- Play counts no longer go up when you restart a song or skip through songs while paused
+- Deleting or externally editing the next song in the queue no longer gets blocked for most of the current song
+- Right-click a song in the Queue, queue popup, or miniplayer queue and choose Remove from Queue
+- New shortcuts: Ctrl+Q adds selected songs to the queue and Shift+Enter plays them next
+- In the Queue, Delete removes the selected song and Alt+Up/Alt+Down move it
+- Ctrl+S toggles shuffle, Ctrl+R changes repeat mode, Ctrl+Up/Ctrl+Down change volume, and M mutes
+- Every shortcut can be changed in Settings > Shortcuts, and the table is cleaner and easier to read

@@ -61,6 +61,16 @@ namespace musicApp.Views
         public Song? GetDefaultPlayTrack() =>
             SelectedTrack ?? _currentFlyout?.Tracks?.FirstOrDefault();
 
+        // Selected flyout songs in album order, or the whole open album when none are selected
+        public IReadOnlyList<Song> GetSelectedTracks()
+        {
+            var tracks = _currentFlyout?.Tracks;
+            if (tracks == null || tracks.Count == 0)
+                return Array.Empty<Song>();
+            var picked = tracks.Where(t => t != null && _flyoutSelectedKeys.Contains(FlyoutSelectionKeyForSong(t))).ToList();
+            return picked.Count > 0 ? picked : tracks.Where(t => t != null).ToList();
+        }
+
         public void SelectTrack(Song track, bool grabFocus = false)
         {
             if (track == null || string.IsNullOrWhiteSpace(track.FilePath))

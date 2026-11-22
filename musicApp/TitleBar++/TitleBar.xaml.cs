@@ -7,9 +7,9 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using MaterialDesignThemes.Wpf;
-using NAudio.Wave;
 using musicApp;
 using musicApp.Helpers;
+using musicApp.Playback;
 
 namespace musicApp.TitleBarPlus
 {
@@ -24,29 +24,24 @@ namespace musicApp.TitleBarPlus
         public event EventHandler? WindowCloseRequested;
         public event EventHandler<double>? VolumeChanged;
         public event EventHandler<bool>? ShuffleStateChanged;
+        public event EventHandler<RepeatMode>? RepeatModeChanged;
         /// <summary>Raised when search text changes (debounced). EventArgs is the current query; empty string when cleared or placeholder.</summary>
         public event EventHandler<string>? SearchTextChanged;
         public event EventHandler<string>? ArtistNavigationRequested;
         public event EventHandler<string>? AlbumNavigationRequested;
         public event EventHandler? QueuePopupToggleRequested;
-        /// <summary>Fired after the user commits a new position on the seek bar (drag release).</summary>
-        public event EventHandler? PlaybackPositionCommitted;
 
         // === Audio Playback State ===
-        private IWavePlayer? waveOut;
-        private AudioFileReader? audioFileReader;
-        private bool _useSoftwareSessionVolume = true;
+        private Player? _player;
         private bool isPlaying = false;
         private bool isMuted = false;
         private double previousVolume = 50;
         private DispatcherTimer? seekBarTimer;
         private TimeSpan totalDuration;
-        private TimeSpan pausedPosition;
-        private bool isUpdatingAudioObjects = false;
 
         // === Player Settings State ===
         private bool isShuffleEnabled = false;
-        private SettingsManager.RepeatMode repeatMode = SettingsManager.RepeatMode.Off;
+        private RepeatMode repeatMode = RepeatMode.Off;
 
         // === Constants ===
         private const double MIN_SPACING_FROM_EDGE = 20;
@@ -84,18 +79,6 @@ namespace musicApp.TitleBarPlus
                 isPlaying = value;
                 UpdatePlayPauseIcon();
                 UpdateSeekBarTimer();
-
-                // Safety check: if we're stopping playback, ensure the seek bar timer is stopped
-                if (!isPlaying)
-                {
-                    StopSeekBarTimer();
-
-                    // Additional safety: if we're stopping and have no valid audio objects, reset to initial state
-                    if (!AreAudioObjectsValid())
-                    {
-                        ResetToInitialState();
-                    }
-                }
             }
         }
 
@@ -105,8 +88,6 @@ namespace musicApp.TitleBarPlus
             set
             {
                 sliderVolume.Value = Math.Max(0, Math.Min(VOLUME_MAX, value));
-                if (waveOut != null && !isMuted)
-                    ApplyOutputVolumeFromUi(sliderVolume.Value);
             }
         }
 
@@ -134,44 +115,20 @@ namespace musicApp.TitleBarPlus
             }
         }
 
-        public SettingsManager.RepeatMode RepeatMode
+        public RepeatMode RepeatMode
         {
             get => repeatMode;
             set
             {
                 repeatMode = value;
                 UpdateRepeatIcon();
+                RepeatModeChanged?.Invoke(this, value);
             }
         }
 
         public bool IsRepeatEnabled
         {
-            get => repeatMode != SettingsManager.RepeatMode.Off;
-        }
-
-        /// <summary>
-        /// Gets the current playback position
-        /// </summary>
-        public TimeSpan CurrentPosition
-        {
-            get
-            {
-                try
-                {
-                    if (AreAudioObjectsValid() && audioFileReader != null)
-                    {
-                        return audioFileReader.CurrentTime;
-                    }
-                    return pausedPosition;
-                }
-                catch
-                {
-                    // If we encounter an error getting the current position, reset to initial state
-                    Console.WriteLine("Error getting current position - resetting to initial state");
-                    ResetToInitialState();
-                    return TimeSpan.Zero;
-                }
-            }
+            get => repeatMode != RepeatMode.Off;
         }
 
         // === Constructor ===
@@ -390,23 +347,32 @@ namespace musicApp.TitleBarPlus
         }
 
         // === Shuffle and Repeat Button Events ===
-        private async void BtnShuffle_Click(object sender, RoutedEventArgs e)
+        private void BtnShuffle_Click(object sender, RoutedEventArgs e)
         {
             e.Handled = true;
+            ToggleShuffle();
+        }
+
+        private void BtnRepeat_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            CycleRepeat();
+        }
+
+        internal async void ToggleShuffle()
+        {
             IsShuffleEnabled = !IsShuffleEnabled;
             await SettingsManager.Instance.SetShuffleStateAsync(IsShuffleEnabled);
         }
 
-        private async void BtnRepeat_Click(object sender, RoutedEventArgs e)
+        internal async void CycleRepeat()
         {
-            e.Handled = true;
-
             var newMode = repeatMode switch
             {
-                SettingsManager.RepeatMode.Off => SettingsManager.RepeatMode.All,
-                SettingsManager.RepeatMode.All => SettingsManager.RepeatMode.One,
-                SettingsManager.RepeatMode.One => SettingsManager.RepeatMode.Off,
-                _ => SettingsManager.RepeatMode.Off
+                RepeatMode.Off => RepeatMode.All,
+                RepeatMode.All => RepeatMode.One,
+                RepeatMode.One => RepeatMode.Off,
+                _ => RepeatMode.Off
             };
 
             RepeatMode = newMode;
@@ -480,7 +446,21 @@ namespace musicApp.TitleBarPlus
             ApplyOutputVolumeFromUi(sliderVolume.Value);
         }
 
-        private void IconVolume_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void IconVolume_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => ToggleMute();
+
+        // Nudges the slider; any change unmutes
+        internal void StepVolume(double delta)
+        {
+            double from = isMuted ? previousVolume : sliderVolume.Value;
+            if (isMuted)
+            {
+                isMuted = false;
+                iconVolume.Kind = PackIconKind.VolumeHigh;
+            }
+            sliderVolume.Value = Math.Clamp(from + delta, 0, VOLUME_MAX);
+        }
+
+        internal void ToggleMute()
         {
             if (isMuted)
             {
@@ -519,55 +499,21 @@ namespace musicApp.TitleBarPlus
             }
         }
 
-        public void SetAudioObjects(IWavePlayer? waveOut, AudioFileReader? audioFileReader, bool useSoftwareSessionVolume = true)
+        public void AttachPlayer(Player player) => _player = player;
+
+        /// <summary>Resyncs the seek bar after a track, play state, or output change.</summary>
+        public void RefreshPlaybackState()
         {
-            isUpdatingAudioObjects = true;
-
-            try
+            if (!HasLoadedTrack)
             {
-                seekBarTimer?.Stop();
-
-                this.waveOut = waveOut;
-                this.audioFileReader = audioFileReader;
-                _useSoftwareSessionVolume = useSoftwareSessionVolume;
-
-                if (waveOut == null || audioFileReader == null)
-                {
-                    ResetToInitialState();
-                }
-                else
-                {
-                    if (!isMuted)
-                        ApplyOutputVolumeFromUi(sliderVolume.Value);
-
-                    try
-                    {
-                        totalDuration = audioFileReader.TotalTime;
-                        var pos = audioFileReader.CurrentTime;
-                        if (pos < TimeSpan.Zero)
-                            pos = TimeSpan.Zero;
-                        if (totalDuration > TimeSpan.Zero && pos > totalDuration)
-                            pos = totalDuration;
-                        pausedPosition = TimeSpan.Zero;
-                        UpdateSeekBar(pos, totalDuration);
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        totalDuration = TimeSpan.Zero;
-                        pausedPosition = TimeSpan.Zero;
-                        UpdateSeekBar(TimeSpan.Zero, TimeSpan.Zero);
-                    }
-                }
+                ResetToInitialState();
+                return;
             }
-            catch (Exception ex)
-            {
-                HandleError("SetAudioObjects", ex);
-            }
-            finally
-            {
-                isUpdatingAudioObjects = false;
-                UpdateSeekBarTimer();
-            }
+
+            totalDuration = _player!.Duration;
+            if (!isDragging)
+                UpdateSeekBar(_player.Position, totalDuration);
+            UpdateSeekBarTimer();
         }
 
         public void ResetToInitialState()
@@ -577,7 +523,6 @@ namespace musicApp.TitleBarPlus
                 seekBarTimer?.Stop();
 
                 totalDuration = TimeSpan.Zero;
-                pausedPosition = TimeSpan.Zero;
                 isPlaying = false;
 
                 isDragging = false;
@@ -589,18 +534,6 @@ namespace musicApp.TitleBarPlus
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error during TitleBar reset: {ex.Message}");
-            }
-        }
-
-        private void StopSeekBarTimer()
-        {
-            try
-            {
-                seekBarTimer?.Stop();
-            }
-            catch (Exception ex)
-            {
-                HandleError("StopSeekBarTimer", ex);
             }
         }
 
@@ -634,6 +567,8 @@ namespace musicApp.TitleBarPlus
                 double restoredVol = await SettingsManager.Instance.GetTitleBarVolume0To100Async();
                 sliderVolume.Value = Math.Max(0, Math.Min(VOLUME_MAX, restoredVol));
                 previousVolume = restoredVol > 0 ? restoredVol : 100;
+                // The slider raises no event when the saved value equals its default.
+                ApplyOutputVolumeFromUi(sliderVolume.Value);
 
                 UpdateShuffleIcon();
                 UpdateRepeatIcon();
@@ -695,19 +630,19 @@ namespace musicApp.TitleBarPlus
             {
                 switch (RepeatMode)
                 {
-                    case SettingsManager.RepeatMode.Off:
+                    case RepeatMode.Off:
                         iconRepeat.Source = Application.Current.Resources["RepeatStandardIcon"] as ImageSource;
                         AnimateFillContract(btnRepeatFill);
                         ResetRepeatIconTransform();
                         break;
 
-                    case SettingsManager.RepeatMode.All:
+                    case RepeatMode.All:
                         iconRepeat.Source = Application.Current.Resources["RepeatStandardIcon"] as ImageSource;
                         AnimateFillExpand(btnRepeatFill);
                         ResetRepeatIconTransform();
                         break;
 
-                    case SettingsManager.RepeatMode.One:
+                    case RepeatMode.One:
                         var customIcon = Application.Current.Resources["RepeatOneIcon"] as ImageSource;
                         iconRepeat.Source = customIcon ?? Application.Current.Resources["RepeatStandardIcon"] as ImageSource;
                         
@@ -922,109 +857,28 @@ namespace musicApp.TitleBarPlus
             }
         }
 
-        private bool AreAudioObjectsValid()
-        {
-            try
-            {
-                if (audioFileReader == null)
-                    return false;
-
-                var _ = audioFileReader.TotalTime;
-                return true;
-            }
-            catch (ObjectDisposedException)
-            {
-                return false;
-            }
-            catch (NullReferenceException)
-            {
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
-        }
+        private bool HasLoadedTrack => _player?.CurrentTrack != null && _player.Duration > TimeSpan.Zero;
 
         private void UpdateSeekBarTimer()
         {
-            if (isUpdatingAudioObjects || seekBarTimer == null) return;
+            if (seekBarTimer == null) return;
 
             seekBarTimer.Stop();
-
-            try
-            {
-                if (isPlaying && AreAudioObjectsValid())
-                {
-                    seekBarTimer.Start();
-                }
-                else
-                {
-                    if (AreAudioObjectsValid() && audioFileReader != null)
-                    {
-                        try
-                        {
-                            pausedPosition = audioFileReader.CurrentTime;
-                        }
-                        catch
-                        {
-                            pausedPosition = TimeSpan.Zero;
-                        }
-                    }
-                    else
-                    {
-                        pausedPosition = TimeSpan.Zero;
-                        if (!isPlaying)
-                        {
-                            ResetToInitialState();
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleError("UpdateSeekBarTimer", ex);
-            }
+            if (isPlaying && HasLoadedTrack)
+                seekBarTimer.Start();
         }
 
         private void SeekBarTimer_Tick(object? sender, EventArgs e)
         {
-            if (isUpdatingAudioObjects || isDragging) return;
+            if (isDragging) return;
 
-            if (!isPlaying || !AreAudioObjectsValid())
+            if (!isPlaying || !HasLoadedTrack)
             {
                 seekBarTimer?.Stop();
-                if (!isPlaying && !AreAudioObjectsValid())
-                {
-                    ResetToInitialState();
-                }
                 return;
             }
 
-            try
-            {
-                if (audioFileReader != null)
-                {
-                    UpdateSeekBar(audioFileReader.CurrentTime, totalDuration);
-                }
-                else
-                {
-                    seekBarTimer?.Stop();
-                }
-            }
-            catch (ObjectDisposedException)
-            {
-                seekBarTimer?.Stop();
-            }
-            catch (NullReferenceException)
-            {
-                seekBarTimer?.Stop();
-            }
-            catch (Exception ex)
-            {
-                seekBarTimer?.Stop();
-                HandleError("SeekBarTimer_Tick", ex);
-            }
+            UpdateSeekBar(_player!.Position, totalDuration);
         }
 
         // === Seek Bar Interaction Events ===
@@ -1037,7 +891,7 @@ namespace musicApp.TitleBarPlus
 
         private void SeekBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (audioFileReader == null || totalDuration.TotalSeconds <= 0) return;
+            if (!HasLoadedTrack || totalDuration.TotalSeconds <= 0) return;
 
             double barWidth = seekBarBackground.ActualWidth;
             System.Windows.Point clickPoint = e.GetPosition(seekBarBackground);
@@ -1047,27 +901,13 @@ namespace musicApp.TitleBarPlus
             lastMouseDownTime = DateTime.Now;
 
             dragTargetPosition = SeekBarInteractionHelper.TimeFromSeekX(clickPosition, barWidth, totalDuration);
-
-            if (audioFileReader != null && totalDuration.TotalSeconds > 0)
-            {
-                try
-                {
-                    UpdateSeekBar(dragTargetPosition, totalDuration);
-                }
-                catch (ObjectDisposedException) { }
-                catch (NullReferenceException) { }
-            }
+            UpdateSeekBar(dragTargetPosition, totalDuration);
 
             wasMutedBeforeDrag = isMuted;
             volumeBeforeDrag = sliderVolume.Value;
 
-            if (waveOut != null && !isMuted)
-            {
-                if (_useSoftwareSessionVolume)
-                    VolumeChanged?.Invoke(this, 0);
-                else
-                    TrySetDeviceVolume(waveOut, 0f);
-            }
+            if (!isMuted)
+                VolumeChanged?.Invoke(this, 0);
 
             isDragging = true;
             seekBarBackground.CaptureMouse();
@@ -1076,7 +916,7 @@ namespace musicApp.TitleBarPlus
 
         private void SeekBar_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
         {
-            if (!isDragging || audioFileReader == null || totalDuration.TotalSeconds <= 0) return;
+            if (!isDragging || !HasLoadedTrack || totalDuration.TotalSeconds <= 0) return;
 
             if (!SeekBarInteractionHelper.HasPassedMoveDelay(lastMouseDownTime, MOUSE_MOVE_DELAY_MS))
                 return;
@@ -1092,16 +932,7 @@ namespace musicApp.TitleBarPlus
             lastValidMousePosition = currentPoint;
 
             dragTargetPosition = SeekBarInteractionHelper.TimeFromSeekX(currentPosition, barWidth, totalDuration);
-
-            if (audioFileReader != null && totalDuration.TotalSeconds > 0)
-            {
-                try
-                {
-                    UpdateSeekBar(dragTargetPosition, totalDuration);
-                }
-                catch (ObjectDisposedException) { }
-                catch (NullReferenceException) { }
-            }
+            UpdateSeekBar(dragTargetPosition, totalDuration);
         }
 
         private void SeekBar_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -1116,70 +947,24 @@ namespace musicApp.TitleBarPlus
         {
         }
 
-        private void ApplyOutputVolumeFromUi(double slider0To100)
-        {
-            if (!_useSoftwareSessionVolume && waveOut != null && !isMuted)
-                TrySetDeviceVolume(waveOut, (float)(slider0To100 / VOLUME_MAX));
-            VolumeChanged?.Invoke(this, slider0To100);
-        }
-
-        private static void TrySetDeviceVolume(IWavePlayer? player, float linear0To1)
-        {
-            switch (player)
-            {
-                case WaveOutEvent w:
-                    w.Volume = linear0To1;
-                    break;
-                case WasapiOut w:
-                    w.Volume = linear0To1;
-                    break;
-                case DirectSoundOut d:
-                    d.Volume = linear0To1;
-                    break;
-            }
-        }
+        private void ApplyOutputVolumeFromUi(double slider0To100) => VolumeChanged?.Invoke(this, slider0To100);
 
         private void EndDragOperation()
         {
-            if (waveOut != null)
-            {
-                if (_useSoftwareSessionVolume)
-                {
-                    if (wasMutedBeforeDrag)
-                        VolumeChanged?.Invoke(this, 0);
-                    else
-                        VolumeChanged?.Invoke(this, volumeBeforeDrag);
-                }
-                else
-                {
-                    if (wasMutedBeforeDrag)
-                        TrySetDeviceVolume(waveOut, 0f);
-                    else
-                        TrySetDeviceVolume(waveOut, (float)(volumeBeforeDrag / VOLUME_MAX));
-                }
-            }
+            VolumeChanged?.Invoke(this, wasMutedBeforeDrag ? 0 : volumeBeforeDrag);
 
-            if (audioFileReader != null && totalDuration.TotalSeconds > 0)
+            if (HasLoadedTrack && totalDuration.TotalSeconds > 0)
             {
-                try
-                {
-                    audioFileReader.CurrentTime = dragTargetPosition;
-                    UpdateSeekBar(dragTargetPosition, totalDuration);
-                }
-                catch (ObjectDisposedException) { }
-                catch (NullReferenceException) { }
+                _player!.Seek(dragTargetPosition);
+                UpdateSeekBar(dragTargetPosition, totalDuration);
             }
 
             isDragging = false;
             seekBarBackground.ReleaseMouseCapture();
-            PlaybackPositionCommitted?.Invoke(this, EventArgs.Empty);
         }
 
-        private void HandleError(string context, Exception ex)
-        {
+        private static void HandleError(string context, Exception ex) =>
             System.Diagnostics.Debug.WriteLine($"Error in {context}: {ex.Message}");
-            ResetToInitialState();
-        }
 
     }
 }

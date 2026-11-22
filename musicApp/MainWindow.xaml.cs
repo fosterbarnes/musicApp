@@ -94,27 +94,6 @@ namespace musicApp
         private Hotkey.GlobalHotkeys _globalHotkeys;
 
         // ===========================================
-        // AUDIO PLAYBACK STATE
-        // ===========================================
-        private IWavePlayer? waveOut;
-        private AudioFileReader? audioFileReader;
-        private VolumeSampleProvider? _sessionVolumeProvider;
-        private Helpers.AudioOutputBackend _cachedAudioBackend = Helpers.AudioOutputBackend.WasapiShared;
-        private bool _useSoftwareSessionVolume = true;
-        private int _cachedOutputSampleRateHz = Helpers.PlaybackResampler.DefaultOutputSampleRateHz;
-        private Helpers.PlaybackOutputBits _cachedOutputBits = Helpers.PlaybackOutputBitsUtil.Default;
-        private bool _playbackOutputPrefsSyncedOnce;
-        private Helpers.AudioOutputBackend _lastAppliedAudioBackend = Helpers.AudioOutputBackend.WasapiShared;
-        private bool _lastAppliedUseSoftwareSessionVolume = true;
-        private int _lastAppliedOutputSampleRateHz = Helpers.PlaybackResampler.DefaultOutputSampleRateHz;
-        private Helpers.PlaybackOutputBits _lastAppliedOutputBits = Helpers.PlaybackOutputBitsUtil.Default;
-        private int currentTrackIndex = -1;
-        private int currentShuffledIndex = -1;
-        private Song? currentTrack;
-        private volatile bool isManuallyStopping;
-        private volatile bool isManualNavigation;
-
-        // ===========================================
         // MODULAR VIEWS
         // ===========================================
         private SongsView? songsView;
@@ -145,6 +124,7 @@ namespace musicApp
         public MainWindow()
         {
             InitializeComponent();
+            InitializePlayer();
 
             statusProgress = new StatusProgressCoordinator(
                 Dispatcher,
@@ -430,10 +410,6 @@ namespace musicApp
                     OpenLaunchInfoDialog(infoSection);
                 }
 
-                if (titleBarPlayer.IsShuffleEnabled)
-                {
-                    RegenerateShuffledTracks();
-                }
             }
             catch (Exception ex)
             {
@@ -613,8 +589,7 @@ namespace musicApp
 
                     await Dispatcher.InvokeAsync(() =>
                     {
-                        foreach (var track in removedTracks)
-                            RemoveTrackFromCollections(track, includeShuffled: true);
+                        RemoveTracksFromCollections(removedTracks);
                         foreach (var track in loadedNew)
                         {
                             allTracks.Add(track);
@@ -624,7 +599,6 @@ namespace musicApp
 
                     await SortLibraryTracksByPathForScanAsync();
                     await UpdateLibraryCacheAsync();
-                    UpdateShuffledTracks();
 
                     await Dispatcher.InvokeAsync(() =>
                     {
@@ -718,8 +692,6 @@ namespace musicApp
 
                 allTracks.AddRange(validTracks);
                 filteredTracks.AddRange(validTracks);
-
-                UpdateShuffledTracks();
 
                 RefreshVisibleViews();
 
@@ -1078,6 +1050,7 @@ namespace musicApp
             titleBarPlayer.WindowCloseRequested += TitleBarPlayer_WindowCloseRequested;
 
             titleBarPlayer.ShuffleStateChanged += TitleBarPlayer_ShuffleStateChanged;
+            titleBarPlayer.RepeatModeChanged += TitleBarPlayer_RepeatModeChanged;
 
             titleBarPlayer.ArtistNavigationRequested += TitleBarPlayer_ArtistNavigationRequested;
             titleBarPlayer.AlbumNavigationRequested += TitleBarPlayer_AlbumNavigationRequested;
@@ -1091,7 +1064,6 @@ namespace musicApp
             titleBarPlayer.QueuePopupToggleRequested += TitleBarPlayer_QueuePopupToggleRequested;
             if (titleBarPlayer.QueuePopupPlacementTarget is UIElement queuePlacementTarget)
                 queuePlacementTarget.PreviewMouseLeftButtonDown += QueuePopupPlacementTarget_PreviewMouseLeftButtonDown;
-            titleBarPlayer.PlaybackPositionCommitted += OnTitleBarPlaybackPositionCommitted;
             titleBarPlayer.VolumeChanged += TitleBarPlayer_VolumeChanged;
             if (searchPopupView != null)
             {
@@ -1211,8 +1183,8 @@ namespace musicApp
                 {
                     if (!ReferenceEquals(_miniPlayerWindow, window))
                         return;
-                    if (currentTrack == null ||
-                        !string.Equals(currentTrack.FilePath, track.FilePath, StringComparison.OrdinalIgnoreCase))
+                    if (CurrentTrack == null ||
+                        !string.Equals(CurrentTrack.FilePath, track.FilePath, StringComparison.OrdinalIgnoreCase))
                         return;
                     window.SetTrackInfo(track.Title, track.Artist, track.Album, art);
                 });
@@ -1275,20 +1247,20 @@ namespace musicApp
 
         private void RefreshTitleBarFromCurrentTrack()
         {
-            if (currentTrack == null)
+            if (CurrentTrack == null)
                 return;
 
-            var albumArt = AlbumArtLoader.LoadAlbumArt(currentTrack, GetTitleBarAlbumArtTargetPixelSize());
-            titleBarPlayer.SetTrackInfo(currentTrack.Title, currentTrack.Artist, currentTrack.Album, albumArt);
-            PushMiniPlayerTrack(currentTrack);
+            var albumArt = AlbumArtLoader.LoadAlbumArt(CurrentTrack, GetTitleBarAlbumArtTargetPixelSize());
+            titleBarPlayer.SetTrackInfo(CurrentTrack.Title, CurrentTrack.Artist, CurrentTrack.Album, albumArt);
+            PushMiniPlayerTrack(CurrentTrack);
         }
 
         private void PushMiniPlayerState(MiniPlayerWindow w)
         {
-            PushMiniPlayerTrack(currentTrack);
-            w.SetAudioObjects(waveOut, audioFileReader);
+            PushMiniPlayerTrack(CurrentTrack);
+            w.AttachPlayer(_player);
             w.SetQueue(BuildQueueView(UILayoutConstants.CompactQueueListMaxItems));
-            w.SetQueueUndoAvailable(CanUndoPreviousQueue());
+            w.SetQueueUndoAvailable(_player.Queue.CanUndo);
             try { w.SetVolumeWithoutNotify(titleBarPlayer.Volume); } catch { }
         }
 
@@ -1296,8 +1268,8 @@ namespace musicApp
         {
             RefreshTrackListBindingsAndAlbumsView(updatedTrack, allowInPlaceAlbumPatch: true);
 
-            if (currentTrack != null && updatedTrack != null &&
-                string.Equals(currentTrack.FilePath, updatedTrack.FilePath, StringComparison.OrdinalIgnoreCase))
+            if (CurrentTrack != null && updatedTrack != null &&
+                string.Equals(CurrentTrack.FilePath, updatedTrack.FilePath, StringComparison.OrdinalIgnoreCase))
             {
                 RefreshTitleBarFromCurrentTrack();
             }
@@ -1358,16 +1330,19 @@ namespace musicApp
             }
         }
 
-        private void RemoveTrackFromCollections(Song track, bool includeShuffled)
+        private void RemoveTracksFromCollections(IReadOnlyCollection<Song> tracks)
         {
-            UnregisterLibraryPathIfLastCopy(track);
-            allTracks.Remove(track);
-            filteredTracks.Remove(track);
-            if (includeShuffled)
+            if (tracks.Count == 0)
+                return;
+
+            _player.RemoveTracks(tracks.Select(t => t.FilePath).ToHashSet(StringComparer.OrdinalIgnoreCase));
+            foreach (var track in tracks)
             {
-                shuffledTracks.Remove(track);
+                UnregisterLibraryPathIfLastCopy(track);
+                allTracks.Remove(track);
+                filteredTracks.Remove(track);
+                recentlyPlayed.Remove(track);
             }
-            recentlyPlayed.Remove(track);
         }
 
         private static void LogDebug(string message)
@@ -1526,11 +1501,11 @@ namespace musicApp
                 return;
 
             ShowAlbumsView();
-            if (currentTrack != null &&
-                !string.IsNullOrWhiteSpace(currentTrack.Album) &&
-                string.Equals(currentTrack.Album.Trim(), albumName.Trim(), StringComparison.OrdinalIgnoreCase))
+            if (CurrentTrack != null &&
+                !string.IsNullOrWhiteSpace(CurrentTrack.Album) &&
+                string.Equals(CurrentTrack.Album.Trim(), albumName.Trim(), StringComparison.OrdinalIgnoreCase))
             {
-                albumsViewControl?.SelectAlbum(currentTrack);
+                albumsViewControl?.SelectAlbum(CurrentTrack);
                 return;
             }
 
@@ -1549,415 +1524,7 @@ namespace musicApp
             genresViewControl?.SelectGenre(genreName);
         }
 
-        #region Shuffle Management
-
-        private void RegenerateShuffledTracks()
-        {
-            try
-            {
-                if (HasContextualPlaybackQueue())
-                    return;
-
-                if (filteredTracks == null || filteredTracks.Count == 0)
-                {
-                    shuffledTracks.Clear();
-                    currentShuffledIndex = -1;
-                    return;
-                }
-
-                shuffledTracks.Clear();
-
-                foreach (var track in filteredTracks)
-                {
-                    if (track != null && !string.IsNullOrEmpty(track.FilePath))
-                        shuffledTracks.Add(track);
-                }
-
-                if (!titleBarPlayer.IsShuffleEnabled)
-                {
-                    currentShuffledIndex = currentTrack != null ? filteredTracks.IndexOf(currentTrack) : -1;
-                    if (contentHost?.Content == queueViewControl)
-                        UpdateQueueView();
-                    return;
-                }
-
-                if (shuffledTracks.Count > 1)
-                    ShuffleRangeUntilOrderDiffersFromLinear(shuffledTracks, filteredTracks, 0, shuffledTracks.Count - 1);
-
-                if (currentTrack != null)
-                {
-                    currentTrackIndex = filteredTracks.IndexOf(currentTrack);
-                    currentShuffledIndex = SongIdentity.IndexOf(shuffledTracks, currentTrack);
-                    if (currentShuffledIndex < 0)
-                        currentShuffledIndex = 0;
-                }
-                else
-                {
-                    currentShuffledIndex = -1;
-                }
-
-                if (contentHost?.Content == queueViewControl)
-                    UpdateQueueView();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"RegenerateShuffledTracks: {ex}");
-
-                try
-                {
-                    shuffledTracks.Clear();
-                    currentShuffledIndex = -1;
-                }
-                catch (Exception clearEx)
-                {
-                    Debug.WriteLine($"RegenerateShuffledTracks clear: {clearEx.Message}");
-                }
-            }
-        }
-
-        /// <summary>
-        /// Keeps library shuffle order stable when <see cref="filteredTracks"/> membership changes:
-        /// drop removed tracks, append newly added ones into the unplayed tail (after the playhead).
-        /// Full reshuffle only if the list was empty or the current track is missing.
-        /// </summary>
-        private void ReconcileLibraryShuffledTracks()
-        {
-            if (!titleBarPlayer.IsShuffleEnabled || HasContextualPlaybackQueue())
-                return;
-
-            if (filteredTracks == null || filteredTracks.Count == 0)
-            {
-                shuffledTracks.Clear();
-                currentShuffledIndex = -1;
-                return;
-            }
-
-            if (shuffledTracks.Count == 0)
-            {
-                RegenerateShuffledTracks();
-                return;
-            }
-
-            var filteredSet = new HashSet<Song>();
-            foreach (var t in filteredTracks)
-            {
-                if (t != null && !string.IsNullOrEmpty(t.FilePath))
-                    filteredSet.Add(t);
-            }
-
-            for (int i = shuffledTracks.Count - 1; i >= 0; i--)
-            {
-                var t = shuffledTracks[i];
-                if (t == null || !filteredSet.Contains(t))
-                    shuffledTracks.RemoveAt(i);
-            }
-
-            var shuffledSet = new HashSet<Song>(shuffledTracks);
-            var newcomers = new List<Song>();
-            foreach (var t in filteredTracks)
-            {
-                if (t != null && !string.IsNullOrEmpty(t.FilePath) && !shuffledSet.Contains(t))
-                    newcomers.Add(t);
-            }
-
-            if (newcomers.Count > 1)
-                FisherYatesRange(newcomers, 0, newcomers.Count - 1);
-
-            int insertAt = currentShuffledIndex >= 0 ? currentShuffledIndex + 1 : shuffledTracks.Count;
-            if (insertAt > shuffledTracks.Count)
-                insertAt = shuffledTracks.Count;
-
-            foreach (var t in newcomers)
-            {
-                shuffledTracks.Insert(insertAt, t);
-                insertAt++;
-            }
-
-            if (currentTrack != null)
-            {
-                currentTrackIndex = filteredTracks.IndexOf(currentTrack);
-                currentShuffledIndex = SongIdentity.IndexOf(shuffledTracks, currentTrack);
-                if (currentShuffledIndex < 0)
-                    RegenerateShuffledTracks();
-            }
-            else
-            {
-                currentShuffledIndex = -1;
-            }
-        }
-
-        private void ValidateAndSyncLibraryShuffleIndices(Song track)
-        {
-            if (track == null || filteredTracks == null)
-                return;
-
-            if (shuffledTracks.Count != filteredTracks.Count)
-            {
-                ReconcileLibraryShuffledTracks();
-                if (shuffledTracks.Count != filteredTracks.Count)
-                    RegenerateShuffledTracks();
-                else
-                {
-                    int siAfter = SongIdentity.IndexOf(shuffledTracks, track);
-                    if (siAfter >= 0)
-                        currentShuffledIndex = siAfter;
-                    currentTrackIndex = filteredTracks.IndexOf(track);
-                }
-                return;
-            }
-
-            int li = filteredTracks.IndexOf(track);
-            if (li < 0)
-            {
-                RegenerateShuffledTracks();
-                return;
-            }
-            currentTrackIndex = li;
-
-            int si = SongIdentity.IndexOf(shuffledTracks, track);
-            if (si < 0)
-            {
-                RegenerateShuffledTracks();
-                return;
-            }
-            currentShuffledIndex = si;
-        }
-
-        private void EnsureShuffledTracksInitialized()
-        {
-            try
-            {
-                if (!titleBarPlayer.IsShuffleEnabled)
-                {
-                    return;
-                }
-
-                if (shuffledTracks.Count == 0 || shuffledTracks.Count != filteredTracks.Count)
-                {
-                    if (shuffledTracks.Count == 0)
-                        RegenerateShuffledTracks();
-                    else
-                        ReconcileLibraryShuffledTracks();
-                    return;
-                }
-
-                if (currentTrack != null && SongIdentity.IndexOf(shuffledTracks, currentTrack) == -1)
-                {
-                    RegenerateShuffledTracks();
-                    return;
-                }
-
-                if (currentTrack != null && currentShuffledIndex == -1)
-                {
-                    currentShuffledIndex = SongIdentity.IndexOf(shuffledTracks, currentTrack);
-                    if (currentShuffledIndex == -1)
-                        RegenerateShuffledTracks();
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"EnsureShuffledTracksInitialized: {ex.Message}");
-                RegenerateShuffledTracks();
-            }
-        }
-
-        private void UpdateShuffledTracks()
-        {
-            if (titleBarPlayer.IsShuffleEnabled)
-            {
-                if (shuffledTracks.Count == 0)
-                    RegenerateShuffledTracks();
-                else if (shuffledTracks.Count != filteredTracks.Count)
-                    ReconcileLibraryShuffledTracks();
-                else
-                    EnsureShuffledTracksInitialized();
-            }
-        }
-
-        private void UpdateShuffleIndicesAfterTrackChange(Song track)
-        {
-            if (!titleBarPlayer.IsShuffleEnabled || HasContextualPlaybackQueue())
-                return;
-
-            ValidateAndSyncLibraryShuffleIndices(track);
-        }
-
-        private ObservableCollection<Song> GetCurrentPlayQueue()
-        {
-            try
-            {
-                if (contextualPlaybackFuture != null && contextualPlaybackFuture.Count > 0)
-                    return contextualPlaybackFuture;
-
-                var queue = titleBarPlayer.IsShuffleEnabled ? shuffledTracks : filteredTracks;
-
-                if (queue == null)
-                    queue = filteredTracks;
-
-                return queue ?? new ObservableCollection<Song>();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"GetCurrentPlayQueue: {ex.Message}");
-                return filteredTracks ?? new ObservableCollection<Song>();
-            }
-        }
-
-        private int GetCurrentTrackIndex()
-        {
-            try
-            {
-                if (contextualPlaybackFuture != null && contextualPlaybackFuture.Count > 0)
-                    return 0;
-
-                return titleBarPlayer.IsShuffleEnabled ? currentShuffledIndex : currentTrackIndex;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"GetCurrentTrackIndex: {ex.Message}");
-                return -1;
-            }
-        }
-
-        private void SetCurrentTrackIndex(int index)
-        {
-            if (contextualPlaybackFuture != null && contextualPlaybackFuture.Count > 0)
-                return;
-
-            if (titleBarPlayer.IsShuffleEnabled)
-            {
-                currentShuffledIndex = index;
-            }
-            else
-            {
-                currentTrackIndex = index;
-            }
-        }
-
-        private Song? GetTrackFromCurrentQueue(int index)
-        {
-            try
-            {
-                var queue = GetCurrentPlayQueue();
-                if (queue != null && index >= 0 && index < queue.Count)
-                {
-                    var track = queue[index];
-                    if (track != null && !string.IsNullOrEmpty(track.FilePath))
-                    {
-                        return track;
-                    }
-                }
-                return null;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"GetTrackFromCurrentQueue({index}): {ex.Message}");
-                return null;
-            }
-        }
-
-        #endregion
-
         #region Title Bar Player Control Event Handlers
-
-        private enum PreviousTrackSeekBehavior
-        {
-            RestartCurrent,
-            GoToPrevious,
-            RestartCurrentEdge,
-        }
-
-        private PreviousTrackSeekBehavior GetPreviousTrackSeekBehavior(double elapsedSeconds, int currentIndex)
-        {
-            if (elapsedSeconds >= UILayoutConstants.PreviousTrackRestartThresholdSeconds)
-                return PreviousTrackSeekBehavior.RestartCurrent;
-
-            bool canGoPrevious = currentIndex > 0 ||
-                                 (HasContextualPlaybackQueue() && contextualPlaybackHistoryMru.Count > 0);
-
-            if (elapsedSeconds <= UILayoutConstants.PreviousTrackEdgeThresholdSeconds && canGoPrevious)
-                return PreviousTrackSeekBehavior.GoToPrevious;
-            return PreviousTrackSeekBehavior.RestartCurrentEdge;
-        }
-
-        private void RestartCurrentTrackFromPreviousButton(bool resumeIfWasPlaying)
-        {
-            if (currentTrack == null)
-                return;
-            LoadTrackWithoutPlayback(currentTrack);
-            if (resumeIfWasPlaying)
-                ResumePlayback();
-        }
-
-        private void TitleBarPlayer_VolumeChanged(object? sender, double volume0To100)
-        {
-            if (_syncingVolume) return;
-            _syncingVolume = true;
-            try
-            {
-                if (_useSoftwareSessionVolume && _sessionVolumeProvider != null)
-                {
-                    bool isMuted = sender is TitleBarPlus.TitleBar tb ? tb.IsMuted : sender is Views.MiniPlayerWindow mp ? mp.IsMuted : titleBarPlayer.IsMuted;
-                    if (isMuted)
-                        _sessionVolumeProvider.Volume = 0f;
-                    else
-                        _sessionVolumeProvider.Volume = (float)(volume0To100 / 100.0);
-                }
-
-                if (sender is not TitleBarPlus.TitleBar)
-                {
-                    try { titleBarPlayer.Volume = volume0To100; } catch { }
-                }
-                if (sender is not Views.MiniPlayerWindow && _miniPlayerWindow != null)
-                {
-                    try { _miniPlayerWindow.SetVolumeWithoutNotify(volume0To100); } catch { }
-                }
-
-                _pendingVolume0To100 = volume0To100;
-                if (_volumeSaveTimer == null)
-                {
-                    _volumeSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
-                    _volumeSaveTimer.Tick += async (_, _) =>
-                    {
-                        _volumeSaveTimer.Stop();
-                        try
-                        {
-                            await SettingsManager.Instance.SetTitleBarVolume0To100Async(_pendingVolume0To100);
-                        }
-                        catch { }
-                    };
-                }
-                _volumeSaveTimer.Stop();
-                _volumeSaveTimer.Start();
-            }
-            finally { _syncingVolume = false; }
-        }
-
-        internal void HandlePlayPauseHotkey()
-        {
-            TitleBarPlayer_PlayPauseRequested(this, EventArgs.Empty);
-        }
-
-        internal void HandlePreviousTrackHotkey()
-        {
-            TitleBarPlayer_PreviousTrackRequested(this, EventArgs.Empty);
-            SelectCurrentTrackInActiveView(true);
-        }
-
-        internal void HandleNextTrackHotkey()
-        {
-            TitleBarPlayer_NextTrackRequested(this, EventArgs.Empty);
-            SelectCurrentTrackInActiveView(true);
-        }
-
-        internal void HandlePlaySelectedTrackHotkey()
-        {
-            if (!TryResolveTrackToPlayFromActiveView(out var selected, out var requestSource))
-                return;
-
-            if (selected != null)
-                PlayTrack(selected, requestSource);
-        }
 
         private bool TryResolveTrackToPlayFromActiveView(out Song? track, out object? requestSource)
         {
@@ -1978,7 +1545,7 @@ namespace musicApp
             {
                 requestSource = queueViewControl;
                 track = queueViewControl?.SelectedTrack
-                    ?? GetCurrentPlayQueue()?.FirstOrDefault();
+                    ?? _player.Queue.View(1).FirstOrDefault();
                 return track != null;
             }
 
@@ -2024,7 +1591,7 @@ namespace musicApp
 
         private void SelectCurrentTrackInActiveView(bool grabFocus = false)
         {
-            var track = currentTrack;
+            var track = CurrentTrack;
             if (track == null) return;
             var current = contentHost?.Content;
 
@@ -2042,165 +1609,6 @@ namespace musicApp
                 playlistsViewControl?.SelectTrack(track, grabFocus);
             else if (ReferenceEquals(current, recentlyPlayedViewControl))
                 recentlyPlayedViewControl?.SelectTrack(track, grabFocus);
-        }
-
-        private void TitleBarPlayer_PlayPauseRequested(object? sender, EventArgs e)
-        {
-            if (currentTrack == null)
-            {
-                if (TryResolveTrackToPlayFromActiveView(out var selected, out var requestSource) && selected != null)
-                {
-                    PlayTrack(selected, requestSource);
-                }
-                else if (filteredTracks.Count > 0)
-                {
-                    PlayTrack(filteredTracks[0]);
-                }
-                return;
-            }
-
-            if (titleBarPlayer.IsPlaying)
-            {
-                PausePlayback();
-            }
-            else
-            {
-                ResumePlayback();
-            }
-        }
-
-        private void TitleBarPlayer_PreviousTrackRequested(object? sender, EventArgs e)
-        {
-            isManualNavigation = true;
-
-            // Title bar shows the incoming track during overlap — treat that as current
-            TryAdoptVisibleCrossfadeTrackAsCurrent();
-
-            var currentQueue = GetCurrentPlayQueue();
-            var currentIndex = GetCurrentTrackIndex();
-
-            var currentPosition = titleBarPlayer.CurrentPosition;
-
-            bool wasPlaying = titleBarPlayer.IsPlaying;
-            var behavior = GetPreviousTrackSeekBehavior(currentPosition.TotalSeconds, currentIndex);
-
-            switch (behavior)
-            {
-                case PreviousTrackSeekBehavior.RestartCurrent:
-                    RestartCurrentTrackFromPreviousButton(wasPlaying);
-                    break;
-
-                case PreviousTrackSeekBehavior.GoToPrevious:
-                    if (HasContextualPlaybackQueue())
-                    {
-                        if (TryRewindContextualSessionOne(out var prevContext) && prevContext != null)
-                        {
-                            LoadTrackWithoutPlayback(prevContext);
-                            if (wasPlaying)
-                                ResumePlayback();
-                        }
-                        else if (contentHost?.Content == queueViewControl)
-                            UpdateQueueView();
-                    }
-                    else
-                    {
-                        var previousTrack = GetTrackFromCurrentQueue(currentIndex - 1);
-                        if (previousTrack != null)
-                        {
-                            LoadTrackWithoutPlayback(previousTrack);
-                            if (wasPlaying)
-                                ResumePlayback();
-                        }
-                        else if (contentHost?.Content == queueViewControl)
-                            UpdateQueueView();
-                    }
-                    break;
-
-                case PreviousTrackSeekBehavior.RestartCurrentEdge:
-                    RestartCurrentTrackFromPreviousButton(wasPlaying);
-                    break;
-            }
-
-            Task.Delay(UILayoutConstants.ManualNavigationResetDelayMs).ContinueWith(_ => isManualNavigation = false);
-        }
-
-        private void ResetPlaybackToIdleAndRefreshQueue()
-        {
-            CleanupAudioObjects();
-            ClearContextualPlaybackQueue();
-        }
-
-        private void TitleBarPlayer_NextTrackRequested(object? sender, EventArgs e)
-        {
-            isManualNavigation = true;
-
-            // Title bar shows the incoming track during overlap — skip that, not the fade-out
-            TryAdoptVisibleCrossfadeTrackAsCurrent();
-
-            var currentQueue = GetCurrentPlayQueue();
-            var currentIndex = GetCurrentTrackIndex();
-            var repeatMode = titleBarPlayer.RepeatMode;
-
-            if (HasContextualPlaybackQueue())
-            {
-                if (TryAdvanceContextualSessionMovingFinishedToHistory(out var next) && next != null)
-                {
-                    bool wasPlaying = titleBarPlayer.IsPlaying;
-                    LoadTrackWithoutPlayback(next);
-                    if (wasPlaying)
-                        ResumePlayback();
-                }
-                else if (repeatMode == SettingsManager.RepeatMode.All &&
-                         TryWrapContextualForRepeatAll(out var wrapStart) &&
-                         wrapStart != null)
-                {
-                    bool wasPlaying = titleBarPlayer.IsPlaying;
-                    LoadTrackWithoutPlayback(wrapStart);
-                    if (wasPlaying)
-                        ResumePlayback();
-                }
-                else
-                {
-                    ResetPlaybackToIdleAndRefreshQueue();
-                }
-
-                Task.Delay(UILayoutConstants.ManualNavigationResetDelayMs).ContinueWith(_ => isManualNavigation = false);
-                return;
-            }
-
-            if (currentIndex < currentQueue.Count - 1)
-            {
-                var nextTrack = GetTrackFromCurrentQueue(currentIndex + 1);
-                if (nextTrack != null)
-                {
-                    bool wasPlaying = titleBarPlayer.IsPlaying;
-
-                    LoadTrackWithoutPlayback(nextTrack);
-                    if (wasPlaying)
-                    {
-                        ResumePlayback();
-                    }
-                }
-                else
-                {
-                    ResetPlaybackToIdleAndRefreshQueue();
-                }
-            }
-            else if (repeatMode == SettingsManager.RepeatMode.All &&
-                     TryWrapLibraryForRepeatAll(out var libStart) &&
-                     libStart != null)
-            {
-                bool wasPlaying = titleBarPlayer.IsPlaying;
-                LoadTrackWithoutPlayback(libStart);
-                if (wasPlaying)
-                    ResumePlayback();
-            }
-            else
-            {
-                ResetPlaybackToIdleAndRefreshQueue();
-            }
-
-            Task.Delay(UILayoutConstants.ManualNavigationResetDelayMs).ContinueWith(_ => isManualNavigation = false);
         }
 
         private void TitleBarPlayer_WindowMinimizeRequested(object? sender, EventArgs e)
@@ -2356,49 +1764,6 @@ namespace musicApp
             windowManager.CloseWindow();
         }
 
-        private void TitleBarPlayer_ShuffleStateChanged(object? sender, bool isShuffleEnabled)
-        {
-            if (HasContextualPlaybackQueue())
-            {
-                if (isShuffleEnabled)
-                {
-                    BuildShuffledFutureForAnchor(currentTrack);
-                    CaptureContextualShuffleWrapPathOrder();
-                }
-                else
-                {
-                    contextualShuffleWrapPathOrder = null;
-                    contextualShuffledFuture.Clear();
-                }
-
-                SetActivePlaybackFuture(currentTrack);
-            }
-            else if (isShuffleEnabled)
-            {
-                RegenerateShuffledTracks();
-            }
-            else
-            {
-                shuffledTracks.Clear();
-                foreach (var t in filteredTracks)
-                    shuffledTracks.Add(t);
-                if (currentTrack != null)
-                {
-                    currentTrackIndex = filteredTracks.IndexOf(currentTrack);
-                    currentShuffledIndex = currentTrackIndex;
-                    if (currentTrackIndex == -1)
-                        currentTrackIndex = 0;
-                }
-                else
-                {
-                    currentShuffledIndex = -1;
-                }
-            }
-
-            UpdateQueueView();
-            RefreshVisibleViews();
-        }
-
         #endregion
 
         #region Navigation Events
@@ -2408,234 +1773,6 @@ namespace musicApp
         #endregion
 
         #region Queue Management
-
-        /// <summary>
-        /// Inserts the given track to play immediately after the current track (play next).
-        /// </summary>
-        private void OnPlayNextRequested(object? sender, Song track) =>
-            InjectTrackIntoQueue(track, playNext: true);
-
-        private void OnAddToQueueRequested(object? sender, Song track) =>
-            InjectTrackIntoQueue(track, playNext: false);
-
-        private void InjectTrackIntoQueue(Song track, bool playNext)
-        {
-            if (!IsValidTrackWithPath(track))
-                return;
-
-            var session = GetOrPromoteContextualSessionForQueueEdit(track);
-            if (session == null)
-                return;
-
-            bool sameAsCurrent = currentTrack != null && SongIdentity.SamePath(currentTrack, track);
-
-            if (!sameAsCurrent)
-            {
-                RemoveFromSessionOrderedFullSkippingCurrent(track);
-                RemoveFromShuffledFutureSkippingHead(track);
-
-                if (playNext && currentTrack != null)
-                {
-                    int curIdx = SongIdentity.IndexOf(session, currentTrack);
-                    int insertIdx = curIdx + 1;
-                    if (insertIdx < 0 || insertIdx > session.Count)
-                        insertIdx = session.Count;
-                    session.Insert(insertIdx, track);
-
-                    if (titleBarPlayer.IsShuffleEnabled)
-                    {
-                        int shInsert = contextualShuffledFuture.Count >= 1 ? 1 : 0;
-                        contextualShuffledFuture.Insert(shInsert, track);
-                        CaptureContextualShuffleWrapPathOrder();
-                    }
-                }
-                else
-                {
-                    session.Add(track);
-                    if (titleBarPlayer.IsShuffleEnabled)
-                    {
-                        contextualShuffledFuture.Add(track);
-                        CaptureContextualShuffleWrapPathOrder();
-                    }
-                }
-            }
-
-            MarkUserQueued(track);
-            SetActivePlaybackFuture(currentTrack);
-            UpdateQueueView();
-            RefreshVisibleViews();
-        }
-
-        private void MarkUserQueued(Song track)
-        {
-            if (track == null) return;
-            track.IsUserQueued = true;
-            userQueuedSongs.Add(track);
-        }
-
-        private void OnQueueToolbarRemoveRequested(object? sender, EventArgs e)
-        {
-            int viewIndex = GetQueueToolbarSelectedViewIndex(sender);
-            if (viewIndex < 0)
-                return;
-
-            var queue = GetCurrentPlayQueue();
-            int baseIdx = GetCurrentTrackIndex();
-            if (queue == null || baseIdx < 0 || queue.Count == 0)
-                return;
-
-            int q = baseIdx + viewIndex;
-            if (q < 0 || q >= queue.Count)
-                return;
-
-            Song? removed = queue[q];
-            bool removeWasCurrent = viewIndex == 0 && currentTrack != null && removed != null &&
-                SongIdentity.SamePath(removed, currentTrack);
-
-            bool wasPlaying = titleBarPlayer.IsPlaying;
-
-            if (HasContextualPlaybackQueue() && contextualSessionOrderedFull != null && removed != null)
-            {
-                if (titleBarPlayer.IsShuffleEnabled && q >= 0 && q < contextualShuffledFuture.Count)
-                    contextualShuffledFuture.RemoveAt(q);
-                else
-                {
-                    int sIdx = contextualShuffledFuture.FindIndex(t => ReferenceEquals(t, removed));
-                    if (sIdx < 0)
-                        sIdx = SongIdentity.IndexOfByPath(contextualShuffledFuture, removed);
-                    if (sIdx >= 0)
-                        contextualShuffledFuture.RemoveAt(sIdx);
-                }
-
-                if (titleBarPlayer.IsShuffleEnabled)
-                    CaptureContextualShuffleWrapPathOrder();
-
-                int sessionIdx = contextualSessionOrderedFull.FindIndex(t => ReferenceEquals(t, removed));
-                if (sessionIdx < 0)
-                    sessionIdx = SongIdentity.IndexOfByPath(contextualSessionOrderedFull, removed);
-                if (sessionIdx >= 0)
-                    contextualSessionOrderedFull.RemoveAt(sessionIdx);
-
-                ClearInjectedFlagFor(removed);
-
-                Song? anchor = removeWasCurrent
-                    ? (titleBarPlayer.IsShuffleEnabled
-                        ? (contextualShuffledFuture.Count > 0 ? contextualShuffledFuture[0] : null)
-                        : FindNaturalNextAfter(removed))
-                    : currentTrack;
-
-                SetActivePlaybackFuture(anchor);
-            }
-            else
-            {
-                queue.RemoveAt(q);
-                ClearInjectedFlagFor(removed);
-            }
-
-            if (removeWasCurrent)
-            {
-                var nextQueue = GetCurrentPlayQueue();
-                int nextBase = GetCurrentTrackIndex();
-                if (nextQueue != null && nextBase >= 0 && nextBase < nextQueue.Count)
-                {
-                    var next = nextQueue[nextBase];
-                    if (next != null)
-                    {
-                        if (wasPlaying)
-                            PlayTrack(next, null);
-                        else
-                            LoadTrackWithoutPlayback(next);
-                    }
-                    else
-                        StopPlayback();
-                }
-                else if (nextQueue != null && nextQueue.Count > 0)
-                {
-                    var next = nextQueue[0];
-                    if (wasPlaying)
-                        PlayTrack(next, null);
-                    else
-                        LoadTrackWithoutPlayback(next);
-                }
-                else
-                    StopPlayback();
-            }
-            else if (currentTrack != null)
-                SyncCurrentTrackIndices(currentTrack);
-
-            UpdateQueueView();
-            RefreshVisibleViews();
-        }
-
-        private Song? GetQueueToolbarSelectedSong(object? sender)
-        {
-            if (queuePopupView != null && ReferenceEquals(sender, queuePopupView))
-                return queuePopupView.GetPrimarySelectedSong();
-
-            if (_miniPlayerWindow != null && ReferenceEquals(sender, _miniPlayerWindow))
-                return _miniPlayerWindow.GetPrimarySelectedSong();
-
-            return queueViewControl?.SelectedTrack;
-        }
-
-        private int GetQueueToolbarSelectedViewIndex(object? sender)
-        {
-            var playQ = GetCurrentPlayQueue();
-            int baseIdx = GetCurrentTrackIndex();
-            if (playQ == null || baseIdx < 0)
-                return -1;
-
-            var selected = GetQueueToolbarSelectedSong(sender);
-            if (selected != null)
-            {
-                for (int i = 0; i < playQ.Count; i++)
-                {
-                    if (ReferenceEquals(playQ[i], selected) || SongIdentity.SamePath(playQ[i], selected))
-                    {
-                        int viewIdx = i - baseIdx;
-                        return viewIdx >= 0 ? viewIdx : -1;
-                    }
-                }
-            }
-
-            if (queuePopupView != null && ReferenceEquals(sender, queuePopupView))
-                return queuePopupView.GetSelectedViewIndex();
-            if (_miniPlayerWindow != null && ReferenceEquals(sender, _miniPlayerWindow))
-                return _miniPlayerWindow.GetSelectedViewIndex();
-            return queueViewControl?.GetSelectedViewIndex() ?? -1;
-        }
-
-        private void OnQueueToolbarMoveUpRequested(object? sender, EventArgs e)
-        {
-            int ix = GetQueueToolbarSelectedViewIndex(sender);
-            if (ix < 2)
-                return;
-            OnQueueTracksReordered(this, (ix, ix - 1));
-        }
-
-        private void OnQueueToolbarMoveDownRequested(object? sender, EventArgs e)
-        {
-            int ix = GetQueueToolbarSelectedViewIndex(sender);
-            if (ix < 1)
-                return;
-            OnQueueTracksReordered(this, (ix, ix + 1));
-        }
-
-        /// <summary>
-        /// Returns true when the given track exists in the effective queue view
-        /// (current song + upcoming songs). Idle state returns false.
-        /// </summary>
-        public bool IsTrackInQueue(Song? track)
-        {
-            if (track == null)
-                return false;
-
-            var queue = BuildQueueView();
-            if (queue == null || queue.Count == 0)
-                return false;
-
-            return SongIdentity.IndexOf(queue, track) >= 0;
-        }
 
         private async void OnAddTrackToPlaylistRequested(object? sender, (Song track, Playlist playlist) args)
         {
@@ -2711,8 +1848,11 @@ namespace musicApp
                 await RemoveTrackFromLibraryAsync(track);
                 return;
             }
+            // Playback may hold this file open as the current or next track.
+            var release = ReleasePlaybackForMetadataWrite(track.FilePath);
             if (!RecycleBinHelper.MoveFileToRecycleBin(track.FilePath))
             {
+                RestorePlaybackAfterMetadataWrite(release);
                 MessageDialog.Show(this, "Error", $"Could not move file to recycle bin: {track.FilePath}", MessageDialog.Buttons.Ok);
                 return;
             }
@@ -2741,22 +1881,7 @@ namespace musicApp
                     pathSet.Add(t.FilePath);
             }
 
-            if (currentTrack != null && pathSet.Contains(currentTrack.FilePath))
-            {
-                CleanupAudioObjects();
-                currentTrack = null;
-                currentTrackIndex = -1;
-                currentShuffledIndex = -1;
-                ClearContextualPlaybackQueue();
-                titleBarPlayer.SetTrackInfo("No track selected", "", "");
-                ClearMiniPlayerTrack();
-            }
-
-            foreach (var track in tracks)
-            {
-                if (track != null)
-                    RemoveTrackFromCollections(track, includeShuffled: true);
-            }
+            RemoveTracksFromCollections(tracks.Where(t => t != null).ToList());
 
             foreach (var playlist in playlists)
             {
@@ -2778,101 +1903,8 @@ namespace musicApp
             await libraryManager.SavePlaylistsFromCollectionAsync(playlists);
 
             UpdateUI();
-            UpdateShuffledTracks();
             RefreshVisibleViews();
             UpdateStatusBar();
-        }
-
-        private void UpdateQueueView()
-        {
-            try
-            {
-                var queueView = BuildQueueView();
-
-                if (queueViewControl != null)
-                {
-                    if (queueView != null && queueView.Count > 0)
-                        queueViewControl.ItemsSource = queueView;
-                    else
-                        queueViewControl.ItemsSource = new ObservableCollection<Song>();
-                }
-
-                if (queuePopup.IsOpen && queuePopupView != null)
-                {
-                    var max = UILayoutConstants.CompactQueueListMaxItems;
-                    ObservableCollection<Song> capped;
-                    if (queueView != null && queueView.Count > max)
-                    {
-                        capped = new ObservableCollection<Song>();
-                        for (int i = 0; i < max; i++)
-                            capped.Add(queueView[i]);
-                    }
-                    else
-                        capped = queueView ?? new ObservableCollection<Song>();
-
-                    queuePopupView.QueueTracks = capped;
-                    queuePopupView.RefreshHeight();
-                    _ = Dispatcher.BeginInvoke(new Action(CenterQueuePopupUnderPlacementButton), DispatcherPriority.ContextIdle);
-                }
-
-                PushMiniPlayerQueue();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"UpdateQueueView: {ex}");
-                if (queueViewControl != null) queueViewControl.ItemsSource = new ObservableCollection<Song>();
-            }
-        }
-
-        private ObservableCollection<Song> BuildQueueView(int? maxItems = null)
-        {
-            try
-            {
-                var queueView = new ObservableCollection<Song>();
-
-                var currentQueue = GetCurrentPlayQueue();
-                var currentIndex = GetCurrentTrackIndex();
-
-                if (currentQueue == null || currentQueue.Count == 0)
-                    return queueView;
-
-                if (currentTrack != null && currentIndex >= 0)
-                {
-                    queueView.Add(currentTrack);
-
-                    if (currentIndex < currentQueue.Count - 1)
-                    {
-                        for (int i = currentIndex + 1; i < currentQueue.Count; i++)
-                        {
-                            if (maxItems.HasValue && queueView.Count >= maxItems.Value)
-                                break;
-
-                            var track = currentQueue[i];
-                            if (track != null && !string.IsNullOrEmpty(track.FilePath))
-                                queueView.Add(track);
-                        }
-                    }
-                }
-                else if (currentTrack == null && contextualPlaybackFuture != null)
-                {
-                    for (int i = 0; i < currentQueue.Count; i++)
-                    {
-                        if (maxItems.HasValue && queueView.Count >= maxItems.Value)
-                            break;
-
-                        var track = currentQueue[i];
-                        if (track != null && !string.IsNullOrEmpty(track.FilePath))
-                            queueView.Add(track);
-                    }
-                }
-
-                return queueView;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"BuildQueueView: {ex}");
-                return new ObservableCollection<Song>();
-            }
         }
 
         #endregion
@@ -3044,8 +2076,6 @@ namespace musicApp
 
                 await libraryManager.UpdateFolderScanTimeAsync(folderPath);
 
-                UpdateShuffledTracks();
-
                 if (contentHost?.Content == queueViewControl)
                 {
                     UpdateQueueView();
@@ -3096,203 +2126,6 @@ namespace musicApp
 
         #endregion
 
-        #region Playback Control
-
-        private IWaveProvider BuildPlaybackOutput(AudioFileReader reader, string tagSourcePath)
-        {
-            _ = tagSourcePath;
-            return PlaybackResampler.ToOutputWaveProvider(reader, _cachedOutputSampleRateHz);
-        }
-
-        private void PlayTrack(Song track, object? requestSource = null)
-        {
-            try
-            {
-                if (track == null)
-                    return;
-
-                if (string.IsNullOrEmpty(track.FilePath))
-                    return;
-
-                if (!File.Exists(track.FilePath))
-                    return;
-
-                TryInitializeContextFromPlayTrack(requestSource, track);
-
-                try
-                {
-                    TeardownPlaybackOutput();
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"PlayTrack audio cleanup: {ex.Message}");
-                }
-
-                currentTrack = track;
-                ClearInjectedFlagFor(track);
-
-                SyncCurrentTrackIndices(track, requestSource);
-                UpdateShuffleIndicesAfterTrackChange(track);
-
-                UpdateNowPlayingUi(track);
-                TitleBarSetAudioObjects(waveOut, audioFileReader);
-
-                CreateAndBindPlaybackOutput(track.FilePath, autoPlay: true);
-
-                AddToRecentlyPlayed(track);
-
-                RefreshVisibleViews();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"PlayTrack '{track?.Title}': {ex}");
-
-                try
-                {
-                    MessageDialog.Show(this, "Error", $"Error playing track: {ex.Message}", MessageDialog.Buttons.Ok);
-                }
-                catch
-                {
-                    Debug.WriteLine("PlayTrack: failed to show error dialog");
-                }
-
-                try
-                {
-                    StopPlayback(clearQueue: false);
-                }
-                catch (Exception stopEx)
-                {
-                    Debug.WriteLine($"PlayTrack StopPlayback: {stopEx.Message}");
-                }
-            }
-        }
-
-        private void LoadTrackWithoutPlayback(Song track)
-        {
-            try
-            {
-                if (track == null)
-                    return;
-
-                if (string.IsNullOrEmpty(track.FilePath))
-                    return;
-
-                if (!File.Exists(track.FilePath))
-                    return;
-
-                bool wasPlaying = titleBarPlayer.IsPlaying;
-
-                CleanupAudioObjects();
-
-                currentTrack = track;
-                ClearInjectedFlagFor(track);
-
-                SyncCurrentTrackIndices(track);
-                UpdateShuffleIndicesAfterTrackChange(track);
-
-                UpdateNowPlayingUi(track);
-                CreateAndBindPlaybackOutput(track.FilePath, autoPlay: false);
-                titleBarPlayer.IsPlaying = wasPlaying;
-
-                AddToRecentlyPlayed(track);
-
-                RefreshVisibleViews();
-                SelectCurrentTrackInActiveView(false);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"LoadTrackWithoutPlayback '{track?.Title}': {ex}");
-
-                try
-                {
-                    MessageDialog.Show(this, "Error", $"Error loading track: {ex.Message}", MessageDialog.Buttons.Ok);
-                }
-                catch
-                {
-                    Debug.WriteLine("LoadTrackWithoutPlayback: failed to show error dialog");
-                }
-
-                try
-                {
-                    StopPlayback(clearQueue: false);
-                }
-                catch (Exception stopEx)
-                {
-                    Debug.WriteLine($"LoadTrackWithoutPlayback StopPlayback: {stopEx.Message}");
-                }
-            }
-        }
-
-        private void AddToRecentlyPlayed(Song track)
-        {
-            track.MarkAsPlayed();
-
-            var existing = recentlyPlayed.FirstOrDefault(t => t.FilePath == track.FilePath);
-            if (existing != null)
-            {
-                recentlyPlayed.Remove(existing);
-            }
-
-            recentlyPlayed.Insert(0, track);
-
-            while (recentlyPlayed.Count > 20)
-            {
-                recentlyPlayed.RemoveAt(recentlyPlayed.Count - 1);
-            }
-        }
-
-
-
-        private void PausePlayback()
-        {
-            if (waveOut != null)
-            {
-                waveOut.Pause();
-                titleBarPlayer.IsPlaying = false;
-            }
-        }
-
-        private void ResumePlayback()
-        {
-            if (waveOut != null)
-            {
-                waveOut.Play();
-                titleBarPlayer.IsPlaying = true;
-            }
-        }
-
-        /// <summary>
-        /// UI/indices idle while there's no decoded track; does not clear contextual playback (
-        /// <see cref="MainWindow.ClearContextualPlaybackQueue"/>).
-        /// </summary>
-        private void ResetToIdleState()
-        {
-            try
-            {
-                currentTrack = null;
-                currentTrackIndex = -1;
-                currentShuffledIndex = -1;
-
-                titleBarPlayer.SetTrackInfo("No track selected", "", "");
-                ClearMiniPlayerTrack();
-                RefreshVisibleViews();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"ResetToIdleState: {ex.Message}");
-            }
-        }
-
-        private bool IsPlaybackIdleAndQueueEmpty()
-        {
-            bool noTrackPlaying = currentTrack == null && !titleBarPlayer.IsPlaying;
-            bool noQueueState = !HasContextualPlaybackQueue() && currentTrackIndex < 0 && currentShuffledIndex < 0;
-            return noTrackPlaying && noQueueState;
-        }
-
-        #endregion
-
-
         protected override void OnClosing(CancelEventArgs e)
         {
             if (_shutdownCloseFinalized)
@@ -3339,7 +2172,7 @@ namespace musicApp
 
                 try
                 {
-                    StopPlayback(clearQueue: false);
+                    _player.Dispose();
                 }
                 finally
                 {
@@ -3354,22 +2187,6 @@ namespace musicApp
                 _shutdownCloseFinalized = true;
                 try { await Dispatcher.InvokeAsync(() => Close()); }
                 catch { /* ignore */ }
-            }
-        }
-
-        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Z &&
-                (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control &&
-                (Keyboard.Modifiers & ModifierKeys.Alt) == 0)
-            {
-                if (Keyboard.FocusedElement is TextBox || Keyboard.FocusedElement is Slider)
-                    return;
-
-                if (TryRestorePreviousQueue())
-                {
-                    e.Handled = true;
-                }
             }
         }
     }

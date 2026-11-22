@@ -18,17 +18,5 @@ namespace musicApp.Helpers
             var i = Math.Clamp(overlapSeconds, 1, DefaultRampSecondsByOverlap.Length - 1);
             return DefaultRampSecondsByOverlap[i];
         }
-
-        public static float LinearOutgoingVolume(float rampT01) => Math.Clamp(1f - rampT01, 0f, 1f);
-
-        public static float LinearIncomingVolume(float rampT01) => Math.Clamp(rampT01, 0f, 1f);
-
-        public static double ClampRampToOverlap(double requestedRampSeconds, double secondsRemainingInOutgoing)
-        {
-            if (requestedRampSeconds <= 0)
-                return 0;
-            var rem = Math.Max(1e-6, secondsRemainingInOutgoing);
-            return Math.Min(requestedRampSeconds, rem);
-        }
     }
 }

@@ -114,7 +114,6 @@ namespace musicApp
             w.PreviousTrackRequested += TitleBarPlayer_PreviousTrackRequested;
             w.NextTrackRequested += TitleBarPlayer_NextTrackRequested;
             w.QueueUndoRequested += (_, _) => TryRestorePreviousQueue();
-            w.PlaybackPositionCommitted += OnTitleBarPlaybackPositionCommitted;
             w.SongPlayRequested += MiniPlayer_SongPlayRequested;
             w.QueueRemoveRequested += OnQueueToolbarRemoveRequested;
             w.TracksReordered += OnQueueTracksReordered;
@@ -133,7 +132,7 @@ namespace musicApp
             w.ArtistNavigationRequested += TitleBarPlayer_ArtistNavigationRequested;
             w.AlbumNavigationRequested += TitleBarPlayer_AlbumNavigationRequested;
             w.VolumeChanged += TitleBarPlayer_VolumeChanged;
-            w.SwapCurrentNextRequested += (_, _) => TrySwapCurrentAndNext();
+            w.SwapCurrentNextRequested += (_, _) => _player.SwapCurrentAndNext();
             w.Closed += MiniPlayerWindow_Closed;
             try { w.SetVolumeWithoutNotify(titleBarPlayer.Volume); } catch { }
             w.Show();
@@ -414,7 +413,7 @@ namespace musicApp
 
         private void OpenLaunchInfoDialog(string? launchSection = null)
         {
-            var track = currentTrack ?? allTracks.FirstOrDefault();
+            var track = CurrentTrack ?? allTracks.FirstOrDefault();
             if (track == null)
             {
                 MessageDialog.Show(this, "Song info", "Add music to your library first, or play a track.", MessageDialog.Buttons.Ok);

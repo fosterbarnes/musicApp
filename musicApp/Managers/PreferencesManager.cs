@@ -33,6 +33,13 @@ namespace musicApp
             public PlaybackPreferences Playback { get; set; } = new PlaybackPreferences();
             public LibraryPreferences Library { get; set; } = new LibraryPreferences();
             public ThemePreferences Theme { get; set; } = new ThemePreferences();
+            public ShortcutPreferences Shortcuts { get; set; } = new ShortcutPreferences();
+        }
+
+        public class ShortcutPreferences
+        {
+            /// <summary>Action name to key text ("Ctrl+Q"). Only changed keys are stored; "" means unbound.</summary>
+            public Dictionary<string, string> Bindings { get; set; } = new Dictionary<string, string>();
         }
 
         public class ThemePreferences
@@ -213,6 +220,9 @@ namespace musicApp
             preferences.Playback ??= new PlaybackPreferences();
             preferences.Library ??= new LibraryPreferences();
             preferences.Theme ??= new ThemePreferences();
+            preferences.Shortcuts ??= new ShortcutPreferences();
+            preferences.Shortcuts.Bindings ??= new Dictionary<string, string>();
+            NormalizeShortcutBindings(preferences.Shortcuts.Bindings);
             preferences.General.Language ??= "en-system";
             preferences.General.UiFontFamily ??= "";
             preferences.General.UiFontSize = Math.Clamp(
@@ -239,8 +249,25 @@ namespace musicApp
                 Sidebar = new SidebarPreferences(),
                 Playback = new PlaybackPreferences(),
                 Library = new LibraryPreferences(),
-                Theme = new ThemePreferences()
+                Theme = new ThemePreferences(),
+                Shortcuts = new ShortcutPreferences()
             };
+        }
+
+        // Drop unknown actions, keys that don't parse, and entries that match the default
+        private static void NormalizeShortcutBindings(Dictionary<string, string> bindings)
+        {
+            foreach (var (name, text) in bindings.ToList())
+            {
+                bool keep = Enum.TryParse<Hotkey.ShortcutAction>(name, out var action)
+                    && Enum.IsDefined(action)
+                    && action.ToString() == name
+                    && text != null
+                    && (text.Length == 0
+                        || Hotkey.ShortcutGesture.TryParse(text) is { } g && g != Hotkey.ShortcutCatalog.Get(action).Default);
+                if (!keep)
+                    bindings.Remove(name);
+            }
         }
     }
 }

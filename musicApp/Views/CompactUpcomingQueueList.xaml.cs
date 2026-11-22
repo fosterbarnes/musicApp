@@ -291,6 +291,10 @@ public partial class CompactUpcomingQueueList : UserControl
         if (sender is not ContextMenu menu || menu.PlacementTarget is not DependencyObject placement)
             return;
 
+        // Queue removal handles one row, so only offer it for a single resolved song
+        var removeFromQueueItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Remove from Queue");
+        TrackContextMenuHelper.SetVisible(removeFromQueueItem, false);
+
         if (EnableMultiSelect && CountSelectedRows() > 1)
         {
             UpdateSwapMenuItemVisibility(menu, show: false);
@@ -311,6 +315,7 @@ public partial class CompactUpcomingQueueList : UserControl
             _contextMenuSong,
             mainWindow?.Playlists,
             QueueContextMenu_PlaylistSubmenuClick);
+        TrackContextMenuHelper.SetVisible(removeFromQueueItem, true);
 
         bool isFirstRow = IsFirstRowSong(song);
         UpdateSwapMenuItemVisibility(menu, show: isFirstRow);
@@ -360,6 +365,10 @@ public partial class CompactUpcomingQueueList : UserControl
     private void QueueContextMenu_AddToQueueClick(object sender, RoutedEventArgs e)
     {
         if (_contextMenuSong != null) AddToQueueRequested?.Invoke(this, _contextMenuSong);
+    }
+    private void QueueContextMenu_RemoveFromQueueClick(object sender, RoutedEventArgs e)
+    {
+        if (_contextMenuSong != null) QueueRemoveRequested?.Invoke(this, EventArgs.Empty);
     }
     private void QueueContextMenu_AddToPlaylistClick(object sender, RoutedEventArgs e) { }
     private void QueueContextMenu_NewPlaylistClick(object sender, RoutedEventArgs e)

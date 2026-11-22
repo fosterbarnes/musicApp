@@ -35,6 +35,11 @@
     <Resource Include="..\.res\svg\*.xaml" Link="Resources\svg\%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <!-- macOS writes ._ metadata files when editing over the network share -->
+  <ItemGroup>
+    <Compile Remove="**/._*" />
+  </ItemGroup>
+
   <ItemGroup>
     <Resource Include="..\.res\icon\musicApp Icon.ico" Link="Resources\icon\musicApp Icon.ico" />
     <Resource Include="..\.res\icon\musicApp Icon.png" Link="Resources\icon\musicApp Icon.png" />

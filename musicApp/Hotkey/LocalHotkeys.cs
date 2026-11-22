@@ -1,49 +1,43 @@
-using System.Windows.Input;
+using System.Collections.Generic;
 using System.Windows.Controls;
-using System;
+using System.Windows.Input;
 
 namespace musicApp.Hotkey
 {
     public class LocalHotkeys
     {
-        private MainWindow _mainWindow;
+        private readonly MainWindow _mainWindow;
+        private Dictionary<ShortcutGesture, ShortcutAction> _lookup = new();
 
         public LocalHotkeys(MainWindow mainWindow)
         {
             _mainWindow = mainWindow;
             _mainWindow.PreviewKeyDown += MainWindow_PreviewKeyDown;
+            Reload();
+        }
+
+        public void Reload()
+        {
+            var prefs = PreferencesManager.Instance.LoadPreferencesSync();
+            PreferencesManager.EnsureInitialized(prefs);
+            _lookup = ShortcutCatalog.BuildLookup(prefs.Shortcuts.Bindings);
         }
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            // Ignore hotkeys if user is interacting with textboxes or sliders
+            // Leave typing and slider keys alone
             if (Keyboard.FocusedElement is TextBox || Keyboard.FocusedElement is Slider)
                 return;
 
-            // Prevent multiple triggers if key is held down
-            if (e.IsRepeat)
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (!_lookup.TryGetValue(new ShortcutGesture(key, Keyboard.Modifiers), out var action))
                 return;
 
-            if (e.Key == Key.Space)
-            {
-                e.Handled = true;
-                _mainWindow.HandlePlayPauseHotkey();
-            }
-            else if (e.Key == Key.Left)
-            {
-                e.Handled = true;
-                _mainWindow.HandlePreviousTrackHotkey();
-            }
-            else if (e.Key == Key.Right)
-            {
-                e.Handled = true;
-                _mainWindow.HandleNextTrackHotkey();
-            }
-            else if (e.Key == Key.Enter || e.Key == Key.Return)
-            {
-                e.Handled = true;
-                _mainWindow.HandlePlaySelectedTrackHotkey();
-            }
+            // Held keys only repeat for volume and queue moves
+            if (e.IsRepeat && !ShortcutCatalog.Get(action).AllowRepeat)
+                return;
+
+            e.Handled = _mainWindow.RunShortcut(action);
         }
     }
 }

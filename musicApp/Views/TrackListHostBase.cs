@@ -55,5 +55,6 @@ namespace musicApp.Views
         public void RebuildColumns() => TrackList.RebuildColumns();
         public void RefreshTrackListBindings() => TrackList.RefreshItemBindings();
         public Song? SelectedTrack => TrackList.SelectedTrack;
+        public IReadOnlyList<Song> GetSelectedTracks() => TrackList.GetSelectedTracks();
     }
 }

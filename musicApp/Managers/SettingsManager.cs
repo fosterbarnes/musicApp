@@ -38,13 +38,6 @@ namespace musicApp
             public double? TitleBarVolume0To100 { get; set; }
         }
 
-        public enum RepeatMode
-        {
-            Off = 0,
-            All = 1,
-            One = 2
-        }
-
         public class WindowStateSettings
         {
             public bool IsMaximized { get; set; } = false;

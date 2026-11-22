@@ -264,6 +264,15 @@ function publishCleanup {
     }
 }
 
+# macOS drops ._* and .DS_Store files when editing over the network share; ._*.cs breaks the build
+function removeMacMetadata {
+    $junk = @(Get-ChildItem -LiteralPath $repoRoot -Recurse -Force -File -Include '._*', '.DS_Store' -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' })
+    if (!$junk) { return }
+    $junk | Remove-Item -Force
+    Write-Host "Removed $($junk.Count) macOS metadata file(s)."
+}
+
 function runNativeCommand {
     param([Parameter(Mandatory)][string]$FilePath, [Parameter(Mandatory)]$ArgumentList, [Parameter(Mandatory)][string]$Name)
     & $FilePath @ArgumentList

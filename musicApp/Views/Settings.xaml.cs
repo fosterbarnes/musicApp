@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -15,6 +17,7 @@ using System.Windows.Threading;
 using musicApp;
 using musicApp.Dialogs;
 using musicApp.Helpers;
+using musicApp.Hotkey;
 
 namespace musicApp.Views
 {
@@ -36,12 +39,18 @@ namespace musicApp.Views
         private bool _generalFontUiLoading;
         private bool _generalUIFontSizeTextLoading;
 
+        private readonly ObservableCollection<KeyboardShortcutRow> _shortcutRows = new();
+        // Pending key changes; copied into preferences on OK/Apply
+        private Dictionary<string, string> _shortcutDraft = new();
+        private KeyboardShortcutRow? _capturingShortcutRow;
+
         public SettingsView(string? launchSection = null)
         {
             InitializeComponent();
             SourceInitialized += (_, _) => WindowsTitleBarTheme.ApplyImmersiveDarkMode(this);
-            KeyboardShortcutsInAppListView.ItemsSource = KeyboardShortcutCatalog.InApp;
+            KeyboardShortcutsInAppListView.ItemsSource = _shortcutRows;
             KeyboardShortcutsGlobalListView.ItemsSource = KeyboardShortcutCatalog.Global;
+            PreviewKeyDown += SettingsView_PreviewKeyDown;
             Loaded += SettingsView_Loaded;
             ShowSection(launchSection ?? "General");
         }
@@ -421,6 +430,113 @@ namespace musicApp.Views
             }
 
             ApplyDonationLinksVisibility();
+            BindShortcutRows();
+        }
+
+        private void BindShortcutRows()
+        {
+            EndShortcutCapture();
+            _shortcutDraft = new Dictionary<string, string>(_preferences.Shortcuts.Bindings);
+            _shortcutRows.Clear();
+            foreach (var def in ShortcutCatalog.All)
+                _shortcutRows.Add(new KeyboardShortcutRow { Action = def.Action, Name = def.Name, Shortcut = ShortcutLabel(def.Action) });
+            foreach (var row in KeyboardShortcutCatalog.FixedInApp)
+                _shortcutRows.Add(row);
+            ShowShortcutStatus(null);
+        }
+
+        // Status line under the table: only shown for conflicts and cleared keys
+        private void ShowShortcutStatus(string? text)
+        {
+            KeyboardShortcutsStatusText.Text = text ?? "";
+            KeyboardShortcutsStatusText.Visibility = text == null ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private string ShortcutLabel(ShortcutAction action) =>
+            ShortcutCatalog.Resolve(action, _shortcutDraft)?.ToDisplayString() ?? "None";
+
+        private void ShortcutKeyButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: KeyboardShortcutRow { IsEditable: true } row } button)
+                return;
+            EndShortcutCapture();
+            _capturingShortcutRow = row;
+            row.IsCapturing = true;
+            row.Shortcut = "Press a key";
+            button.Focus();
+        }
+
+        private void ShortcutKeyButton_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (sender is Button { Tag: KeyboardShortcutRow row } && ReferenceEquals(row, _capturingShortcutRow))
+                EndShortcutCapture();
+        }
+
+        private void EndShortcutCapture()
+        {
+            if (_capturingShortcutRow is not { Action: { } action } row)
+                return;
+            _capturingShortcutRow = null;
+            row.IsCapturing = false;
+            row.Shortcut = ShortcutLabel(action);
+        }
+
+        // While a row is listening, every key goes to it (so Enter/Esc don't hit OK/Cancel)
+        private void SettingsView_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (_capturingShortcutRow is not { Action: { } action })
+                return;
+            e.Handled = true;
+
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            var mods = Keyboard.Modifiers;
+            if (ShortcutCatalog.IsModifierKey(key))
+                return;
+
+            if (mods == ModifierKeys.None && key is Key.Escape or Key.Back)
+            {
+                if (key == Key.Back)
+                {
+                    SetShortcutDraft(action, null);
+                    ShowShortcutStatus($"{ShortcutCatalog.Get(action).Name} has no key now.");
+                }
+                EndShortcutCapture();
+                return;
+            }
+
+            var gesture = new ShortcutGesture(key, mods);
+            if (ShortcutCatalog.IsReserved(gesture))
+            {
+                ShowShortcutStatus($"{gesture.ToDisplayString()} is reserved. Try another key.");
+                return;
+            }
+
+            // One key, one action: take it away from whoever had it
+            var takenFrom = ShortcutCatalog.All
+                .Where(d => d.Action != action && ShortcutCatalog.Resolve(d.Action, _shortcutDraft) == gesture)
+                .ToList();
+            foreach (var other in takenFrom)
+            {
+                SetShortcutDraft(other.Action, null);
+                if (_shortcutRows.FirstOrDefault(r => r.Action == other.Action) is { } otherRow)
+                    otherRow.Shortcut = ShortcutLabel(other.Action);
+            }
+
+            SetShortcutDraft(action, gesture);
+            ShowShortcutStatus(takenFrom.Count == 0
+                ? null
+                : $"{gesture.ToDisplayString()} moved from {string.Join(", ", takenFrom.Select(d => d.Name))}, which now has no key.");
+            EndShortcutCapture();
+        }
+
+        // Only differences from the default are stored; "" means unbound
+        private void SetShortcutDraft(ShortcutAction action, ShortcutGesture? gesture)
+        {
+            var name = action.ToString();
+            if (gesture == ShortcutCatalog.Get(action).Default)
+                _shortcutDraft.Remove(name);
+            else
+                _shortcutDraft[name] = gesture?.ToString() ?? "";
         }
 
         private void RestoreDefaultsButton_Click(object sender, RoutedEventArgs e)
@@ -598,6 +714,8 @@ namespace musicApp.Views
             _preferences.Sidebar.ShowRescanLibrary = SidebarRescanLibraryCheckBox.IsChecked == true;
             _preferences.Sidebar.ShowRemoveMusic = SidebarRemoveMusicCheckBox.IsChecked == true;
             _preferences.Sidebar.ShowClearSettings = SidebarClearSettingsCheckBox.IsChecked == true;
+
+            _preferences.Shortcuts.Bindings = new Dictionary<string, string>(_shortcutDraft);
 
             _preferences.Playback.VolumeNormalization = PlaybackVolumeNormalizationCheckBox.IsChecked == true;
             var crossfadeSec = Math.Clamp((int)Math.Round(PlaybackCrossfadeSlider.Value), 0, 15);
@@ -950,6 +1068,7 @@ namespace musicApp.Views
             {
                 main.ApplySidebarPreferences();
                 main.ApplyPlaybackPreferences();
+                main.ApplyShortcutPreferences();
             }
         }
 

@@ -108,7 +108,9 @@ internal static class TrackContextMenuHelper
         }
     }
 
-    public static void ApplyRemoveFromPlaylistVisibility(MenuItem? item, bool visible)
+    public static void ApplyRemoveFromPlaylistVisibility(MenuItem? item, bool visible) => SetVisible(item, visible);
+
+    public static void SetVisible(MenuItem? item, bool visible)
     {
         if (item != null)
             item.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
@@ -169,6 +171,10 @@ internal static class TrackContextMenuHelper
             var removeFromPlaylistItem = FindMenuItemByHeader(items, "Remove from Playlist");
             ApplyRemoveFromPlaylistVisibility(removeFromPlaylistItem, removeFromPlaylistVisible);
         }
+
+        // Queue removal handles one row, so only offer it for a single selection in the Queue view
+        bool isQueueView = string.Equals(contextMenuViewName?.Trim(), "Queue", StringComparison.OrdinalIgnoreCase);
+        SetVisible(FindMenuItemByHeader(items, "Remove from Queue"), isQueueView && selectedSong != null);
 
         var mainWindow = Application.Current?.MainWindow as MainWindow;
         bool isInQueue = selectedSong != null && mainWindow?.IsTrackInQueue(selectedSong) == true;

@@ -74,6 +74,7 @@ namespace musicApp.Views
         public event EventHandler<Song>? CreateNewPlaylistWithTrackRequested;
         public event EventHandler<Song>? PlayNextRequested;
         public event EventHandler<Song>? AddToQueueRequested;
+        public event EventHandler? RemoveFromQueueRequested;
         public event EventHandler<Song>? InfoRequested;
         public event EventHandler<Song>? ShowInArtistsRequested;
         public event EventHandler<Song>? ShowInSongsRequested;
@@ -84,6 +85,16 @@ namespace musicApp.Views
         public event EventHandler<Song>? DeleteRequested;
 
         public Song? SelectedTrack => lstTracks.SelectedItem as Song;
+
+        // Selected songs in list order (SelectedItems is in click order)
+        public IReadOnlyList<Song> GetSelectedTracks()
+        {
+            if (lstTracks.SelectedItems.Count <= 1)
+                return SelectedTrack is { } one ? new[] { one } : Array.Empty<Song>();
+
+            var picked = new HashSet<Song>(lstTracks.SelectedItems.OfType<Song>(), ReferenceEqualityComparer.Instance);
+            return lstTracks.Items.OfType<Song>().Where(picked.Contains).ToList();
+        }
 
         public void RefreshItemBindings()
         {
@@ -818,6 +829,8 @@ namespace musicApp.Views
             if (song != null && CurrentPlaylist != null)
                 RemoveFromPlaylistRequested?.Invoke(this, (song, CurrentPlaylist));
         }
+
+        public void RequestRemoveFromQueue() => RemoveFromQueueRequested?.Invoke(this, EventArgs.Empty);
 
         public void RequestCreateNewPlaylistWithTrack(Song song)
         {

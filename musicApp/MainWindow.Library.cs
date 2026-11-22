@@ -87,8 +87,7 @@ namespace musicApp
                             .Where(t => LibraryPathHelper.IsFileUnderMusicFolder(t.FilePath, folderPath))
                             .Where(t => !diskPaths.Contains(LibraryPathHelper.TryNormalizePath(t.FilePath) ?? ""))
                             .ToList();
-                        foreach (var track in missing)
-                            RemoveTrackFromCollections(track, includeShuffled: true);
+                        RemoveTracksFromCollections(missing);
                     }
 
                     await UpdateLibraryCacheAsync();
@@ -160,10 +159,7 @@ namespace musicApp
                     if (musicFolders.Any(f => LibraryPathHelper.PathsEqual(f, folderToRemove)))
                     {
                         var tracksToRemove = allTracks.Where(t => LibraryPathHelper.IsFileUnderMusicFolder(t.FilePath, folderToRemove)).ToList();
-                        foreach (var track in tracksToRemove)
-                        {
-                            RemoveTrackFromCollections(track, includeShuffled: true);
-                        }
+                        RemoveTracksFromCollections(tracksToRemove);
 
                         foreach (var playlist in playlists)
                         {
@@ -178,7 +174,6 @@ namespace musicApp
                         await libraryManager.RemoveFolderFromCacheAsync(folderToRemove);
 
                         UpdateUI();
-                        UpdateShuffledTracks();
                         RefreshVisibleViews();
                         UpdateStatusBar();
 

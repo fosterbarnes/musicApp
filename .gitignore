@@ -9,6 +9,7 @@ musicApp/.updater/bin
 musicApp/.updater.swap/bin
 musicApp/.updater/obj
 musicApp/.updater.swap/obj
+musicApp.Tests/bin
 .installer/Output/
 .vs/
 obj/
@@ -16,3 +17,5 @@ obj/
 .res/exe/yapBot.json
 .md/YapBot.json
 desktop.ini
+._*
+.DS_Store

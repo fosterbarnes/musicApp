@@ -12,6 +12,7 @@ namespace musicApp.Views
         {
             InitializeComponent();
             WireTrackList();
+            trackList.RemoveFromQueueRequested += (_, e) => QueueToolbarRemoveRequested?.Invoke(this, e);
         }
 
         public event EventHandler? QueueToolbarRemoveRequested;
