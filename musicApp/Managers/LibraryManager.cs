@@ -23,6 +23,12 @@ namespace musicApp
         public class LibraryCache
         {
             public List<Song> Tracks { get; set; } = new List<Song>();
+
+            /// <summary>
+            /// False in files saved before Date Added came from the file's creation time; startup then moves each
+            /// date back to the file's date once (MainWindow.LoadMusicFromCacheAsync). Every save writes true.
+            /// </summary>
+            public bool DateAddedFromFiles { get; set; }
         }
 
         public class LibraryFolders
@@ -482,10 +488,9 @@ namespace musicApp
                     if (dirInfo.LastWriteTime > lastScanned.Value)
                         return true;
 
-                    var supportedExtensions = new[] { ".mp3", ".wav", ".flac", ".m4a", ".aac" };
                     foreach (var file in dirInfo.EnumerateFiles("*.*", SearchOption.AllDirectories))
                     {
-                        if (!supportedExtensions.Contains(file.Extension.ToLower())) continue;
+                        if (!LibraryPathHelper.IsSupportedAudioFile(file.Name)) continue;
                         if (file.LastWriteTime > lastScanned.Value) return true;
                     }
                     return false;

@@ -473,22 +473,24 @@ namespace musicApp.Views
             try { songs = songsEnumerable.ToList(); }
             catch { return new List<(AlbumGridItem, DateTime)>(); }
 
-            var list = songs
-                .Where(t => !string.IsNullOrWhiteSpace(t.Album) && t.Album != "Unknown Album")
-                .GroupBy(AlbumGroupKey, StringComparer.OrdinalIgnoreCase)
+            // Same groups and order as playing from this view (RecentlyAddedPlaybackOrder).
+            return RecentlyAddedPlaybackOrder.BuildGroups(songs)
                 .Select(g =>
                 {
-                    var maxAdded = g.Max(t => t.DateAdded).Date;
-                    var rep = g.OrderByDescending(t => t.DateAdded).First();
-                    return (new AlbumGridItem(rep.Album ?? string.Empty, AlbumGroupArtist(rep), rep, null), maxAdded);
+                    var rep = g.Tracks.MaxBy(t => t.DateAdded)!;
+                    var item = g.IsSingleSong
+                        ? new AlbumGridItem(SingleSongTileTitle(rep), rep.Artist ?? string.Empty, rep) { IsSingleSong = true }
+                        : new AlbumGridItem(rep.Album ?? string.Empty, AlbumGroupArtist(rep), rep);
+                    return (item, g.LastAdded);
                 })
-                .OrderByDescending(x => x.Item2)
-                .ThenBy(x => x.Item1.AlbumTitle, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(x => x.Item1.Artist, StringComparer.OrdinalIgnoreCase)
                 .ToList();
-
-            return list;
         }
+
+        // Untagged files read as "Unknown Title"; the file name says more.
+        private static string SingleSongTileTitle(Song s) =>
+            string.IsNullOrWhiteSpace(s.Title) || s.Title == "Unknown Title"
+                ? System.IO.Path.GetFileNameWithoutExtension(s.FilePath)
+                : s.Title;
 
         private static List<object> BuildRecentlyAddedRows(
             IReadOnlyList<(AlbumGridItem Item, DateTime MaxAdded)> ordered,

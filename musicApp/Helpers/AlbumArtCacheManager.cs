@@ -71,8 +71,34 @@ public static class AlbumArtCacheManager
             : track.Artist ?? "";
     }
 
+    // A song with no album gets its own entry: "Unknown Album" + artist would give every loose song by that
+    // artist one shared cover (they show as separate tiles in Recently Added).
     public static string GetCachedPathForTrack(Song track) =>
-        GetCachedPath(track.Album ?? "", GetThumbnailCacheArtistKey(track));
+        RecentlyAddedPlaybackOrder.HasAlbum(track)
+            ? GetCachedPath(track.Album ?? "", GetThumbnailCacheArtistKey(track))
+            : GetCachedPath(track.FilePath ?? "", "");
+
+    /// <summary>
+    /// Cached thumbnail for a track: its saved ThumbnailCachePath, then its own key, then (albums only) the older
+    /// plain-artist key. A song with no album may still hold the shared "Unknown Album" path from older versions;
+    /// that one is skipped so it gets its own art.
+    /// </summary>
+    public static BitmapSource? TryGetCachedForTrack(Song track, int decodePixelWidth = 0)
+    {
+        var ownPath = GetCachedPathForTrack(track);
+        if (!string.IsNullOrEmpty(track.ThumbnailCachePath) &&
+            (RecentlyAddedPlaybackOrder.HasAlbum(track) || track.ThumbnailCachePath == ownPath) &&
+            LoadFromCachePath(track.ThumbnailCachePath, decodePixelWidth) is { } saved)
+            return saved;
+
+        var cached = LoadFromCachePath(ownPath, decodePixelWidth);
+        if (cached != null || !RecentlyAddedPlaybackOrder.HasAlbum(track))
+            return cached;
+        var artist = track.Artist ?? "";
+        return string.Equals(GetThumbnailCacheArtistKey(track), artist, StringComparison.Ordinal)
+            ? null
+            : TryGetCached(track.Album ?? "", artist, decodePixelWidth);
+    }
 
     /// <summary>
     /// Loads a cached thumbnail as a frozen BitmapImage, with optional WPF-side decode scaling.

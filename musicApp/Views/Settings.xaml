@@ -529,6 +529,8 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <StackPanel Grid.Row="0"
@@ -808,6 +810,85 @@
                                 <Button Content="Export"
                                         Style="{StaticResource SettingsGeneralActionButtonStyle}" />
                             </StackPanel>
+
+                            <Separator Grid.Row="7"
+                                       Grid.ColumnSpan="2"
+                                       Margin="{StaticResource SettingsGeneralDividerMargin-thk}"
+                                       Background="{StaticResource BorderDefault-brush}" />
+
+                            <TextBlock Grid.Row="8"
+                                       Grid.Column="0"
+                                       Text="Automatically add"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Top"
+                                       Margin="{StaticResource Top2-thk}"
+                                       ToolTip="{Binding ToolTip, ElementName=LibraryAutoAddCheckBox}" />
+                            <!-- Watch folder (toggle + path) and where its songs end up; the tooltip explains the rest. -->
+                            <!-- Path column takes the rest of the width, so a long path is cut short and the
+                                 folder button stays on screen. -->
+                            <Grid Grid.Row="8"
+                                  Grid.Column="1"
+                                  Margin="{StaticResource FieldRowGap-thk}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <CheckBox x:Name="LibraryAutoAddCheckBox"
+                                          Grid.Row="0"
+                                          Grid.Column="0"
+                                          Content="Watch folder"
+                                          Foreground="{StaticResource TextPrimary-brush}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,16,0"
+                                          ToolTip="Songs dropped in the watch folder are moved into your library, filed as Artist\Album\01 Title like iTunes does. Files that can't be played go to its Not Added folder. While iTunes or Apple Music is open, musicApp leaves the folder to it."
+                                          Checked="LibraryAutoAddCheckBox_Changed"
+                                          Unchecked="LibraryAutoAddCheckBox_Changed" />
+                                <TextBox x:Name="LibraryAutoAddFolderText"
+                                         Grid.Row="0"
+                                         Grid.Column="1"
+                                         HorizontalAlignment="Stretch"
+                                         VerticalAlignment="Center"
+                                         AutomationProperties.Name="Watch folder"
+                                         Style="{StaticResource FileStoragePathReadOnlyTextBoxStyle}" />
+                                <Button x:Name="LibraryAutoAddBrowseButton"
+                                        Grid.Row="0"
+                                        Grid.Column="2"
+                                        VerticalAlignment="Center"
+                                        Margin="{StaticResource Left8NudgeUp4-thk}"
+                                        Style="{StaticResource AboutOpenFolderIconButtonStyle}"
+                                        ToolTip="Choose watch folder"
+                                        AutomationProperties.Name="Choose watch folder"
+                                        Click="LibraryAutoAddBrowseButton_Click">
+                                    <materialDesign:PackIcon Kind="FolderOpen"
+                                                             Width="18"
+                                                             Height="18"
+                                                             Foreground="{StaticResource TextSecondary-brush}" />
+                                </Button>
+
+                                <TextBlock Grid.Row="1"
+                                           Grid.Column="0"
+                                           Text="Moves to"
+                                           Foreground="{StaticResource TextPrimary-brush}"
+                                           VerticalAlignment="Center"
+                                           Margin="0,8,16,0"
+                                           ToolTip="Library folder the songs are filed into, as Artist\Album\01 Title." />
+                                <TextBox x:Name="LibraryAutoAddDestinationText"
+                                         Grid.Row="1"
+                                         Grid.Column="1"
+                                         Grid.ColumnSpan="2"
+                                         HorizontalAlignment="Stretch"
+                                         VerticalAlignment="Center"
+                                         Margin="0,8,0,0"
+                                         AutomationProperties.Name="Moves to"
+                                         Style="{StaticResource FileStoragePathReadOnlyTextBoxStyle}" />
+                            </Grid>
                         </Grid>
                     </ScrollViewer>
                 </Grid>

@@ -34,6 +34,7 @@ namespace musicApp.Views
         private string _fileStorageMusicPathOpen = "";
         private bool _playbackNormalizationCheckLoading;
         private bool _sidebarLibraryActionCheckLoading;
+        private bool _autoAddUiLoading;
         private bool _themeDonationLinksCheckLoading;
         private bool _libraryAlbumArtScanGuiBusy;
         private bool _generalFontUiLoading;
@@ -200,6 +201,7 @@ namespace musicApp.Views
             var main = OwnerMainWhenLibraryIdle();
             if (main != null)
                 await main.RunAddMusicFromSettingsAsync();
+            await RefreshAutoAddDestinationAsync();
         }
 
         private async void LibraryRescanLibraryButton_Click(object sender, RoutedEventArgs e)
@@ -214,6 +216,8 @@ namespace musicApp.Views
             var main = OwnerMainWhenLibraryIdle();
             if (main != null)
                 await main.RunRemoveMusicFromSettingsAsync();
+            // "Moves to" depends on the library folders.
+            await RefreshAutoAddDestinationAsync();
         }
 
         private void LibraryClearSettingsButton_Click(object sender, RoutedEventArgs e)
@@ -305,6 +309,115 @@ namespace musicApp.Views
                 main.ApplySidebarPreferences();
         }
 
+        // Auto-add saves right away (like the sidebar checkboxes) so the watcher follows the toggle.
+        private async void LibraryAutoAddCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_autoAddUiLoading)
+                return;
+            PreferencesManager.EnsureInitialized(_preferences);
+            var enable = LibraryAutoAddCheckBox.IsChecked == true;
+            var folder = _preferences.Library.AutoAddFolder;
+            if (enable)
+            {
+                var musicFolders = await LibraryManager.Instance.GetMusicFoldersAsync();
+                // Unchecked again while the folders loaded: that newer change already saved.
+                if (LibraryAutoAddCheckBox.IsChecked != true)
+                    return;
+                if (string.IsNullOrWhiteSpace(folder))
+                    folder = AutoAddFolderLocator.Detect(musicFolders) ?? PickAutoAddFolder();
+                if (folder == null || !TryPrepareAutoAddFolder(folder, musicFolders))
+                {
+                    SetAutoAddCheckBoxQuietly(false);
+                    return;
+                }
+            }
+            SaveAutoAddPreferences(enable, folder ?? "");
+        }
+
+        private async void LibraryAutoAddBrowseButton_Click(object sender, RoutedEventArgs e)
+        {
+            var folder = PickAutoAddFolder();
+            if (folder == null)
+                return;
+            PreferencesManager.EnsureInitialized(_preferences);
+            // Validate even while off, or a folder inside the library is saved and only fails at enable.
+            if (!TryPrepareAutoAddFolder(folder, await LibraryManager.Instance.GetMusicFoldersAsync()))
+                return;
+            SaveAutoAddPreferences(_preferences.Library.AutoAddEnabled, folder);
+        }
+
+        private string? PickAutoAddFolder()
+        {
+            var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Automatically add folder" };
+            var current = _preferences.Library.AutoAddFolder;
+            if (!string.IsNullOrWhiteSpace(current) && Directory.Exists(current))
+                dialog.InitialDirectory = current;
+            return dialog.ShowDialog(this) == true ? dialog.FolderName : null;
+        }
+
+        // Creates the folder like iTunes does, and refuses one that has no library to add into or overlaps it.
+        private bool TryPrepareAutoAddFolder(string folder, IReadOnlyList<string> musicFolders)
+        {
+            if (musicFolders.Count == 0)
+            {
+                MessageDialog.Show(this, "Automatically Add", "Add a music folder to your library first.",
+                    MessageDialog.Buttons.Ok);
+                return false;
+            }
+            if (AutoAddFolderLocator.DestinationRoot(folder, musicFolders) == null)
+            {
+                MessageDialog.Show(this, "Automatically Add",
+                    "Choose a folder outside your music library folders.", MessageDialog.Buttons.Ok);
+                return false;
+            }
+            try
+            {
+                Directory.CreateDirectory(folder);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
+                                           or NotSupportedException)
+            {
+                MessageDialog.Show(this, "Automatically Add", $"Could not create the folder: {ex.Message}",
+                    MessageDialog.Buttons.Ok);
+                return false;
+            }
+        }
+
+        private void SaveAutoAddPreferences(bool enabled, string folder)
+        {
+            _preferences.Library.AutoAddEnabled = enabled;
+            _preferences.Library.AutoAddFolder = folder;
+            LibraryAutoAddFolderText.Text = folder;
+            _ = RefreshAutoAddDestinationAsync();
+            PreferencesManager.Instance.SavePreferencesSync(_preferences);
+            if (Owner is MainWindow main)
+                main.ApplyAutoAddPreferences();
+        }
+
+        // Same rule the importer uses, so the shown folder is where songs really go.
+        private async Task RefreshAutoAddDestinationAsync()
+        {
+            var folder = _preferences.Library.AutoAddFolder;
+            var musicFolders = await LibraryManager.Instance.GetMusicFoldersAsync();
+            LibraryAutoAddDestinationText.Text = string.IsNullOrWhiteSpace(folder)
+                ? ""
+                : AutoAddFolderLocator.DestinationRoot(folder, musicFolders) ?? "";
+        }
+
+        private void SetAutoAddCheckBoxQuietly(bool value)
+        {
+            _autoAddUiLoading = true;
+            try
+            {
+                LibraryAutoAddCheckBox.IsChecked = value;
+            }
+            finally
+            {
+                _autoAddUiLoading = false;
+            }
+        }
+
         private void LoadPreferencesIntoUi()
         {
             _preferences = PreferencesManager.Instance.LoadPreferencesSync();
@@ -366,6 +479,18 @@ namespace musicApp.Views
             {
                 _sidebarLibraryActionCheckLoading = false;
             }
+
+            _autoAddUiLoading = true;
+            try
+            {
+                LibraryAutoAddCheckBox.IsChecked = _preferences.Library.AutoAddEnabled;
+                LibraryAutoAddFolderText.Text = _preferences.Library.AutoAddFolder;
+            }
+            finally
+            {
+                _autoAddUiLoading = false;
+            }
+            _ = RefreshAutoAddDestinationAsync();
 
             _playbackNormalizationCheckLoading = true;
             try
@@ -1075,6 +1200,7 @@ namespace musicApp.Views
                 main.ApplySidebarPreferences();
                 main.ApplyPlaybackPreferences();
                 main.ApplyShortcutPreferences();
+                main.ApplyAutoAddPreferences();
             }
         }
 

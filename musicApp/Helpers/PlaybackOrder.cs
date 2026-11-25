@@ -115,35 +115,33 @@ internal static class GenrePlaybackOrder
     }
 }
 
+/// <summary>
+/// Recently Added order, shared by the album grid and its play order so both always list the same thing.
+/// </summary>
 internal static class RecentlyAddedPlaybackOrder
 {
-    public static List<Song> BuildOrderedTracks(IEnumerable<Song> songsEnumerable)
-    {
-        var songs = songsEnumerable.ToList();
-        if (songs.Count == 0)
-            return new List<Song>();
+    public sealed record Group(List<Song> Tracks, DateTime LastAdded, bool IsSingleSong);
 
-        var orderedGroups = songs
-            .Where(t => t != null && !string.IsNullOrWhiteSpace(t.Album) && t.Album != "Unknown Album")
-            .GroupBy(t =>
-            {
-                var albumArtist = AlbumGroupedPlaybackOrder.AlbumArtistKey(t);
-                return (Album: t.Album ?? string.Empty, Artist: albumArtist);
-            })
+    public static bool HasAlbum(Song t) =>
+        !string.IsNullOrWhiteSpace(t.Album) && !string.Equals(t.Album, "Unknown Album", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Newest first by full Date Added time (not just the day). One group per album (album + album artist, case
+    /// ignored), and one per song that has no album, so untagged songs still show up.
+    /// </summary>
+    public static List<Group> BuildGroups(IEnumerable<Song> songs) =>
+        songs
+            .Where(t => t != null)
+            .GroupBy(t => HasAlbum(t) ? t.Album + "\u001F" + AlbumGroupedPlaybackOrder.AlbumArtistKey(t) : "\u001E" + t.FilePath,
+                StringComparer.OrdinalIgnoreCase)
             .Select(g =>
             {
-                var maxAdded = g.Max(t => t.DateAdded).Date;
-                return (g.Key.Album, g.Key.Artist, maxAdded, g);
+                var tracks = g.ToList();
+                return new Group(tracks, tracks.Max(t => t.DateAdded), !HasAlbum(tracks[0]));
             })
-            .OrderByDescending(x => x.maxAdded)
-            .ThenBy(x => x.Album, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(x => x.Artist, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.LastAdded)
             .ToList();
 
-        var result = new List<Song>(songs.Count);
-        foreach (var (_, _, _, g) in orderedGroups)
-            result.AddRange(AlbumTrackOrder.SortByAlbumSequence(g));
-
-        return result;
-    }
+    public static List<Song> BuildOrderedTracks(IEnumerable<Song> songs) =>
+        BuildGroups(songs).SelectMany(g => AlbumTrackOrder.SortByAlbumSequence(g.Tracks)).ToList();
 }

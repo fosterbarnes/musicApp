@@ -21,6 +21,8 @@
     <Compile Include="..\musicApp\MetadataAudioSession.cs" Link="Linked\MetadataAudioSession.cs" />
     <Compile Include="..\musicApp\Helpers\SongIdentity.cs" Link="Linked\SongIdentity.cs" />
     <Compile Include="..\musicApp\Helpers\AudioOutput.cs" Link="Linked\AudioOutput.cs" />
+    <Compile Include="..\musicApp\Helpers\ITunesMediaPathBuilder.cs" Link="Linked\ITunesMediaPathBuilder.cs" />
+    <Compile Include="..\musicApp\Helpers\PlaybackOrder.cs" Link="Linked\PlaybackOrder.cs" />
   </ItemGroup>
 
 </Project>

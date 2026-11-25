@@ -205,7 +205,7 @@ public static class FruitAppLocalAlbumArtCache
         return map;
     }
 
-    private static List<string> BuildCandidateLibraryXmlPathsList()
+    internal static List<string> BuildCandidateLibraryXmlPathsList()
     {
         var list = new List<string>(12);
         foreach (var p in EnumerateLibraryXmlPathsFromFruitAppPrefs())

@@ -28,26 +28,11 @@ public static class AlbumArtThumbnailHelper
         if (track == null || string.IsNullOrWhiteSpace(track.FilePath))
             return null;
 
-        // Fast path: load from on-disk thumbnail cache and decode near target size.
-        if (!string.IsNullOrEmpty(track.ThumbnailCachePath))
-        {
-            var decodeWidth = targetSizePx > 0 ? Math.Max(targetSizePx, 64) : 0;
-            var cached = AlbumArtCacheManager.LoadFromCachePath(track.ThumbnailCachePath, decodeWidth);
-            if (cached != null)
-                return cached;
-        }
-
+        // Fast path: on-disk thumbnail cache, decoded near target size.
         var decodePx = targetSizePx > 0 ? Math.Max(targetSizePx, 64) : 0;
-        var canonArtist = AlbumArtCacheManager.GetThumbnailCacheArtistKey(track);
-        var fromAlbumKey = AlbumArtCacheManager.TryGetCached(track.Album ?? "", canonArtist, decodePx);
-        if (fromAlbumKey != null)
-            return fromAlbumKey;
-        if (!string.Equals(canonArtist, track.Artist ?? "", StringComparison.Ordinal))
-        {
-            var legacy = AlbumArtCacheManager.TryGetCached(track.Album ?? "", track.Artist ?? "", decodePx);
-            if (legacy != null)
-                return legacy;
-        }
+        var fromCache = AlbumArtCacheManager.TryGetCachedForTrack(track, decodePx);
+        if (fromCache != null)
+            return fromCache;
 
         try
         {

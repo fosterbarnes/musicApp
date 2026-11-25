@@ -21,6 +21,9 @@ public sealed class AlbumGridItem : INotifyPropertyChanged
     public string Artist { get; }
     public Song RepresentativeTrack { get; }
 
+    /// <summary>Recently Added tile for a song with no album: titled with the song, holds only that song.</summary>
+    public bool IsSingleSong { get; init; }
+
     public ImageSource? AlbumArtSource
     {
         get => _albumArtSource;

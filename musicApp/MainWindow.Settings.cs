@@ -72,6 +72,7 @@ namespace musicApp
             ApplySidebarPreferences();
             ApplyPlaybackPreferences();
             ApplyShortcutPreferences();
+            ApplyAutoAddPreferences();
             _ = titleBarPlayer.ReloadPlayerSettingsFromDiskAsync();
         }
 
@@ -167,6 +168,7 @@ namespace musicApp
 
                 ApplySidebarPreferences();
                 ApplyPlaybackPreferences();
+                ApplyAutoAddPreferences();
 
                 var notMoved = jsonFiles.Length - movedFiles;
                 MessageDialog.Show(this, "Settings Cleared",

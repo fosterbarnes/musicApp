@@ -26,23 +26,9 @@ public static class AlbumArtLoader
             if (targetSizePx < 1)
                 targetSizePx = (int)Math.Ceiling(UILayoutConstants.TitleBarAlbumArtLogicalSizeDip);
 
-            if (!string.IsNullOrEmpty(track.ThumbnailCachePath))
-            {
-                var cached = AlbumArtCacheManager.LoadFromCachePath(track.ThumbnailCachePath, targetSizePx);
-                if (cached != null)
-                    return cached;
-            }
-
-            var artist = AlbumArtCacheManager.GetThumbnailCacheArtistKey(track);
-            var byAlbum = AlbumArtCacheManager.TryGetCached(track.Album ?? "", artist, targetSizePx);
-            if (byAlbum != null)
-                return byAlbum;
-            if (!string.Equals(artist, track.Artist ?? "", StringComparison.Ordinal))
-            {
-                var legacy = AlbumArtCacheManager.TryGetCached(track.Album ?? "", track.Artist ?? "", targetSizePx);
-                if (legacy != null)
-                    return legacy;
-            }
+            var cached = AlbumArtCacheManager.TryGetCachedForTrack(track, targetSizePx);
+            if (cached != null)
+                return cached;
 
             try
             {

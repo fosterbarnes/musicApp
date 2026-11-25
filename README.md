@@ -13,7 +13,7 @@ Currently in a pre-release state, so not all intended features or behaviors have
 **136 / 169 tasks complete (80.5%)**
 [Tasks.md](https://github.com/fosterbarnes/musicApp/blob/main/.md/Tasks.md#main-window)
 
-[34,904](https://github.com/fosterbarnes/musicApp/blob/main/.md/scc.txt) lines of code and counting...
+[35,855](https://github.com/fosterbarnes/musicApp/blob/main/.md/scc.txt) lines of code and counting...
 
 
 ## Downloads
@@ -23,12 +23,12 @@ This project is in early development, bugs are expected. Windows only (for now).
 <table border="0">
 <tbody>
 <tr>
-<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.7/musicApp-v0.3.7-kickKevin-x64-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/res/refs/heads/main/btn/x64Installer.svg" width="180" height="auto" alt="x64 installer"/></a></td>
-<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.7/musicApp-v0.3.7-kickKevin-x86-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/res/refs/heads/main/btn/x86Installer.svg" width="180" height="auto" alt="x86 installer"/></a></td>
-<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.7/musicApp-v0.3.7-kickKevin-arm64-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/res/refs/heads/main/btn/arm64.svg" width="180" height="auto" alt="arm64 installer"/></a></td>
+<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.8/musicApp-v0.3.8-tacoCable-x64-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/res/refs/heads/main/btn/x64Installer.svg" width="180" height="auto" alt="x64 installer"/></a></td>
+<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.8/musicApp-v0.3.8-tacoCable-x86-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/res/refs/heads/main/btn/x86Installer.svg" width="180" height="auto" alt="x86 installer"/></a></td>
+<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.8/musicApp-v0.3.8-tacoCable-arm64-installer.exe"><img src="https://raw.githubusercontent.com/fosterbarnes/res/refs/heads/main/btn/arm64.svg" width="180" height="auto" alt="arm64 installer"/></a></td>
 </tr>
 <tr>
-<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.7/musicApp-v0.3.7-kickKevin-portable.zip"><img src="https://raw.githubusercontent.com/fosterbarnes/res/refs/heads/main/btn/portable.svg" width="180" height="auto" alt="portable .zip"/></a></td>
+<td valign="top"><a href="https://github.com/fosterbarnes/musicApp/releases/download/v0.3.8/musicApp-v0.3.8-tacoCable-portable.zip"><img src="https://raw.githubusercontent.com/fosterbarnes/res/refs/heads/main/btn/portable.svg" width="180" height="auto" alt="portable .zip"/></a></td>
 </tr>
 </tbody>
 </table>

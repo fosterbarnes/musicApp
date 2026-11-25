@@ -72,14 +72,13 @@ namespace musicApp
                         }
                     }
 
-                    var supportedExtensions = new[] { ".mp3", ".wav", ".flac", ".m4a", ".aac" };
                     foreach (var folderPath in musicFolders)
                     {
                         if (!Directory.Exists(folderPath))
                             continue;
 
                         var diskPaths = LibraryPathHelper.EnumerateFilesRecursive(folderPath)
-                            .Where(file => supportedExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+                            .Where(LibraryPathHelper.IsSupportedAudioFile)
                             .Select(file => LibraryPathHelper.TryNormalizePath(file) ?? "")
                             .Where(path => path.Length > 0)
                             .ToHashSet(StringComparer.OrdinalIgnoreCase);

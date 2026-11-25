@@ -7,6 +7,12 @@ namespace musicApp.Helpers
 {
     public static class LibraryPathHelper
     {
+        private static readonly HashSet<string> SupportedAudioExtensions =
+            new(StringComparer.OrdinalIgnoreCase) { ".mp3", ".wav", ".flac", ".m4a", ".aac" };
+
+        public static bool IsSupportedAudioFile(string path) =>
+            SupportedAudioExtensions.Contains(Path.GetExtension(path));
+
         public static string? TryNormalizePath(string? path)
         {
             if (string.IsNullOrWhiteSpace(path)) return null;

@@ -465,12 +465,21 @@ namespace musicApp
             foreach (var folderPath in existingFolders)
                 await LoadMusicFromCacheAsync(folderPath, libraryCache);
 
+            // Save the one-time Date Added repair so it does not run again. Not while a folder is missing (unplugged
+            // drive): the save only holds loaded tracks and would drop that folder's songs before they are repaired.
+            if (!libraryCache.DateAddedFromFiles && allTracks.Count > 0 && existingFolders.Count == musicFolders.Count)
+                await UpdateLibraryCacheAsync();
+
             StartThumbnailCacheBackfillIfNeeded();
 
-            // Reconcile with disk after the UI has painted; never blocks startup.
-            _ = Dispatcher.InvokeAsync(
-                () => _ = ReconcileLibraryFoldersWithDiskAsync(existingFolders, libraryCache),
-                DispatcherPriority.ApplicationIdle);
+            // After the UI has painted, never blocking startup: import the auto-add drop folder first so reconcile
+            // finds those files already registered, then start watching it.
+            _ = Dispatcher.InvokeAsync(async () =>
+            {
+                await ProcessDropFolderAsync();
+                await ReconcileLibraryFoldersWithDiskAsync(existingFolders, libraryCache);
+                ApplyAutoAddPreferences();
+            }, DispatcherPriority.ApplicationIdle);
         }
 
         /// <summary>
@@ -484,7 +493,6 @@ namespace musicApp
             try
             {
                 var priorByPath = BuildPriorLibraryTrackMap(libraryCache);
-                var supportedExtensions = new[] { ".mp3", ".wav", ".flac", ".m4a", ".aac" };
 
                 var currentByPath = new Dictionary<string, Song>(StringComparer.OrdinalIgnoreCase);
                 foreach (var t in allTracks)
@@ -504,7 +512,7 @@ namespace musicApp
                     {
                         foreach (var file in LibraryPathHelper.EnumerateFilesRecursive(folderPath))
                         {
-                            if (!supportedExtensions.Contains(Path.GetExtension(file).ToLower()))
+                            if (!LibraryPathHelper.IsSupportedAudioFile(file))
                                 continue;
                             var norm = LibraryPathHelper.TryNormalizePath(file);
                             if (norm == null || !diskPaths.Add(norm))
@@ -544,9 +552,12 @@ namespace musicApp
                     return;
 
                 var needsArtPass = newFiles.Count > 0 || changedTracks.Count > 0;
-                _libraryPipelinePhase = needsArtPass
-                    ? statusProgress.Begin(100, ("updating library", 0.7), ("album artwork", 0.3))
-                    : statusProgress.Begin(100, ("updating library", 1.0));
+                // An auto-add retry can own the phase already; report into it instead of replacing it.
+                var ownedPhase = _libraryPipelinePhase == null
+                    ? _libraryPipelinePhase = needsArtPass
+                        ? statusProgress.Begin(100, ("updating library", 0.7), ("album artwork", 0.3))
+                        : statusProgress.Begin(100, ("updating library", 1.0))
+                    : null;
 
                 try
                 {
@@ -594,38 +605,49 @@ namespace musicApp
                         });
                     }
 
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        RemoveTracksFromCollections(removedTracks);
-                        foreach (var track in loadedNew)
-                        {
-                            allTracks.Add(track);
-                            filteredTracks.Add(track);
-                        }
-                    });
-
-                    await SortLibraryTracksByPathForScanAsync();
-                    await UpdateLibraryCacheAsync();
-
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        UpdateUI();
-                        UpdateStatusBar();
-                    });
-
-                    if (needsArtPass)
-                        await MaybeRunPostScanSystemArtworkCacheAsync();
+                    await CommitLibraryChangesAsync(loadedNew, removedTracks, needsArtPass);
                 }
                 finally
                 {
-                    _libraryPipelinePhase?.Dispose();
-                    _libraryPipelinePhase = null;
+                    ownedPhase?.Dispose();
+                    if (ownedPhase != null && ReferenceEquals(_libraryPipelinePhase, ownedPhase))
+                        _libraryPipelinePhase = null;
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Library reconcile failed: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Shared tail of reconcile and auto-add: apply adds/removes on the UI thread, re-sort, save
+        /// library.json, refresh views, then fetch artwork for new or changed files.
+        /// </summary>
+        private async Task CommitLibraryChangesAsync(
+            IReadOnlyCollection<Song> added, IReadOnlyCollection<Song> removed, bool runArtPass)
+        {
+            await Dispatcher.InvokeAsync(() =>
+            {
+                RemoveTracksFromCollections(removed);
+                foreach (var track in added)
+                {
+                    allTracks.Add(track);
+                    filteredTracks.Add(track);
+                }
+            });
+
+            await SortLibraryTracksByPathForScanAsync();
+            await UpdateLibraryCacheAsync();
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                UpdateUI();
+                UpdateStatusBar();
+            });
+
+            if (runArtPass)
+                await MaybeRunPostScanSystemArtworkCacheAsync();
         }
 
         private static Dictionary<string, Song> BuildPriorLibraryTrackMap(LibraryManager.LibraryCache? libraryCache)
@@ -668,6 +690,15 @@ namespace musicApp
                             continue;
                         if (!TryRegisterLibraryPath(track.FilePath))
                             continue;
+
+                        // One-time repair: older versions stamped the scan time, so a fresh library was all "Today".
+                        // Earlier of the two, so a real older date is never moved later.
+                        if (!libraryCache.DateAddedFromFiles)
+                        {
+                            var fileDate = TrackMetadataLoader.FileDateAdded(track.FilePath);
+                            if (fileDate < track.DateAdded)
+                                track.DateAdded = fileDate;
+                        }
 
                         if (string.IsNullOrEmpty(track.FileType))
                         {
@@ -1973,11 +2004,10 @@ namespace musicApp
                     priorMap = built;
                 }
 
-                var supportedExtensions = new[] { ".mp3", ".wav", ".flac", ".m4a", ".aac" };
                 var musicFiles = await Task.Run(() =>
                 {
                     return LibraryPathHelper.EnumerateFilesRecursive(folderPath)
-                        .Where(file => supportedExtensions.Contains(Path.GetExtension(file).ToLower()))
+                        .Where(LibraryPathHelper.IsSupportedAudioFile)
                         .ToList();
                 });
 
@@ -2153,7 +2183,7 @@ namespace musicApp
             await _libraryCacheUpdateGate.WaitAsync();
             try
             {
-                var libraryCache = new LibraryManager.LibraryCache();
+                var libraryCache = new LibraryManager.LibraryCache { DateAddedFromFiles = true };
                 libraryCache.Tracks = allTracks.ToList();
                 await libraryManager.SaveLibraryCacheAsync(libraryCache);
             }
@@ -2183,6 +2213,7 @@ namespace musicApp
 
         private async Task FinishShutdownAsync()
         {
+            ShutdownAutoAdd();
             try
             {
                 try

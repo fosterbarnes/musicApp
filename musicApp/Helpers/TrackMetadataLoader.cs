@@ -27,7 +27,7 @@ public static class TrackMetadataLoader
                 TrackNumber = 0,
                 Year = 0,
                 Genre = "",
-                DateAdded = preserveLibraryFieldsFrom?.DateAdded ?? DateTime.Now,
+                DateAdded = preserveLibraryFieldsFrom?.DateAdded ?? FileDateAdded(filePath),
                 PlayCount = preserveLibraryFieldsFrom?.PlayCount ?? 0,
                 LastPlayed = preserveLibraryFieldsFrom?.LastPlayed ?? DateTime.MinValue,
                 IsFavorite = preserveLibraryFieldsFrom?.IsFavorite ?? false
@@ -91,6 +91,25 @@ public static class TrackMetadataLoader
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Date Added for a file found on disk: when it was created there (for an iTunes folder, roughly when iTunes
+    /// added it), not when musicApp first scanned it, which would make a whole library look added at once.
+    /// </summary>
+    public static DateTime FileDateAdded(string filePath)
+    {
+        try
+        {
+            var created = File.GetCreationTime(filePath);
+            // Missing file reads as 1601; a clock-skewed copy can be in the future.
+            if (created.Year > 1601 && created <= DateTime.Now)
+                return created;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+        }
+        return DateTime.Now;
     }
 
     // Total minutes, not "mm" (minutes mod 60): a 90 minute track must read 90:00, and startup parses it back.

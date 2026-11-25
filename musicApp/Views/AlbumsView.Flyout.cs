@@ -164,7 +164,9 @@ namespace musicApp.Views
             if (_itemsSource is not IEnumerable<Song> songs)
                 return;
 
-            flyout.Tracks = AlbumTrackOrder.SortByAlbumSequence(
+            flyout.Tracks = _selectedAlbum is { IsSingleSong: true } single
+                ? new List<Song> { single.RepresentativeTrack }
+                : AlbumTrackOrder.SortByAlbumSequence(
                 songs.Where(s =>
                     string.Equals(s.Album, albumTitle, StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(

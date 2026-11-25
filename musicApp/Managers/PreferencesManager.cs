@@ -50,6 +50,10 @@ namespace musicApp
 
         public class LibraryPreferences
         {
+            /// <summary>Watch an iTunes-style "Automatically Add to iTunes" folder and import what lands there.</summary>
+            public bool AutoAddEnabled { get; set; }
+
+            public string AutoAddFolder { get; set; } = "";
         }
 
         public class PlaybackPreferences
@@ -231,6 +235,7 @@ namespace musicApp
             preferences.Shortcuts ??= new ShortcutPreferences();
             preferences.Shortcuts.Bindings ??= new Dictionary<string, string>();
             NormalizeShortcutBindings(preferences.Shortcuts.Bindings);
+            preferences.Library.AutoAddFolder ??= "";
             preferences.General.Language ??= "en-system";
             preferences.General.UiFontFamily ??= "";
             preferences.General.UiFontSize = Math.Clamp(
