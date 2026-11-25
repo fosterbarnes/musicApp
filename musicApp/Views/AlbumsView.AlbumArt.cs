@@ -1,325 +1,141 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Media;
 using System.Windows.Threading;
 using musicApp.Constants;
 using musicApp.Helpers;
 
 namespace musicApp.Views
 {
+    // Grid art: tiles read AlbumGridArtCache synchronously when they bind (AlbumGridItem.AlbumArtSource), so
+    // art is never seen loading. This file keeps the cache filled around the view so those reads are hits; the
+    // cache is byte-bounded, so the prefetch window follows the scroll position.
     public partial class AlbumsView
     {
-        private void ScheduleArtLoad()
-        {
-            _artLoadDebounce.Stop();
-            _artLoadDebounce.Start();
-        }
+        private CancellationTokenSource? _artPrefetchCts;
+        private bool _artPrefetchReporting; // a running prefetch owns the status bar's "loading artwork"
+        private DispatcherTimer? _scrollPrefetchDebounce;
 
-        private void KickViewportAlbumArtNow()
+        /// <summary>
+        /// Decode size for grid art: the tile size in DIPs, as before the cache. Measured 2026-11-25: decoding at
+        /// display pixels (x1.5) cost 2.25x the memory and overflowed the cache budget (evict/re-decode churn).
+        /// </summary>
+        private int GridArtPx => Math.Max(UILayoutConstants.AlbumArtMinimumTargetSize, (int)Math.Round(CurrentTileSize));
+
+        private static int ArtDecodeParallelism => Math.Clamp(Environment.ProcessorCount, 4, 12);
+
+        /// <summary>
+        /// Decodes the albums around <paramref name="startIndex"/> (as many as fit the cache budget, two ahead for
+        /// each one behind) on worker threads. Replaces any earlier prefetch and outlives the view being unloaded.
+        /// <paramref name="reportStatus"/> shows progress in the status bar; a replaced reporting prefetch hands
+        /// that over, so "loading artwork" always ends.
+        /// </summary>
+        private void StartArtPrefetch(int startIndex, bool reportStatus = true)
         {
-            _artLoadDebounce.Stop();
-            if (!Dispatcher.CheckAccess())
+            _artPrefetchCts?.Cancel();
+            _artPrefetchCts?.Dispose();
+            _artPrefetchCts = new CancellationTokenSource();
+            var ct = _artPrefetchCts.Token;
+            var albums = _albums;
+            int px = AlbumGridItem.ArtPx;
+            int total = Math.Min(albums.Count, AlbumGridArtCache.AlbumsInBudget(px));
+            int songCount = TryGetCount(_itemsSource);
+            bool report = reportStatus || _artPrefetchReporting;
+            _artPrefetchReporting = report;
+            void Report(AlbumsGridRebuildPhase phase, int done)
             {
-                Dispatcher.BeginInvoke(KickViewportAlbumArtNow, DispatcherPriority.Loaded);
-                return;
-            }
-            _ = LoadVisibleAlbumArtAsync();
-        }
-
-        private void CancelAllAlbumArtWork()
-        {
-            _viewportArtCts?.Cancel();
-            _viewportArtCts?.Dispose();
-            _viewportArtCts = null;
-            _prefetchArtCts?.Cancel();
-            _prefetchArtCts?.Dispose();
-            _prefetchArtCts = null;
-        }
-
-        private void GetAlbumArtViewportIndexRange(out int firstIdx, out int lastIdx)
-        {
-            firstIdx = 0;
-            lastIdx = -1;
-            if (_albumItems.Count == 0)
-                return;
-
-            var visible = GetVisibleIndices();
-            if (visible.Count > 0)
-            {
-                firstIdx = Math.Max(0, visible[0] - UILayoutConstants.AlbumVisibleRangeOverscan);
-                lastIdx = Math.Min(_albumItems.Count - 1, visible[^1] + UILayoutConstants.AlbumVisibleRangeOverscan);
-                return;
+                if (report)
+                    AlbumGridRebuildStatus?.Invoke(phase, done, total, songCount);
             }
 
-            if (AlbumScrollViewer == null)
-                return;
-
-            double vw = AlbumScrollViewer.ViewportWidth > 0
-                ? AlbumScrollViewer.ViewportWidth
-                : Math.Max(UILayoutConstants.AlbumWrapFallbackWidth, ActualWidth - UILayoutConstants.AlbumWrapHorizontalPadding);
-            double vh = AlbumScrollViewer.ViewportHeight > 0
-                ? AlbumScrollViewer.ViewportHeight
-                : UILayoutConstants.AlbumArtBootstrapViewportHeightFallback;
-
-            AlbumGridLayoutMath.GetStrides(
-                CurrentTileSize, TileMargin.Right, TileMargin.Bottom, TileScaleRatio,
-                out double tileStrideX, out double tileStrideY);
-            int perRow = AlbumGridLayoutMath.PerRowFromViewport(vw, tileStrideX);
-            int rowCount = Math.Max(
-                UILayoutConstants.AlbumArtViewportBootstrapMinRows,
-                (int)Math.Ceiling(vh / tileStrideY) + UILayoutConstants.AlbumVisibleRangeOverscan);
-            if (BrowseMode == AlbumsBrowseMode.RecentlyAdded)
-                rowCount += 6;
-
-            lastIdx = Math.Min(_albumItems.Count - 1, perRow * rowCount - 1);
-        }
-
-        private async Task PrefetchAllAlbumArtBackgroundAsync()
-        {
-            _prefetchArtCts?.Cancel();
-            _prefetchArtCts?.Dispose();
-            _prefetchArtCts = new CancellationTokenSource();
-            var ct = _prefetchArtCts.Token;
-
-            int batchesSinceSample = int.MaxValue;
-            SystemResourceSnapshot? lastResourceSnapshot = null;
-
-            try
+            _ = Task.Run(() =>
             {
-                while (!ct.IsCancellationRequested)
-                {
-                    int countSnapshot;
-                    try
-                    {
-                        countSnapshot = await Dispatcher.InvokeAsync(
-                            () => _albumItems.Count,
-                            DispatcherPriority.Loaded).Task.ConfigureAwait(false);
-                    }
-                    catch (TaskCanceledException) { return; }
-
-                    if (countSnapshot == 0)
-                        break;
-
-                    int indexChunk = UILayoutConstants.AlbumArtPrefetchIndexChunk;
-                    if (lastResourceSnapshot.HasValue && lastResourceSnapshot.Value.CpuBusyPercent >= 88)
-                        indexChunk = Math.Max(8, indexChunk / 2);
-
-                    bool anyWorkThisPass = false;
-
-                    for (int start = 0; start < countSnapshot && !ct.IsCancellationRequested; start += indexChunk)
-                    {
-                        try
-                        {
-                            int liveCount = await Dispatcher.InvokeAsync(() => _albumItems.Count, DispatcherPriority.Loaded).Task.ConfigureAwait(false);
-                            if (liveCount > countSnapshot)
-                                countSnapshot = liveCount;
-                        }
-                        catch (TaskCanceledException) { return; }
-
-                        bool mustSample = batchesSinceSample >= UILayoutConstants.AlbumArtPrefetchMetricsResampleEveryNBatches;
-                        if (mustSample)
-                        {
-                            var sampleInterval = lastResourceSnapshot.HasValue && lastResourceSnapshot.Value.CpuBusyPercent < 40
-                                ? TimeSpan.FromMilliseconds(50)
-                                : TimeSpan.FromMilliseconds(100);
-                            try
-                            {
-                                lastResourceSnapshot = await Task.Run(() => WindowsSystemMetrics.Sample(sampleInterval), ct).ConfigureAwait(false);
-                            }
-                            catch (OperationCanceledException) { return; }
-                            batchesSinceSample = 0;
-                            indexChunk = UILayoutConstants.AlbumArtPrefetchIndexChunk;
-                            if (lastResourceSnapshot.HasValue && lastResourceSnapshot.Value.CpuBusyPercent >= 88)
-                                indexChunk = Math.Max(8, indexChunk / 2);
-                        }
-                        else
-                            batchesSinceSample++;
-
-                        int s = start;
-                        int e = Math.Min(start + indexChunk, countSnapshot);
-
-                        List<AlbumGridItem> batch;
-                        try
-                        {
-                            batch = await Dispatcher.InvokeAsync(() =>
-                            {
-                                var list = new List<AlbumGridItem>();
-                                // The grid can shrink after countSnapshot was taken (rebuild, flyout removed).
-                                int end = Math.Min(e, _albumItems.Count);
-                                for (int i = s; i < end; i++)
-                                {
-                                    if (_albumItems[i] is AlbumGridItem a && a.AlbumArtSource == null)
-                                        list.Add(a);
-                                }
-                                return list;
-                            }, DispatcherPriority.Loaded).Task.ConfigureAwait(false);
-                        }
-                        catch (TaskCanceledException) { return; }
-
-                        if (batch.Count > 0)
-                        {
-                            anyWorkThisPass = true;
-                            try { await LoadAlbumArtForItemsAsync(batch, ct, backgroundFriendly: true).ConfigureAwait(false); }
-                            catch (OperationCanceledException) { return; }
-                        }
-
-                        if (lastResourceSnapshot.HasValue && lastResourceSnapshot.Value.CpuBusyPercent >= 88)
-                        {
-                            try { await Task.Delay(5, ct).ConfigureAwait(false); }
-                            catch (OperationCanceledException) { return; }
-                        }
-                        else
-                            await Task.Yield();
-                    }
-
-                    bool anyMissing;
-                    try
-                    {
-                        anyMissing = await Dispatcher.InvokeAsync(() =>
-                        {
-                            for (int i = 0; i < _albumItems.Count; i++)
-                            {
-                                if (_albumItems[i] is AlbumGridItem a && a.AlbumArtSource == null)
-                                    return true;
-                            }
-                            return false;
-                        }, DispatcherPriority.Loaded).Task.ConfigureAwait(false);
-                    }
-                    catch (TaskCanceledException) { return; }
-
-                    if (!anyMissing)
-                        break;
-                    if (!anyWorkThisPass)
-                        break;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        }
-
-        private async Task LoadVisibleAlbumArtAsync()
-        {
-            if (!Dispatcher.CheckAccess())
-            {
-                KickViewportAlbumArtNow();
-                return;
-            }
-
-            if (AlbumScrollViewer == null || _albumItems.Count == 0) return;
-
-            GetAlbumArtViewportIndexRange(out int firstIdx, out int lastIdx);
-            if (lastIdx < firstIdx)
-                return;
-
-            _viewportArtCts?.Cancel();
-            _viewportArtCts?.Dispose();
-            _viewportArtCts = new CancellationTokenSource();
-            var ct = _viewportArtCts.Token;
-
-            var itemsToLoad = new List<AlbumGridItem>();
-            for (int i = firstIdx; i <= lastIdx; i++)
-            {
-                if (_albumItems[i] is AlbumGridItem a && a.AlbumArtSource == null)
-                    itemsToLoad.Add(a);
-            }
-
-            try { await LoadAlbumArtForItemsAsync(itemsToLoad, ct, backgroundFriendly: false); }
-            catch (OperationCanceledException) { }
-        }
-
-        private async Task LoadAlbumArtForItemsAsync(IReadOnlyCollection<AlbumGridItem> items, CancellationToken ct, bool backgroundFriendly)
-        {
-            if (items.Count == 0)
-                return;
-
-            double tileDp = CurrentTileSize;
-            if (!Dispatcher.CheckAccess())
-            {
+                int done = 0;
                 try
                 {
-                    tileDp = await Dispatcher.InvokeAsync(() => CurrentTileSize, DispatcherPriority.Loaded).Task.ConfigureAwait(false);
-                }
-                catch (TaskCanceledException)
-                {
-                    return;
-                }
-            }
-            int targetSize = Math.Max(UILayoutConstants.AlbumArtMinimumTargetSize, (int)Math.Round(tileDp));
-            int parallel = 4;
-            try
-            {
-                parallel = await Task.Run(() =>
-                {
-                    int smoothed = 0;
-                    var snap = WindowsSystemMetrics.Sample(TimeSpan.FromMilliseconds(50));
-                    return ScanConcurrencyAdvisor.Recommend(snap, Environment.ProcessorCount, ref smoothed);
-                }, ct).ConfigureAwait(false);
-                int maxP = backgroundFriendly ? UILayoutConstants.AlbumArtPrefetchMaxParallelism : UILayoutConstants.AlbumArtLoadMaxParallelism;
-                parallel = Math.Clamp(parallel, 1, maxP);
-                if (backgroundFriendly)
-                {
-                    parallel = Math.Max(1, parallel / 2);
-                    parallel = Math.Min(parallel, UILayoutConstants.AlbumArtPrefetchMaxParallelism);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-            catch
-            {
-                int maxP = backgroundFriendly ? UILayoutConstants.AlbumArtPrefetchMaxParallelism : UILayoutConstants.AlbumArtLoadMaxParallelism;
-                parallel = Math.Clamp(4, 1, maxP);
-                if (backgroundFriendly)
-                {
-                    parallel = Math.Max(1, parallel / 2);
-                    parallel = Math.Min(parallel, UILayoutConstants.AlbumArtPrefetchMaxParallelism);
-                }
-            }
-
-            var assignPriority = DispatcherPriority.Normal;
-            using var throttler = new SemaphoreSlim(parallel);
-            var tasks = items.Select(async item =>
-            {
-                if (item.AlbumArtSource != null || ct.IsCancellationRequested)
-                    return;
-
-                await throttler.WaitAsync(ct).ConfigureAwait(false);
-                try
-                {
-                    var img = AlbumArtThumbnailHelper.LoadForTrack(item.RepresentativeTrack, targetSize);
-                    if (img == null || ct.IsCancellationRequested)
-                        return;
-
-                    await Dispatcher.InvokeAsync(() =>
+                    var options = new ParallelOptions { MaxDegreeOfParallelism = ArtDecodeParallelism, CancellationToken = ct };
+                    Parallel.ForEach(NearestFirst(albums.Count, startIndex, total), options, i =>
                     {
-                        if (!ct.IsCancellationRequested && item.AlbumArtSource == null)
-                            item.AlbumArtSource = img;
-                    }, assignPriority);
+                        AlbumGridArtCache.GetOrLoad(albums[i].ArtKey, albums[i].RepresentativeTrack, px);
+                        int d = Interlocked.Increment(ref done);
+                        if (d % 24 == 0 && !ct.IsCancellationRequested)
+                            Report(AlbumsGridRebuildPhase.LoadingArtwork, d);
+                    });
                 }
-                finally
+                catch (OperationCanceledException)
                 {
-                    throttler.Release();
+                    return; // whoever canceled started the newer prefetch, which reports
                 }
-            });
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+                Report(AlbumsGridRebuildPhase.Complete, total);
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (!ct.IsCancellationRequested)
+                        _artPrefetchReporting = false;
+                });
+            }, ct);
         }
 
+        /// <summary>Scrolling moves the prefetch window with the view (once the scroll settles briefly).</summary>
         private void AlbumScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
-            SyncSectionHeaderWidth();
-            if (e.VerticalChange == 0 && e.ExtentHeightChange == 0)
+            if (e.VerticalChange == 0 || _albums.Count == 0)
+                return;
+            if (_scrollPrefetchDebounce == null)
+            {
+                _scrollPrefetchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+                _scrollPrefetchDebounce.Tick += (_, _) =>
+                {
+                    _scrollPrefetchDebounce.Stop();
+                    StartArtPrefetch(FirstVisibleAlbumIndex(), reportStatus: false);
+                };
+            }
+            _scrollPrefetchDebounce.Stop();
+            _scrollPrefetchDebounce.Start();
+        }
+
+        /// <summary>Decodes <paramref name="count"/> albums from <paramref name="from"/> in parallel, blocking until done.</summary>
+        private static void PrefetchArtNow(IReadOnlyList<AlbumGridItem> albums, int from, int count, int px, CancellationToken ct = default)
+        {
+            from = Math.Clamp(from, 0, albums.Count);
+            int to = Math.Min(albums.Count, from + Math.Max(0, count));
+            var options = new ParallelOptions { MaxDegreeOfParallelism = ArtDecodeParallelism, CancellationToken = ct };
+            Parallel.For(from, to, options, i => AlbumGridArtCache.GetOrLoad(albums[i].ArtKey, albums[i].RepresentativeTrack, px));
+        }
+
+        /// <summary>Up to <paramref name="limit"/> indices outward from <paramref name="start"/>, two ahead per one behind.</summary>
+        private static IEnumerable<int> NearestFirst(int count, int start, int limit)
+        {
+            int ahead = Math.Clamp(start, 0, count), behind = ahead - 1, n = 0;
+            while (n < limit && (ahead < count || behind >= 0))
+            {
+                for (int k = 0; k < 2 && ahead < count && n < limit; k++, n++)
+                    yield return ahead++;
+                if (behind >= 0 && n < limit)
+                {
+                    yield return behind--;
+                    n++;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Tile size changed: decode the albums around the view at the new size first (parallel, ~tens of ms on a
+        /// cold cache), then re-chunk the rows so the new tiles bind to ready art, then refill the rest.
+        /// </summary>
+        private void OnTileSizeChanged()
+        {
+            AlbumGridItem.ArtPx = GridArtPx;
+            if (_entries.Count == 0 || _isDraggingSlider)
                 return;
 
-            ScheduleArtLoad();
+            int first = FirstVisibleAlbumIndex();
+            int screen = AlbumsPerScreen();
+            // The panel realizes about one screen above and one below the view (default CacheLength).
+            PrefetchArtNow(_albums, first - screen, screen * 3, AlbumGridItem.ArtPx);
+            RebuildRows();
+            StartArtPrefetch(first);
         }
     }
 }

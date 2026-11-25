@@ -10,7 +10,6 @@ using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Threading;
 using musicApp;
-using musicApp.Constants;
 using musicApp.Helpers;
 
 namespace musicApp.Views
@@ -57,6 +56,10 @@ namespace musicApp.Views
                     FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
                     OnAlbumSizePercentChanged));
 
+        // CurrentTileSize, TileMargin and RowWidth are attached and inherit down the visual tree (WPF inherits
+        // only attached properties reliably). Tiles bind to their own inherited value, which exists at their
+        // first measure; a RelativeSource AncestorType binding resolved only later, so new rows first
+        // measured 41 px tall and the panel built ~5x too many.
         public double CurrentTileSize
         {
             get => (double)GetValue(CurrentTileSizeProperty);
@@ -64,11 +67,11 @@ namespace musicApp.Views
         }
 
         public static readonly DependencyProperty CurrentTileSizeProperty =
-            DependencyProperty.Register(
+            DependencyProperty.RegisterAttached(
                 nameof(CurrentTileSize),
                 typeof(double),
                 typeof(AlbumsView),
-                new PropertyMetadata(DefaultTileSize, OnCurrentTileSizeChanged));
+                new FrameworkPropertyMetadata(DefaultTileSize, FrameworkPropertyMetadataOptions.Inherits, OnCurrentTileSizeChanged));
 
         public Thickness TileMargin
         {
@@ -77,11 +80,11 @@ namespace musicApp.Views
         }
 
         public static readonly DependencyProperty TileMarginProperty =
-            DependencyProperty.Register(
+            DependencyProperty.RegisterAttached(
                 nameof(TileMargin),
                 typeof(Thickness),
                 typeof(AlbumsView),
-                new PropertyMetadata(new Thickness(0, 0, BaseTileRightGap, BaseTileBottomGap)));
+                new FrameworkPropertyMetadata(new Thickness(0, 0, BaseTileRightGap, BaseTileBottomGap), FrameworkPropertyMetadataOptions.Inherits));
 
         public double TileScaleRatio
         {
@@ -95,6 +98,20 @@ namespace musicApp.Views
                 typeof(double),
                 typeof(AlbumsView),
                 new PropertyMetadata(1.0));
+
+        /// <summary>Width of a tile row: tiles-per-row strides (Albums, centered) or the full header width (Recently Added).</summary>
+        public double RowWidth
+        {
+            get => (double)GetValue(RowWidthProperty);
+            set => SetValue(RowWidthProperty, value);
+        }
+
+        public static readonly DependencyProperty RowWidthProperty =
+            DependencyProperty.RegisterAttached(
+                nameof(RowWidth),
+                typeof(double),
+                typeof(AlbumsView),
+                new FrameworkPropertyMetadata(600d, FrameworkPropertyMetadataOptions.Inherits));
 
         public double FlyoutPanelWidth
         {
@@ -216,6 +233,7 @@ namespace musicApp.Views
                 view.TileMargin = new Thickness(0, 0, Math.Round(BaseTileRightGap * ratio), tileBottom);
                 view.FlyoutMargin = new Thickness(0, Math.Max(0, flyoutGap - tileBottom), 0, flyoutGap);
                 view.TileScaleRatio = ratio;
+                view.OnTileSizeChanged();
             }
         }
 
@@ -236,38 +254,28 @@ namespace musicApp.Views
             }
             else
             {
+                // Slider click or arrow keys: keep the same share of the list in view, like a drag.
+                double ratio = view.GetScrollRatio();
                 view.CurrentTileSize = newSize;
-                view.ScheduleArtLoad();
+                view.RestoreScrollRatio(ratio);
             }
         }
 
         private enum AlbumSortMode { Album, Artist }
 
-        private enum ResizeAnchorKind
-        {
-            SelectedAlbum,
-            FirstVisibleAlbum
-        }
-
-        private readonly record struct ResizeAnchorState(
-            string AlbumTitle,
-            string Artist,
-            double OffsetFromViewportTop,
-            ResizeAnchorKind Kind);
-
         private AlbumSortMode _sortMode = AlbumSortMode.Album;
         private IEnumerable? _itemsSource;
         private int _itemsSourceCount = -1;
-        private ObservableCollection<object> _albumItems = new();
+        // The built grid in display order: AlbumGridItem tiles and (Recently Added) AlbumSectionHeaderItem headers.
+        private List<object> _entries = new();
+        private List<AlbumGridItem> _albums = new();
+        // What AlbumGrid shows: _entries chunked into AlbumTileRow rows, plus the open AlbumFlyoutItem.
+        private readonly ObservableCollection<object> _rows = new();
+        private int _tilesPerRow;
         private CancellationTokenSource? _rebuildCts;
-        private CancellationTokenSource? _viewportArtCts;
-        private CancellationTokenSource? _prefetchArtCts;
         private Song? _contextMenuSong;
 
         private (string albumName, string? artistName, bool openDetails, string? selectedTrackFilePath)? _pendingAlbumSelection;
-        private readonly DispatcherTimer _artLoadDebounce;
-        private readonly DispatcherTimer _flyoutResizeDebounce;
-        private readonly DispatcherTimer _resizeAnchorDebounce;
         private readonly DispatcherTimer _collectionChangeRebuildDebounce;
 
         private readonly HashSet<string> _flyoutSelectedKeys = new(StringComparer.OrdinalIgnoreCase);
@@ -275,14 +283,18 @@ namespace musicApp.Views
 
         private AlbumGridItem? _selectedAlbum;
         private AlbumFlyoutItem? _currentFlyout;
-        private bool _isRefreshingFlyoutLayout;
-        private ResizeAnchorState? _pendingResizeAnchor;
+
+        // Template parts of AlbumGrid (Albums.xaml), found once in the constructor.
+        private readonly ScrollViewer _albumScrollViewer;
+        private readonly ItemsPresenter _itemsPresenter;
+        private readonly FrameworkElement _rowSpace; // the ScrollContentPresenter: viewport minus padding
 
         private bool _isDraggingSlider;
         private double _dragStartTileSize;
         private double _dragTargetSize;
         private ScaleTransform? _dragScaleTransform;
-        private AlbumsBrowseMode _lastGridBuildBrowseMode = AlbumsBrowseMode.AllAlbums;
+        // Mode the grid holds or is being built for; null after a canceled build left it partial.
+        private AlbumsBrowseMode? _lastGridBuildBrowseMode;
         private bool _isRebuilding;
         private int _rebuildGeneration;
         private bool _suppressBrowseModeRebuild;
@@ -292,29 +304,27 @@ namespace musicApp.Views
         public AlbumsView()
         {
             InitializeComponent();
-            ScrollWheelDampingHelper.Attach(AlbumScrollViewer);
+            AlbumGrid.ApplyTemplate();
+            _albumScrollViewer = AlbumGrid.Template.FindName("PART_ScrollViewer", AlbumGrid) as ScrollViewer
+                ?? throw new InvalidOperationException("AlbumGrid template has no PART_ScrollViewer");
+            _albumScrollViewer.ApplyTemplate();
+            _itemsPresenter = AlbumGrid.Template.FindName("PART_ItemsPresenter", AlbumGrid) as ItemsPresenter
+                ?? throw new InvalidOperationException("AlbumGrid template has no PART_ItemsPresenter");
+            _rowSpace = _albumScrollViewer.Template.FindName("PART_ScrollContentPresenter", _albumScrollViewer) as FrameworkElement
+                ?? throw new InvalidOperationException("ScrollViewer template has no PART_ScrollContentPresenter");
+            // The row width follows the space next to the scrollbar, so re-chunk when it changes. Read from the
+            // content presenter, not the items presenter: the slider drag scales the items presenter.
+            _rowSpace.SizeChanged += (_, e) =>
+            {
+                if (e.WidthChanged)
+                    RechunkRowsKeepingPlace();
+            };
+            _albumScrollViewer.ScrollChanged += AlbumScrollViewer_ScrollChanged;
+            ScrollWheelDampingHelper.Attach(_albumScrollViewer);
             emptyLibraryOverlay.AddMusicFolderRequested += (_, __) => AddMusicFolderRequested?.Invoke(this, EventArgs.Empty);
-            AlbumGrid.ItemsSource = _albumItems;
+            AlbumGrid.ItemsSource = _rows;
+            AlbumGridItem.ArtPx = GridArtPx;
 
-            _artLoadDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
-            _artLoadDebounce.Tick += async (_, __) =>
-            {
-                _artLoadDebounce.Stop();
-                await LoadVisibleAlbumArtAsync();
-            };
-
-            _flyoutResizeDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(90) };
-            _flyoutResizeDebounce.Tick += (_, __) =>
-            {
-                _flyoutResizeDebounce.Stop();
-                RefreshOpenFlyoutLayout();
-            };
-            _resizeAnchorDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(70) };
-            _resizeAnchorDebounce.Tick += (_, __) =>
-            {
-                _resizeAnchorDebounce.Stop();
-                RestoreResizeAnchorIfPending();
-            };
             _collectionChangeRebuildDebounce = new DispatcherTimer(DispatcherPriority.Background)
             {
                 Interval = TimeSpan.FromMilliseconds(400)
@@ -331,13 +341,7 @@ namespace musicApp.Views
             {
                 UpdateSortBarVisibility();
                 SyncSectionHeaderWidth();
-                KickViewportAlbumArtNow();
                 UpdateEmptyLibraryOverlay();
-            };
-            IsVisibleChanged += (_, __) =>
-            {
-                if (IsVisible)
-                    KickViewportAlbumArtNow();
             };
             Unloaded += AlbumsView_OnUnloaded;
             SizeChanged += AlbumsView_SizeChanged;
@@ -345,13 +349,8 @@ namespace musicApp.Views
 
         internal void SyncSectionHeaderWidth()
         {
-            if (AlbumScrollViewer == null)
-                return;
-            double w = AlbumScrollViewer.ViewportWidth;
-            if (w <= 0)
-                w = Math.Max(1, ActualWidth - UILayoutConstants.AlbumWrapHorizontalPadding);
-            double pad = AlbumScrollViewer.Padding.Left + AlbumScrollViewer.Padding.Right;
-            SectionHeaderWidth = Math.Max(100, w - pad);
+            double pad = _albumScrollViewer.Padding.Left + _albumScrollViewer.Padding.Right;
+            SectionHeaderWidth = Math.Max(100, AvailableRowWidth() - pad);
         }
 
         private void UpdateSortBarVisibility()
@@ -373,18 +372,14 @@ namespace musicApp.Views
                     _itemsSourceCollectionNotify = null;
                 }
 
+                // Canceling a build mid-way leaves a partial grid; mark it stale now (not in the run's
+                // finally, which lands later) so coming straight back rebuilds.
+                if (_isRebuilding)
+                    _lastGridBuildBrowseMode = null;
+                // Art prefetch keeps running: it only fills the cache, which the next visit uses.
                 _rebuildCts?.Cancel();
                 _rebuildCts?.Dispose();
                 _rebuildCts = null;
-                _viewportArtCts?.Cancel();
-                _viewportArtCts?.Dispose();
-                _viewportArtCts = null;
-                _prefetchArtCts?.Cancel();
-                _prefetchArtCts?.Dispose();
-                _prefetchArtCts = null;
-                _artLoadDebounce.Stop();
-                _flyoutResizeDebounce.Stop();
-                _resizeAnchorDebounce.Stop();
                 _collectionChangeRebuildDebounce.Stop();
             }
             catch

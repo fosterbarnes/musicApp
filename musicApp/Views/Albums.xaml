@@ -163,13 +163,30 @@
         </StackPanel>
 
         <Grid Grid.Row="1">
-        <ScrollViewer x:Name="AlbumScrollViewer"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled"
-                      Padding="24,8,24,16"
-                      ScrollChanged="AlbumScrollViewer_ScrollChanged">
-            <ItemsControl x:Name="AlbumGrid">
+            <!-- A virtualized list of rows (tile strip, date header, or album flyout): only rows near the
+                 viewport get containers. The ScrollViewer must be in the template, not around the
+                 ItemsControl, or the panel gets infinite height and stops virtualizing. -->
+            <ItemsControl x:Name="AlbumGrid"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling"
+                          VirtualizingPanel.ScrollUnit="Pixel">
+                <ItemsControl.Template>
+                    <ControlTemplate TargetType="ItemsControl">
+                        <ScrollViewer x:Name="PART_ScrollViewer"
+                                      CanContentScroll="True"
+                                      Focusable="False"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      Padding="24,8,24,16">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </ControlTemplate>
+                </ItemsControl.Template>
                 <ItemsControl.Resources>
+                    <DataTemplate DataType="{x:Type views:AlbumTileRow}">
+                        <views:AlbumTileRowPanel Width="{Binding (views:AlbumsView.RowWidth), RelativeSource={RelativeSource Self}}"
+                                                 HorizontalAlignment="Center"/>
+                    </DataTemplate>
                     <DataTemplate DataType="{x:Type views:AlbumSectionHeaderItem}">
                         <StackPanel Width="{Binding SectionHeaderWidth, RelativeSource={RelativeSource AncestorType=views:AlbumsView}}"
                                     Margin="0,12,0,0">
@@ -185,8 +202,8 @@
                     </DataTemplate>
                     <!-- Album tile template -->
                     <DataTemplate DataType="{x:Type views:AlbumGridItem}">
-                        <Border Width="{Binding CurrentTileSize, RelativeSource={RelativeSource AncestorType=views:AlbumsView}}"
-                                Margin="{Binding TileMargin, RelativeSource={RelativeSource AncestorType=views:AlbumsView}}"
+                        <Border Width="{Binding (views:AlbumsView.CurrentTileSize), RelativeSource={RelativeSource Self}}"
+                                Margin="{Binding (views:AlbumsView.TileMargin), RelativeSource={RelativeSource Self}}"
                                 CornerRadius="5"
                                 Cursor="Hand"
                                 MouseLeftButtonDown="AlbumItem_MouseLeftButtonDown">
@@ -200,8 +217,8 @@
                                 </Style>
                             </Border.Style>
                             <StackPanel>
-                                <Border Width="{Binding CurrentTileSize, RelativeSource={RelativeSource AncestorType=views:AlbumsView}}"
-                                        Height="{Binding CurrentTileSize, RelativeSource={RelativeSource AncestorType=views:AlbumsView}}"
+                                <Border Width="{Binding (views:AlbumsView.CurrentTileSize), RelativeSource={RelativeSource Self}}"
+                                        Height="{Binding (views:AlbumsView.CurrentTileSize), RelativeSource={RelativeSource Self}}"
                                         CornerRadius="5"
                                         SnapsToDevicePixels="True"
                                         ClipToBounds="True">
@@ -402,12 +419,10 @@
                 </ItemsControl.Resources>
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal"
-                                   HorizontalAlignment="Center"/>
+                        <VirtualizingStackPanel/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
             </ItemsControl>
-        </ScrollViewer>
         <views:EmptyLibraryAddOverlay x:Name="emptyLibraryOverlay"
                                       VerticalAlignment="Stretch"
                                       HorizontalAlignment="Stretch"

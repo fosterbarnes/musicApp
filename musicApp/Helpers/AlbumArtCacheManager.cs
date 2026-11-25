@@ -83,38 +83,30 @@ public static class AlbumArtCacheManager
     /// plain-artist key. A song with no album may still hold the shared "Unknown Album" path from older versions;
     /// that one is skipped so it gets its own art.
     /// </summary>
-    public static BitmapSource? TryGetCachedForTrack(Song track, int decodePixelWidth = 0)
+    public static BitmapSource? TryGetCachedForTrack(Song track, int decodePixelWidth = 0, bool keepInMemory = true)
     {
         var ownPath = GetCachedPathForTrack(track);
         if (!string.IsNullOrEmpty(track.ThumbnailCachePath) &&
             (RecentlyAddedPlaybackOrder.HasAlbum(track) || track.ThumbnailCachePath == ownPath) &&
-            LoadFromCachePath(track.ThumbnailCachePath, decodePixelWidth) is { } saved)
+            LoadFromCachePath(track.ThumbnailCachePath, decodePixelWidth, keepInMemory) is { } saved)
             return saved;
 
-        var cached = LoadFromCachePath(ownPath, decodePixelWidth);
+        var cached = LoadFromCachePath(ownPath, decodePixelWidth, keepInMemory);
         if (cached != null || !RecentlyAddedPlaybackOrder.HasAlbum(track))
             return cached;
         var artist = track.Artist ?? "";
         return string.Equals(GetThumbnailCacheArtistKey(track), artist, StringComparison.Ordinal)
             ? null
-            : TryGetCached(track.Album ?? "", artist, decodePixelWidth);
-    }
-
-    /// <summary>
-    /// Loads a cached thumbnail as a frozen BitmapImage, with optional WPF-side decode scaling.
-    /// Returns null if no cache file exists.
-    /// </summary>
-    public static BitmapSource? TryGetCached(string album, string artist, int decodePixelWidth = 0)
-    {
-        var path = GetCachedPath(album, artist);
-        return LoadFromCachePath(path, decodePixelWidth);
+            : LoadFromCachePath(GetCachedPath(track.Album ?? "", artist), decodePixelWidth, keepInMemory);
     }
 
     /// <summary>
     /// Loads a cached thumbnail by its file path with optional WPF-side decode scaling.
     /// Uses an in-memory dictionary so the same file is only read from disk once per session.
+    /// <paramref name="keepInMemory"/> false: do not store the result there (the album grid has its own
+    /// byte-bounded cache, and a copy here would hold bitmaps past its budget).
     /// </summary>
-    public static BitmapSource? LoadFromCachePath(string cachePath, int decodePixelWidth = 0)
+    public static BitmapSource? LoadFromCachePath(string cachePath, int decodePixelWidth = 0, bool keepInMemory = true)
     {
         if (string.IsNullOrEmpty(cachePath))
             return null;
@@ -160,8 +152,11 @@ public static class AlbumArtCacheManager
                 }
 
                 bmp.Freeze();
-                _memoryCache[cacheKey] = bmp;
-                TrimMemoryCacheIfNeeded();
+                if (keepInMemory)
+                {
+                    _memoryCache[cacheKey] = bmp;
+                    TrimMemoryCacheIfNeeded();
+                }
                 return bmp;
             }
             catch
@@ -264,6 +259,7 @@ public static class AlbumArtCacheManager
         AlbumArtSourceResolver.ClearDirectoryCoverCache();
         _memoryCache.Clear();
         _noArtworkCache.Clear();
+        AlbumGridArtCache.Clear();
         try
         {
             if (Directory.Exists(ThumbnailFolder))
@@ -298,6 +294,7 @@ public static class AlbumArtCacheManager
             .ToList();
         foreach (var key in keysToRemove)
             _memoryCache.TryRemove(key, out _);
+        AlbumGridArtCache.Invalidate(path);
 
         try { if (File.Exists(path)) File.Delete(path); } catch { }
     }
@@ -308,6 +305,7 @@ public static class AlbumArtCacheManager
         AlbumArtThumbnailHelper.ClearFullSizeCache();
         _memoryCache.Clear();
         _noArtworkCache.Clear();
+        AlbumGridArtCache.Clear();
     }
 
     private static bool LooksLikeRasterImageHeader(ReadOnlySpan<byte> data)

@@ -1,190 +1,212 @@
+using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
+using musicApp.Constants;
 using musicApp.Helpers;
 
 namespace musicApp.Views
 {
+    // Row layout: _entries (tiles and headers) are chunked into AlbumTileRow rows of tiles-per-row albums.
+    // Rows are re-chunked only when tiles-per-row or the entries change; everything else is row lookups.
     public partial class AlbumsView
     {
-        private List<int> GetVisibleIndices()
+        private VirtualizingStackPanel? ItemsHost => FindVisualChild<VirtualizingStackPanel>(_itemsPresenter);
+
+        /// <summary>Width rows can use: the scroll viewer's content area (minus padding and scrollbar).</summary>
+        private double AvailableRowWidth() =>
+            _rowSpace.ActualWidth > 0
+                ? _rowSpace.ActualWidth
+                : Math.Max(UILayoutConstants.AlbumWrapFallbackWidth, ActualWidth - UILayoutConstants.AlbumWrapHorizontalPadding);
+
+        private double TileStrideX()
         {
-            var result = new List<int>();
-            if (AlbumScrollViewer == null || _albumItems.Count == 0)
-                return result;
-
-            if (AlbumScrollViewer.ViewportHeight <= 0)
-                return result;
-
-            AlbumGridLayoutMath.GetStrides(
-                CurrentTileSize, TileMargin.Right, TileMargin.Bottom, TileScaleRatio,
-                out double tileStrideX, out double tileStrideY);
-            int perRow = AlbumGridLayoutMath.PerRowFromViewport(AlbumScrollViewer.ViewportWidth, tileStrideX);
-
-            int startRow = Math.Max(0, (int)Math.Floor(AlbumScrollViewer.VerticalOffset / tileStrideY) - 2);
-            int endRow = (int)Math.Ceiling((AlbumScrollViewer.VerticalOffset + AlbumScrollViewer.ViewportHeight) / tileStrideY) + 2;
-            int startIndex = Math.Max(0, startRow * perRow);
-            int endIndex = Math.Min(_albumItems.Count - 1, ((endRow + 1) * perRow) - 1);
-
-            var gen = AlbumGrid.ItemContainerGenerator;
-            for (int i = startIndex; i <= endIndex; i++)
-            {
-                if (_albumItems[i] is not AlbumGridItem) continue;
-
-                var container = gen.ContainerFromIndex(i) as FrameworkElement;
-                if (container == null)
-                    continue;
-
-                GeneralTransform transform;
-                try { transform = container.TransformToAncestor(AlbumScrollViewer); }
-                catch { continue; }
-
-                var topLeft = transform.Transform(new Point(0, 0));
-                double itemTop = topLeft.Y;
-                double itemBottom = itemTop + container.ActualHeight;
-
-                if (itemBottom >= 0 && itemTop <= AlbumScrollViewer.ViewportHeight)
-                    result.Add(i);
-            }
-
-            return result;
+            AlbumGridLayoutMath.GetStrides(CurrentTileSize, TileMargin.Right, TileMargin.Bottom, TileScaleRatio, out var sx, out _);
+            return sx;
         }
 
-        private void AlbumsView_SizeChanged(object sender, SizeChangedEventArgs e)
+        // Recently Added tiles wrap inside the header width (call SyncSectionHeaderWidth first).
+        private int ComputeTilesPerRow() => AlbumGridLayoutMath.PerRowFromViewport(
+            BrowseMode == AlbumsBrowseMode.RecentlyAdded ? SectionHeaderWidth : AvailableRowWidth(), TileStrideX());
+
+        /// <summary>Recently Added rows span the header width (tiles start at the left); Albums rows are centered.</summary>
+        private void UpdateRowWidth()
+        {
+            RowWidth = BrowseMode == AlbumsBrowseMode.RecentlyAdded ? SectionHeaderWidth : _tilesPerRow * TileStrideX();
+            FlyoutPanelWidth = RowWidth;
+        }
+
+        /// <summary>Rebuilds the row list from <see cref="_entries"/>, keeping the open flyout under its album's row.</summary>
+        private void RebuildRows()
         {
             SyncSectionHeaderWidth();
-            TryCaptureResizeAnchor();
-            _resizeAnchorDebounce.Stop();
-            _resizeAnchorDebounce.Start();
+            _tilesPerRow = ComputeTilesPerRow();
+            UpdateRowWidth();
 
-            ScheduleArtLoad();
-            if (_currentFlyout == null || _selectedAlbum == null)
-                return;
-
-            FlyoutPanelWidth = GetWrapPanelWidth();
-            _flyoutResizeDebounce.Stop();
-            _flyoutResizeDebounce.Start();
-        }
-
-        private bool TryCaptureResizeAnchor()
-        {
-            if (AlbumScrollViewer == null)
-                return false;
-
-            if (_selectedAlbum != null)
+            var rows = new List<object>(_entries.Count / _tilesPerRow + 8);
+            List<AlbumGridItem>? row = null;
+            foreach (var entry in _entries)
             {
-                if (!TryGetAlbumItemTopInViewport(_selectedAlbum, out var itemTop))
-                    itemTop = 12;
-
-                _pendingResizeAnchor = new ResizeAnchorState(
-                    _selectedAlbum.AlbumTitle,
-                    _selectedAlbum.Artist,
-                    itemTop,
-                    ResizeAnchorKind.SelectedAlbum);
-                return true;
-            }
-
-            if (!TryGetFirstVisibleAlbumItem(out var visibleAlbum, out var visibleTop) || visibleAlbum == null)
-                return false;
-
-            _pendingResizeAnchor = new ResizeAnchorState(
-                visibleAlbum.AlbumTitle,
-                visibleAlbum.Artist,
-                visibleTop,
-                ResizeAnchorKind.FirstVisibleAlbum);
-            return true;
-        }
-
-        private bool TryGetFirstVisibleAlbumItem(out AlbumGridItem? album, out double itemTop)
-        {
-            album = null;
-            itemTop = 0;
-
-            if (AlbumScrollViewer == null || _albumItems.Count == 0)
-                return false;
-
-            var visibleIndices = GetVisibleIndices();
-            if (visibleIndices.Count == 0)
-                return false;
-
-            double bestTop = double.MaxValue;
-            foreach (var index in visibleIndices)
-            {
-                if (index < 0 || index >= _albumItems.Count)
-                    continue;
-
-                if (_albumItems[index] is not AlbumGridItem candidate)
-                    continue;
-
-                if (!TryGetAlbumItemTopInViewport(candidate, out var top))
-                    continue;
-
-                if (top < bestTop)
+                if (entry is AlbumGridItem album)
                 {
-                    bestTop = top;
-                    album = candidate;
-                    itemTop = top;
+                    row ??= new List<AlbumGridItem>(_tilesPerRow);
+                    row.Add(album);
+                    if (row.Count < _tilesPerRow)
+                        continue;
+                }
+                else if (row == null)
+                {
+                    rows.Add(entry);
+                    continue;
+                }
+
+                rows.Add(new AlbumTileRow(row));
+                row = null;
+                if (entry is not AlbumGridItem)
+                    rows.Add(entry); // a header ends the row before it
+            }
+            if (row != null)
+                rows.Add(new AlbumTileRow(row));
+
+            if (_currentFlyout != null && _selectedAlbum != null)
+            {
+                int at = rows.FindIndex(r => r is AlbumTileRow t && t.Albums.Contains(_selectedAlbum));
+                if (at >= 0)
+                    rows.Insert(at + 1, _currentFlyout);
+                else
+                {
+                    _currentFlyout = null;
+                    _selectedAlbum = null;
+                    ClearFlyoutTrackSelection();
                 }
             }
 
-            return album != null;
+            // Update in place rather than swapping in a new collection: a Reset makes the panel drop every row
+            // container (and its tiles); replacing items lets it rebind the containers it already has.
+            int keep = Math.Min(_rows.Count, rows.Count);
+            for (int i = 0; i < keep; i++)
+            {
+                if (!ReferenceEquals(_rows[i], rows[i]))
+                    _rows[i] = rows[i];
+            }
+            while (_rows.Count > rows.Count)
+                _rows.RemoveAt(_rows.Count - 1);
+            for (int i = keep; i < rows.Count; i++)
+                _rows.Add(rows[i]);
+
+            if (_currentFlyout != null && _selectedAlbum != null)
+                UpdateFlyoutArrowOffset(_selectedAlbum);
         }
 
-        private bool TryGetAlbumItemTopInViewport(AlbumGridItem album, out double itemTop)
+        /// <summary>
+        /// The space for rows changed (window resize, scrollbar shown or hidden): re-chunk if tiles-per-row
+        /// changed, keeping the open album (when on screen) or the first visible album at the same height.
+        /// </summary>
+        private void RechunkRowsKeepingPlace()
         {
-            itemTop = 0;
-            if (AlbumScrollViewer == null)
-                return false;
-
-            var container = AlbumGrid.ItemContainerGenerator.ContainerFromItem(album) as FrameworkElement;
-            if (container == null)
-                return false;
-
-            try
-            {
-                var transform = container.TransformToAncestor(AlbumScrollViewer);
-                itemTop = transform.Transform(new Point(0, 0)).Y;
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private void RestoreResizeAnchorIfPending()
-        {
-            if (!_pendingResizeAnchor.HasValue || AlbumScrollViewer == null || _albumItems.Count == 0)
+            SyncSectionHeaderWidth();
+            if (_isDraggingSlider || _entries.Count == 0)
                 return;
-
-            var pending = _pendingResizeAnchor.Value;
-            var anchor = FindAlbumItem(pending.AlbumTitle, pending.Artist);
-            if (anchor == null)
+            if (ComputeTilesPerRow() == _tilesPerRow)
             {
-                _pendingResizeAnchor = null;
+                UpdateRowWidth();
                 return;
             }
 
+            var anchor = CaptureViewAnchor();
+            RebuildRows();
+            if (anchor is { } a)
+                ScrollRowTo(RowIndexOf(a.Album), a.Top);
+        }
+
+        private (AlbumGridItem Album, double Top)? CaptureViewAnchor()
+        {
+            // The open album anchors only while it is on screen; scrolled far away, anchoring it made a
+            // resize jump back to it.
+            if (_selectedAlbum != null && TryGetRowTop(RowIndexOf(_selectedAlbum), out var selectedTop) &&
+                selectedTop > -CurrentTileSize && selectedTop < _albumScrollViewer.ViewportHeight)
+                return (_selectedAlbum, selectedTop);
+
+            foreach (var (row, top, bottom) in RealizedRows())
+            {
+                if (bottom > 0 && row is AlbumTileRow tiles)
+                    return (tiles.Albums[0], top);
+            }
+            return null;
+        }
+
+        /// <summary>Realized row containers in order, with their top and bottom relative to the viewport.</summary>
+        private IEnumerable<(object Row, double Top, double Bottom)> RealizedRows()
+        {
+            if (ItemsHost is not { } host)
+                yield break;
+            var generator = AlbumGrid.ItemContainerGenerator;
+            foreach (UIElement child in host.Children)
+            {
+                // Recycled containers waiting for reuse have no index.
+                if (child is not FrameworkElement fe || fe.ActualHeight <= 0 || generator.IndexFromContainer(fe) < 0)
+                    continue;
+                double top;
+                try { top = fe.TransformToAncestor(_albumScrollViewer).Transform(new Point(0, 0)).Y; }
+                catch (InvalidOperationException) { continue; }
+                yield return (fe.DataContext, top, top + fe.ActualHeight);
+            }
+        }
+
+        private int RowIndexOf(AlbumGridItem album)
+        {
+            for (int i = 0; i < _rows.Count; i++)
+            {
+                if (_rows[i] is AlbumTileRow row && row.Albums.Contains(album))
+                    return i;
+            }
+            return -1;
+        }
+
+        /// <summary>Index in <see cref="_albums"/> of the first album in the first visible tile row (0 if none).</summary>
+        private int FirstVisibleAlbumIndex()
+        {
+            foreach (var (row, _, bottom) in RealizedRows())
+            {
+                if (bottom > 0 && row is AlbumTileRow tiles)
+                    return Math.Max(0, _albums.IndexOf(tiles.Albums[0]));
+            }
+            return 0;
+        }
+
+        private int AlbumsPerScreen()
+        {
+            AlbumGridLayoutMath.GetStrides(CurrentTileSize, TileMargin.Right, TileMargin.Bottom, TileScaleRatio, out _, out var sy);
+            double vh = _albumScrollViewer.ViewportHeight > 0 ? _albumScrollViewer.ViewportHeight : UILayoutConstants.AlbumArtBootstrapViewportHeightFallback;
+            return Math.Max(1, _tilesPerRow) * ((int)Math.Ceiling(vh / sy) + 1);
+        }
+
+        private bool TryGetRowTop(int rowIndex, out double top)
+        {
+            top = 0;
+            if (rowIndex < 0 || AlbumGrid.ItemContainerGenerator.ContainerFromIndex(rowIndex) is not FrameworkElement container)
+                return false;
+            try { top = container.TransformToAncestor(_albumScrollViewer).Transform(new Point(0, 0)).Y; }
+            catch (InvalidOperationException) { return false; }
+            return true;
+        }
+
+        /// <summary>Scrolls so row <paramref name="rowIndex"/> starts <paramref name="desiredTop"/> below the viewport top.</summary>
+        private void ScrollRowTo(int rowIndex, double desiredTop)
+        {
+            if (rowIndex < 0 || ItemsHost is not { } host)
+                return;
             AlbumGrid.UpdateLayout();
-            AlbumScrollViewer.UpdateLayout();
-
-            if (!TryGetAlbumItemTopInViewport(anchor, out var currentTop))
+            if (!TryGetRowTop(rowIndex, out var top))
             {
-                _pendingResizeAnchor = null;
-                return;
+                host.BringIndexIntoViewPublic(rowIndex); // realizes the row so it can be measured
+                AlbumGrid.UpdateLayout();
+                if (!TryGetRowTop(rowIndex, out top))
+                    return;
             }
-
-            double desiredTop = pending.OffsetFromViewportTop;
-            if (pending.Kind == ResizeAnchorKind.SelectedAlbum)
-                desiredTop = Math.Min(Math.Max(0, desiredTop), Math.Max(0, AlbumScrollViewer.ViewportHeight - CurrentTileSize));
-            else
-                desiredTop = Math.Max(0, desiredTop);
-
-            double targetOffset = AlbumScrollViewer.VerticalOffset + (currentTop - desiredTop);
-            targetOffset = Math.Min(Math.Max(0, targetOffset), AlbumScrollViewer.ScrollableHeight);
-            AlbumScrollViewer.ScrollToVerticalOffset(targetOffset);
-            _pendingResizeAnchor = null;
+            _albumScrollViewer.ScrollToVerticalOffset(Math.Max(0, _albumScrollViewer.VerticalOffset + top - desiredTop));
         }
+
+        private void AlbumsView_SizeChanged(object sender, SizeChangedEventArgs e) => SyncSectionHeaderWidth();
     }
 }

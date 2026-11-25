@@ -11,7 +11,6 @@ using musicApp;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using musicApp.Constants;
 using musicApp.Helpers;
@@ -21,7 +20,6 @@ namespace musicApp.Views
     public partial class AlbumsView
     {
         private INotifyCollectionChanged? _itemsSourceCollectionNotify;
-        private bool _isStartupRebuild = true;
 
         public IEnumerable? ItemsSource
         {
@@ -29,7 +27,7 @@ namespace musicApp.Views
             set
             {
                 int newCount = TryGetCount(value);
-                if (ReferenceEquals(_itemsSource, value) && newCount == _itemsSourceCount && _albumItems.Count > 0 &&
+                if (ReferenceEquals(_itemsSource, value) && newCount == _itemsSourceCount && _entries.Count > 0 &&
                     BrowseMode == _lastGridBuildBrowseMode)
                 {
                     UpdateEmptyLibraryOverlay();
@@ -100,7 +98,7 @@ namespace musicApp.Views
         public bool IsGridCurrentFor(AlbumsBrowseMode mode, IEnumerable? source)
         {
             return !_isRebuilding
-                && _albumItems.Count > 0
+                && _entries.Count > 0
                 && BrowseMode == mode
                 && mode == _lastGridBuildBrowseMode
                 && ReferenceEquals(_itemsSource, source);
@@ -121,32 +119,38 @@ namespace musicApp.Views
             if (track == null || !TryGetAlbumGridGroupKey(track, out var albumTitle, out var artistKey))
                 return false;
 
-            int targetSize = Math.Max(UILayoutConstants.AlbumArtMinimumTargetSize, (int)Math.Round(CurrentTileSize));
             var matchedAny = false;
 
-            foreach (var item in _albumItems.OfType<AlbumGridItem>())
+            foreach (var item in _albums)
             {
                 if (!string.Equals(item.AlbumTitle, albumTitle, StringComparison.OrdinalIgnoreCase) ||
                     !string.Equals(item.Artist, artistKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    // The song left the group this tile was built for: only a rebuild drops or re-picks that tile.
+                    if (ReferenceEquals(item.RepresentativeTrack, track))
+                        return false;
                     continue;
+                }
 
                 matchedAny = true;
-                var rep = item.RepresentativeTrack;
-                var img = rep != null ? AlbumArtThumbnailHelper.LoadForTrack(rep, targetSize) : null;
-                item.AlbumArtSource = img;
+                AlbumGridArtCache.Invalidate(item.ArtKey); // the edit may have changed the art
+                item.NotifyArtChanged();
             }
 
             if (!matchedAny)
                 return false;
 
-            if (_currentFlyout != null &&
-                string.Equals(_currentFlyout.AlbumTitle, albumTitle, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(_currentFlyout.Artist, artistKey, StringComparison.OrdinalIgnoreCase))
+            if (_currentFlyout != null)
             {
-                PatchOpenFlyoutForGroup(albumTitle, artistKey);
+                bool flyoutIsGroup =
+                    string.Equals(_currentFlyout.AlbumTitle, albumTitle, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(_currentFlyout.Artist, artistKey, StringComparison.OrdinalIgnoreCase);
+                if (flyoutIsGroup)
+                    PatchOpenFlyoutForGroup(albumTitle, artistKey);
+                else if (_currentFlyout.Tracks.Contains(track))
+                    return false; // open flyout of the song's old album still lists it
             }
 
-            KickViewportAlbumArtNow();
             return true;
         }
 
@@ -214,14 +218,14 @@ namespace musicApp.Views
         {
             if (!string.IsNullOrWhiteSpace(artistName))
             {
-                var match = _albumItems.OfType<AlbumGridItem>().FirstOrDefault(a =>
+                var match = _albums.FirstOrDefault(a =>
                     string.Equals(a.AlbumTitle, albumName, StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(a.Artist, artistName, StringComparison.OrdinalIgnoreCase));
                 if (match != null)
                     return match;
             }
 
-            return _albumItems.OfType<AlbumGridItem>().FirstOrDefault(a =>
+            return _albums.FirstOrDefault(a =>
                 string.Equals(a.AlbumTitle, albumName, StringComparison.OrdinalIgnoreCase));
         }
 
@@ -231,8 +235,8 @@ namespace musicApp.Views
             {
                 if (!ReferenceEquals(_selectedAlbum, album) || _currentFlyout == null)
                     ShowAlbumDetail(album, bringFlyoutIntoView: bringTargetIntoView);
-                else
-                    RefreshOpenFlyoutLayout();
+                else if (bringTargetIntoView && _currentFlyout is { } open)
+                    Dispatcher.InvokeAsync(() => BringFlyoutFullyIntoView(open), DispatcherPriority.Loaded);
 
                 // Flyout BringIntoView already handles scroll; tile BringIntoView races and
                 // leaves the tall flyout below the viewport.
@@ -244,9 +248,9 @@ namespace musicApp.Views
 
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                var container = AlbumGrid.ItemContainerGenerator.ContainerFromItem(album) as FrameworkElement;
-                if (container != null)
-                    container.BringIntoView();
+                int rowIndex = RowIndexOf(album);
+                if (rowIndex >= 0)
+                    ItemsHost?.BringIndexIntoViewPublic(rowIndex);
             }), DispatcherPriority.Background);
         }
 
@@ -259,6 +263,9 @@ namespace musicApp.Views
 
         private void OnItemsSourceCollectionChangedForEmptyOverlay(object? sender, NotifyCollectionChangedEventArgs e)
         {
+            // Overlay check is a Count read; doing it now stops the "add music" icon lingering over
+            // the first tiles at startup. The rebuild stays debounced.
+            UpdateEmptyLibraryOverlay();
             _collectionChangeRebuildDebounce.Stop();
             _collectionChangeRebuildDebounce.Start();
         }
@@ -275,32 +282,37 @@ namespace musicApp.Views
         private void AlbumSizeSlider_DragStarted(object sender, DragStartedEventArgs e)
         {
             CloseAlbumDetail();
+            // Read before the drag's LayoutTransform scales the extent; read on release it is off
+            // by the scale factor and the view jumped (small -> large landed near the top).
+            _dragStartScrollRatio = GetScrollRatio();
             _isDraggingSlider = true;
             _dragStartTileSize = CurrentTileSize;
             _dragTargetSize = CurrentTileSize;
             _dragScaleTransform = new ScaleTransform(1, 1);
-            AlbumGrid.LayoutTransform = _dragScaleTransform;
+            _itemsPresenter.LayoutTransform = _dragScaleTransform;
         }
 
         private void AlbumSizeSlider_DragCompleted(object sender, DragCompletedEventArgs e)
         {
             _isDraggingSlider = false;
-
-            double scrollRatio = 0;
-            if (AlbumScrollViewer != null && AlbumScrollViewer.ExtentHeight > 0)
-                scrollRatio = AlbumScrollViewer.VerticalOffset / AlbumScrollViewer.ExtentHeight;
-
-            AlbumGrid.LayoutTransform = Transform.Identity;
+            _itemsPresenter.LayoutTransform = Transform.Identity;
             _dragScaleTransform = null;
             CurrentTileSize = _dragTargetSize;
+            RestoreScrollRatio(_dragStartScrollRatio);
+        }
 
-            if (AlbumScrollViewer != null)
-            {
-                AlbumScrollViewer.UpdateLayout();
-                AlbumScrollViewer.ScrollToVerticalOffset(scrollRatio * AlbumScrollViewer.ExtentHeight);
-            }
+        private double _dragStartScrollRatio;
 
-            ScheduleArtLoad();
+        private double GetScrollRatio() =>
+            _albumScrollViewer.ExtentHeight > 0
+                ? _albumScrollViewer.VerticalOffset / _albumScrollViewer.ExtentHeight
+                : 0;
+
+        /// <summary>Lays out the new tile size now and scrolls back to the same share of the list.</summary>
+        private void RestoreScrollRatio(double ratio)
+        {
+            _albumScrollViewer.UpdateLayout();
+            _albumScrollViewer.ScrollToVerticalOffset(ratio * _albumScrollViewer.ExtentHeight);
         }
 
         private readonly record struct AlbumGridLayoutHint(
@@ -313,20 +325,12 @@ namespace musicApp.Views
 
         private AlbumGridLayoutHint CaptureAlbumGridLayoutHint()
         {
-            double vw = 0, vh = 0;
-            if (AlbumScrollViewer != null)
-            {
-                vw = AlbumScrollViewer.ViewportWidth;
-                vh = AlbumScrollViewer.ViewportHeight;
-            }
-            if (vw <= 0)
-                vw = Math.Max(1, ActualWidth - UILayoutConstants.AlbumWrapHorizontalPadding * 2);
-            if (vh <= 0)
-                vh = 400;
+            double vw = AvailableRowWidth();
+            double vh = _albumScrollViewer.ViewportHeight > 0 ? _albumScrollViewer.ViewportHeight : 400;
             return new AlbumGridLayoutHint(vw, vh, CurrentTileSize, TileMargin.Right, TileMargin.Bottom, TileScaleRatio);
         }
 
-        private static void GetWrapPanelStride(in AlbumGridLayoutHint h, out double tileStrideX, out double tileStrideY)
+        private static void GetTileStrides(in AlbumGridLayoutHint h, out double tileStrideX, out double tileStrideY)
         {
             AlbumGridLayoutMath.GetStrides(h.TileSize, h.MarginRight, h.MarginBottom, h.TileScaleRatio, out tileStrideX, out tileStrideY);
         }
@@ -335,17 +339,14 @@ namespace musicApp.Views
         {
             if (grouped.Count == 0)
                 return 0;
-            GetWrapPanelStride(hint, out var sx, out var sy);
+            GetTileStrides(hint, out var sx, out var sy);
             double vw = hint.ViewportWidth > 0 ? hint.ViewportWidth : UILayoutConstants.AlbumWrapFallbackWidth;
             double vh = hint.ViewportHeight > 0 ? hint.ViewportHeight : 400;
             int perRow = AlbumGridLayoutMath.PerRowFromViewport(vw, sx);
             int visibleRows = Math.Max(1, (int)Math.Ceiling(Math.Max(1, vh) / sy));
-            int overscanRows = UILayoutConstants.AlbumRebuildPrefixOverscanRows;
-            int firstScreen = Math.Min(grouped.Count, (visibleRows + overscanRows) * perRow);
-            if (!targetIndex.HasValue)
-                return firstScreen;
-            int extra = (visibleRows + overscanRows) * perRow;
-            return Math.Min(grouped.Count, targetIndex.Value + 1 + extra);
+            // The panel realizes the view plus one page below it (default CacheLength: a page each side).
+            int realized = (visibleRows * 2 + 1) * perRow;
+            return Math.Min(grouped.Count, (targetIndex ?? -1) + 1 + realized);
         }
 
         private static int? FindTargetAlbumIndex(IReadOnlyList<AlbumGridItem> grouped, string albumName, string? artistName)
@@ -387,48 +388,6 @@ namespace musicApp.Views
             return true;
         }
 
-        private static void HydrateAllAlbumGridItems(
-            IReadOnlyList<AlbumGridItem> items,
-            int targetPx,
-            CancellationToken ct,
-            IProgress<(int done, int total)>? progress)
-        {
-            if (items.Count == 0)
-                return;
-
-            int dop = Math.Clamp(Environment.ProcessorCount, 4, 12);
-            var opts = new ParallelOptions
-            {
-                MaxDegreeOfParallelism = dop,
-                CancellationToken = ct,
-            };
-
-            const int progressEvery = 24;
-            int doneBucket = 0;
-
-            Parallel.For(0, items.Count, opts, i =>
-            {
-                try
-                {
-                    var item = items[i];
-                    if (item.AlbumArtSource == null)
-                    {
-                        var img = AlbumArtThumbnailHelper.LoadForTrack(item.RepresentativeTrack, targetPx);
-                        if (img != null)
-                            item.PrebindSetAlbumArt(img);
-                    }
-                }
-                finally
-                {
-                    var d = Interlocked.Increment(ref doneBucket);
-                    if (progress != null && (d % progressEvery == 0 || d == items.Count))
-                        progress.Report((d, items.Count));
-                }
-            });
-
-            progress?.Report((items.Count, items.Count));
-        }
-
         private static string AlbumGroupArtist(Song t) =>
             !string.IsNullOrWhiteSpace(t.AlbumArtist) ? t.AlbumArtist : t.Artist ?? string.Empty;
 
@@ -448,7 +407,7 @@ namespace musicApp.Views
                 .Select(g =>
                 {
                     var rep = g.First();
-                    return new AlbumGridItem(rep.Album ?? string.Empty, AlbumGroupArtist(rep), rep, null);
+                    return new AlbumGridItem(rep.Album ?? string.Empty, AlbumGroupArtist(rep), rep);
                 });
 
             query = sortMode switch
@@ -514,24 +473,6 @@ namespace musicApp.Views
             return rows;
         }
 
-        private static int MapAlbumCountToRowExclusiveEnd(IReadOnlyList<object> rows, int albumPrefixGoal)
-        {
-            if (albumPrefixGoal <= 0)
-                return 0;
-            int albums = 0;
-            for (int r = 0; r < rows.Count; r++)
-            {
-                if (rows[r] is AlbumGridItem)
-                {
-                    albums++;
-                    if (albums >= albumPrefixGoal)
-                        return r + 1;
-                }
-            }
-
-            return rows.Count;
-        }
-
         private (double? scrollRatio, double? scrollOffsetPixels, (string albumName, string? artistName, bool openDetails, string? selectedTrackFilePath)? mergedPending)
             CaptureRebuildRestoreStateAndCloseFlyout(bool preserveViewState)
         {
@@ -541,10 +482,10 @@ namespace musicApp.Views
 
             if (preserveViewState)
             {
-                if (AlbumScrollViewer != null && AlbumScrollViewer.ExtentHeight > 0)
+                if (_albumScrollViewer.ExtentHeight > 0)
                 {
-                    scrollRatio = AlbumScrollViewer.VerticalOffset / AlbumScrollViewer.ExtentHeight;
-                    scrollOffsetPixels = AlbumScrollViewer.VerticalOffset;
+                    scrollRatio = _albumScrollViewer.VerticalOffset / _albumScrollViewer.ExtentHeight;
+                    scrollOffsetPixels = _albumScrollViewer.VerticalOffset;
                 }
 
                 if (_pendingAlbumSelection.HasValue)
@@ -562,15 +503,6 @@ namespace musicApp.Views
             return (scrollRatio, scrollOffsetPixels, mergedPending);
         }
 
-        /// <summary>
-        /// IProgress that invokes the handler on the reporting thread. Unlike Progress&lt;T&gt;,
-        /// reports are not posted asynchronously, so they can't arrive after a later status update.
-        /// </summary>
-        private sealed class SynchronousProgress<T>(Action<T> handler) : IProgress<T>
-        {
-            public void Report(T value) => handler(value);
-        }
-
         private async Task RebuildAlbumItemsAsync(bool preserveViewState = true)
         {
             _isRebuilding = true;
@@ -582,7 +514,7 @@ namespace musicApp.Views
                 ? CaptureRebuildRestoreStateAndCloseFlyout(preserveViewState)
                 : await Dispatcher.InvokeAsync(() => CaptureRebuildRestoreStateAndCloseFlyout(preserveViewState)).Task.ConfigureAwait(false);
 
-            CancelAllAlbumArtWork();
+            AlbumGridArtCache.ForgetMissing(); // a rebuild retries albums that had no art, as before the cache
             _rebuildCts?.Cancel();
             _rebuildCts?.Dispose();
             _rebuildCts = new CancellationTokenSource();
@@ -601,225 +533,61 @@ namespace musicApp.Views
             void ReportPhase(AlbumsGridRebuildPhase phase, int done = 0, int total = 0) =>
                 AlbumGridRebuildStatus?.Invoke(phase, done, total, songCount);
 
+            bool finished = false;
             try
             {
                 ReportPhase(AlbumsGridRebuildPhase.Grouping);
 
-            var sortMode = _sortMode;
-            var browseMode = BrowseMode;
-
-            AlbumGridLayoutHint layoutHint;
-            if (Dispatcher.CheckAccess())
-                layoutHint = CaptureAlbumGridLayoutHint();
-            else
-                layoutHint = await Dispatcher.InvokeAsync(CaptureAlbumGridLayoutHint).Task.ConfigureAwait(false);
-
-            // Copy the live library here (UI thread): enumerating it on the worker while a scan adds
-            // tracks threw "collection was modified", and the catch turned that into an empty grid.
-            var songsSnapshot = songsRef.ToList();
-
-            List<object> rows;
-            List<AlbumGridItem> albumsOnly;
-            try
-            {
-                if (browseMode == AlbumsBrowseMode.RecentlyAdded)
+                var sortMode = _sortMode;
+                var browseMode = BrowseMode;
+                // Albums and Recently Added are different lists: the old scroll offset means nothing in
+                // the other one, so a mode switch starts at the top.
+                bool modeChanged = _lastGridBuildBrowseMode != browseMode;
+                if (modeChanged)
                 {
-                    (rows, albumsOnly) = await Task.Run(() =>
+                    scrollRatio = null;
+                    scrollOffsetPixels = null;
+                }
+                // Claim the mode now, not at the end: a switch back to the old mode mid-build must
+                // reschedule instead of hitting the ItemsSource fast path.
+                _lastGridBuildBrowseMode = browseMode;
+
+                AlbumGridLayoutHint layoutHint = Dispatcher.CheckAccess()
+                    ? CaptureAlbumGridLayoutHint()
+                    : await Dispatcher.InvokeAsync(CaptureAlbumGridLayoutHint).Task.ConfigureAwait(false);
+
+                // Copy the live library here (UI thread): enumerating it on the worker while a scan adds
+                // tracks threw "collection was modified", and the catch turned that into an empty grid.
+                var songsSnapshot = songsRef.ToList();
+
+                (List<object> entries, List<AlbumGridItem> albums) = await Task.Run(() =>
+                {
+                    if (browseMode == AlbumsBrowseMode.RecentlyAdded)
                     {
                         var pairs = BuildGroupedAlbumsByRecentlyAdded(songsSnapshot, ct);
                         var r = BuildRecentlyAddedRows(pairs, DateTime.Now);
                         return (r, r.OfType<AlbumGridItem>().ToList());
-                    }, ct).ConfigureAwait(false);
-                }
-                else
-                {
-                    var grouped = await Task.Run(() => BuildGroupedAlbums(songsSnapshot, sortMode, ct), ct).ConfigureAwait(false);
-                    albumsOnly = grouped;
-                    rows = grouped.Cast<object>().ToList();
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-            if (ct.IsCancellationRequested)
-                return;
+                    }
+                    var grouped = BuildGroupedAlbums(songsSnapshot, sortMode, ct);
+                    return (grouped.Cast<object>().ToList(), grouped);
+                }, ct).ConfigureAwait(false);
 
-            if (rows.Count == 0)
-            {
+                // Decode the first screen off the UI thread so the first frame binds to ready art.
+                int? targetIndex = mergedPending is { } p ? FindTargetAlbumIndex(albums, p.albumName, p.artistName) : null;
+                int prefixGoal = ComputePrefixGoal(albums, targetIndex, layoutHint);
+                ReportPhase(AlbumsGridRebuildPhase.LoadingArtwork, 0, albums.Count);
+                await Task.Run(() => PrefetchArtNow(albums, 0, prefixGoal, AlbumGridItem.ArtPx, ct), ct).ConfigureAwait(false);
+
                 await Dispatcher.InvokeAsync(() =>
                 {
-                    _albumItems.Clear();
-                    _lastGridBuildBrowseMode = browseMode;
-                    _isRebuilding = false;
-                }, DispatcherPriority.Loaded).Task.ConfigureAwait(false);
-                return;
-            }
-
-            int targetArtPx = Math.Max(UILayoutConstants.AlbumArtMinimumTargetSize, (int)Math.Round(layoutHint.TileSize));
-
-            int? targetIndex = null;
-            if (mergedPending.HasValue)
-            {
-                var p = mergedPending.Value;
-                targetIndex = FindTargetAlbumIndex(albumsOnly, p.albumName, p.artistName);
-            }
-
-            int totalRows = rows.Count;
-            int prefixGoal = ComputePrefixGoal(albumsOnly, targetIndex, layoutHint);
-            int prefixRowEnd = MapAlbumCountToRowExclusiveEnd(rows, prefixGoal);
-
-            try
-            {
-                ReportPhase(AlbumsGridRebuildPhase.LoadingArtwork, 0, albumsOnly.Count);
-                
-                var prefixAlbums = albumsOnly.Take(prefixGoal).ToList();
-                var remainingAlbums = albumsOnly.Skip(prefixGoal).ToList();
-
-                // Synchronous reporter: ReportPhase already marshals to the dispatcher, and
-                // reporting inline keeps LoadingArtwork updates ordered before the final Complete.
-                var hydrateProgress = new SynchronousProgress<(int done, int total)>(p =>
-                    ReportPhase(AlbumsGridRebuildPhase.LoadingArtwork, prefixAlbums.Count + p.done, albumsOnly.Count));
-
-                // Await ONLY the prefix albums to make startup instant
-                if (prefixAlbums.Count > 0)
-                {
-                    await Task.Run(() => HydrateAllAlbumGridItems(prefixAlbums, targetArtPx, ct, null), ct).ConfigureAwait(false);
-                }
-
-                // Fire and forget the rest in the background; it outlives this method, so it
-                // must report Complete itself or the status bar sticks on "loading artwork".
-                if (remainingAlbums.Count > 0)
-                {
-                    _ = Task.Run(async () =>
-                    {
-                        HydrateAllAlbumGridItems(remainingAlbums, targetArtPx, ct, hydrateProgress);
-                        if (ct.IsCancellationRequested)
-                            return;
-
-                        // Prebind runs off-UI and skips PropertyChanged; notify so DataTriggers re-evaluate.
-                        try
-                        {
-                            await Dispatcher.InvokeAsync(() =>
-                            {
-                                foreach (var item in remainingAlbums)
-                                {
-                                    if (item.AlbumArtSource != null)
-                                        item.NotifyAlbumArtBound();
-                                }
-                            }, DispatcherPriority.Background).Task.ConfigureAwait(false);
-                        }
-                        catch (TaskCanceledException)
-                        {
-                            return;
-                        }
-
-                        if (!ct.IsCancellationRequested)
-                            ReportPhase(AlbumsGridRebuildPhase.Complete);
-                    }, ct);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-
-            int i = 0;
-            int batchLoopIndex = 0;
-            int batchesSinceSample = int.MaxValue;
-            SystemResourceSnapshot? lastResourceSnapshot = null;
-            int scanConcurrencySmoothed = Environment.ProcessorCount; // Default high for startup fast-path
-
-            while (i < totalRows && !ct.IsCancellationRequested)
-            {
-                bool inPrefixPhase = i < prefixRowEnd;
-                bool mustSample = !_isStartupRebuild && (batchLoopIndex == 0 || batchesSinceSample >= UILayoutConstants.AlbumRebuildMetricsResampleEveryNBatches);
-                
-                if (mustSample)
-                {
-                    var sampleInterval = lastResourceSnapshot.HasValue && lastResourceSnapshot.Value.CpuBusyPercent < 40
-                        ? TimeSpan.FromMilliseconds(50)
-                        : TimeSpan.FromMilliseconds(100);
-                    try
-                    {
-                        lastResourceSnapshot = await Task.Run(() => WindowsSystemMetrics.Sample(sampleInterval), ct).ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        return;
-                    }
-
-                    ScanConcurrencyAdvisor.Recommend(
-                        lastResourceSnapshot.Value,
-                        Environment.ProcessorCount,
-                        ref scanConcurrencySmoothed);
-                    batchesSinceSample = 0;
-                }
-                else
-                {
-                    batchesSinceSample++;
-                }
-
-                int baseBatch = AlbumRebuildUiAdvisor.ItemsPerDispatcherBatch(scanConcurrencySmoothed);
-                if (inPrefixPhase)
-                    baseBatch = AlbumRebuildUiAdvisor.PrefixPhaseItemsPerBatch(baseBatch);
-
-                int end = i + baseBatch;
-                if (inPrefixPhase)
-                    end = Math.Min(end, prefixRowEnd);
-                end = Math.Min(end, totalRows);
-
-                if (end <= i)
-                    end = Math.Min(i + UILayoutConstants.AlbumRebuildBatchMin, totalRows);
-
-                bool isFirstUiBatch = i == 0;
-                var priority = isFirstUiBatch ? DispatcherPriority.Loaded : DispatcherPriority.Background;
-                int endLocal = end;
-                int iLocal = i;
-
-                try
-                {
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        if (isFirstUiBatch)
-                            _albumItems.Clear();
-                        for (int j = iLocal; j < endLocal; j++)
-                            _albumItems.Add(rows[j]);
-
-                        if (isFirstUiBatch && endLocal > iLocal)
-                            _ = LoadVisibleAlbumArtAsync();
-                    }, priority).Task.ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    return;
-                }
-
-                i = endLocal;
-                batchLoopIndex++;
-
-                if (batchLoopIndex == 1)
-                    _ = PrefetchAllAlbumArtBackgroundAsync();
-
-                if (lastResourceSnapshot.HasValue && lastResourceSnapshot.Value.CpuBusyPercent >= 88 && !inPrefixPhase)
-                {
-                    try { await Task.Delay(5, ct).ConfigureAwait(false); }
-                    catch (OperationCanceledException)
-                    {
-                        return;
-                    }
-                }
-                else
-                    await Task.Yield();
-            }
-
-            if (!ct.IsCancellationRequested)
-            {
-                await Dispatcher.InvokeAsync(() =>
-                {
+                    if (ct.IsCancellationRequested)
+                        return; // a newer run owns the grid now
+                    _entries = entries;
+                    _albums = albums;
+                    RebuildRows();
+                    if (modeChanged)
+                        _albumScrollViewer.ScrollToTop();
                     AlbumGrid.UpdateLayout();
-                    AlbumScrollViewer?.UpdateLayout();
-                    SyncSectionHeaderWidth();
 
                     bool restoredExternalSelection = false;
                     if (_pendingAlbumSelection.HasValue)
@@ -834,38 +602,32 @@ namespace musicApp.Views
                         ApplyMergedAlbumSelection(mergedPending.Value, bringTargetIntoView: false);
                     }
 
-                    AlbumGrid.UpdateLayout();
-                    AlbumScrollViewer?.UpdateLayout();
-
-                    if (!restoredExternalSelection && preserveViewState && AlbumScrollViewer != null)
+                    if (!restoredExternalSelection && preserveViewState)
                     {
-                        double y;
-                        if (scrollOffsetPixels.HasValue)
-                            y = scrollOffsetPixels.Value;
-                        else if (scrollRatio.HasValue)
-                            y = scrollRatio.Value * AlbumScrollViewer.ExtentHeight;
-                        else
-                            y = double.NaN;
-
+                        AlbumGrid.UpdateLayout();
+                        double y = scrollOffsetPixels
+                            ?? (scrollRatio.HasValue ? scrollRatio.Value * _albumScrollViewer.ExtentHeight : double.NaN);
                         if (!double.IsNaN(y))
-                        {
-                            AlbumScrollViewer.ScrollToVerticalOffset(
-                                Math.Min(Math.Max(0, y), AlbumScrollViewer.ScrollableHeight));
-                        }
+                            _albumScrollViewer.ScrollToVerticalOffset(Math.Min(Math.Max(0, y), _albumScrollViewer.ScrollableHeight));
                     }
 
-                    _lastGridBuildBrowseMode = browseMode;
+                    finished = true;
                     _isRebuilding = false;
-                    _isStartupRebuild = false;
-                    KickViewportAlbumArtNow();
+                    StartArtPrefetch(FirstVisibleAlbumIndex()); // reports progress, then Complete
                 }, DispatcherPriority.Loaded).Task.ConfigureAwait(false);
             }
+            catch (OperationCanceledException)
+            {
             }
             finally
             {
-                if (generation == _rebuildGeneration)
+                // A superseded run leaves state and status to the newer one.
+                if (generation == _rebuildGeneration && !finished)
+                {
                     _isRebuilding = false;
-                ReportPhase(AlbumsGridRebuildPhase.Complete);
+                    _lastGridBuildBrowseMode = null; // canceled mid-build: the grid is partial
+                    ReportPhase(AlbumsGridRebuildPhase.Complete);
+                }
             }
         }
 

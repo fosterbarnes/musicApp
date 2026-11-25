@@ -22,15 +22,18 @@ public static class AlbumArtThumbnailHelper
         _fullSizeCache.Clear();
     }
 
-    /// <summary>Load album art for a track and scale to the given size. Returns null if none found.</summary>
-    public static BitmapSource? LoadForTrack(Song track, int targetSizePx = DefaultThumbnailSize)
+    /// <summary>
+    /// Load album art for a track and scale to the given size. Returns null if none found.
+    /// <paramref name="keepInMemory"/> false skips the shared thumbnail memory cache (see LoadFromCachePath).
+    /// </summary>
+    public static BitmapSource? LoadForTrack(Song track, int targetSizePx = DefaultThumbnailSize, bool keepInMemory = true)
     {
         if (track == null || string.IsNullOrWhiteSpace(track.FilePath))
             return null;
 
         // Fast path: on-disk thumbnail cache, decoded near target size.
         var decodePx = targetSizePx > 0 ? Math.Max(targetSizePx, 64) : 0;
-        var fromCache = AlbumArtCacheManager.TryGetCachedForTrack(track, decodePx);
+        var fromCache = AlbumArtCacheManager.TryGetCachedForTrack(track, decodePx, keepInMemory);
         if (fromCache != null)
             return fromCache;
 

@@ -8,7 +8,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using musicApp;
-using musicApp.Constants;
 using musicApp.Helpers;
 
 namespace musicApp.Views
@@ -164,6 +163,11 @@ namespace musicApp.Views
             if (_itemsSource is not IEnumerable<Song> songs)
                 return;
 
+            // Shift-click ranges start at the anchor index; keep it on the same song across the new list.
+            var anchorSong = _flyoutAnchorIndex >= 0 && _flyoutAnchorIndex < flyout.Tracks.Count
+                ? flyout.Tracks[_flyoutAnchorIndex]
+                : null;
+
             flyout.Tracks = _selectedAlbum is { IsSingleSong: true } single
                 ? new List<Song> { single.RepresentativeTrack }
                 : AlbumTrackOrder.SortByAlbumSequence(
@@ -179,6 +183,7 @@ namespace musicApp.Views
             flyout.TracksColumn2 = flyout.Tracks.Skip(half).ToList();
             flyout.AlbumMetadata = AlbumMetadataText.BuildAlbumSummary(flyout.Tracks);
             FlyoutPanelHeight = CalculateFlyoutHeight(flyout.Tracks.Count);
+            _flyoutAnchorIndex = anchorSong != null ? flyout.Tracks.IndexOf(anchorSong) : -1;
             FilterFlyoutSelectionToCurrentTracks();
         }
 
@@ -197,7 +202,7 @@ namespace musicApp.Views
             flyout.AlbumArtSource = _selectedAlbum?.AlbumArtSource;
 
             PopulateFlyoutTrackLists(flyout, albumTitle, albumArtistKey);
-            FlyoutPanelWidth = GetWrapPanelWidth();
+            flyout.NotifyAllChanged();
             if (_selectedAlbum != null)
                 UpdateFlyoutArrowOffset(_selectedAlbum);
 
@@ -211,11 +216,16 @@ namespace musicApp.Views
 
             if (_currentFlyout != null)
             {
-                _albumItems.Remove(_currentFlyout);
+                _rows.Remove(_currentFlyout);
                 _currentFlyout = null;
-                AlbumGrid.UpdateLayout();
             }
 
+            int rowIndex = RowIndexOf(album);
+            if (rowIndex < 0)
+            {
+                _selectedAlbum = null;
+                return;
+            }
             _selectedAlbum = album;
 
             var flyout = new AlbumFlyoutItem
@@ -227,36 +237,14 @@ namespace musicApp.Views
                 AlbumArtSource = album.AlbumArtSource
             };
 
-            if (album.AlbumArtSource == null && album.RepresentativeTrack is Song repForThumb)
-            {
-                _ = Task.Run(() =>
-                {
-                    var img = AlbumArtThumbnailHelper.LoadForTrack(repForThumb);
-                    if (img != null)
-                    {
-                        Dispatcher.InvokeAsync(() =>
-                        {
-                            album.AlbumArtSource = img;
-                            if (_selectedAlbum == album)
-                                flyout.AlbumArtSource = img;
-                        });
-                    }
-                });
-            }
-
             if (album.RepresentativeTrack is Song repForFull)
                 EnqueueFlyoutFullSizeArtLoad(flyout, repForFull, requireSelectedAlbum: album);
 
             PopulateFlyoutTrackLists(flyout, album.AlbumTitle, album.Artist);
-
-            int albumIndex = _albumItems.IndexOf(album);
-            int insertIndex = GetRowEndIndex(albumIndex);
-
-            FlyoutPanelWidth = GetWrapPanelWidth();
             UpdateFlyoutArrowOffset(album);
 
             _currentFlyout = flyout;
-            _albumItems.Insert(insertIndex, flyout);
+            _rows.Insert(rowIndex + 1, flyout);
 
             if (!bringFlyoutIntoView)
                 return;
@@ -269,33 +257,38 @@ namespace musicApp.Views
 
         private void BringFlyoutFullyIntoView(AlbumFlyoutItem flyout)
         {
-            if (AlbumScrollViewer == null || flyout == null)
+            int index = _rows.IndexOf(flyout);
+            if (index < 0 || ItemsHost is not { } host)
                 return;
 
             AlbumGrid.UpdateLayout();
-            var container = AlbumGrid.ItemContainerGenerator.ContainerFromItem(flyout) as FrameworkElement;
-            if (container == null)
+            if (AlbumGrid.ItemContainerGenerator.ContainerFromIndex(index) is not FrameworkElement)
+            {
+                host.BringIndexIntoViewPublic(index); // far away (Go to album): realize it first
+                AlbumGrid.UpdateLayout();
+            }
+            if (AlbumGrid.ItemContainerGenerator.ContainerFromIndex(index) is not FrameworkElement container)
                 return;
 
             try
             {
-                var transform = container.TransformToAncestor(AlbumScrollViewer);
+                var transform = container.TransformToAncestor(_albumScrollViewer);
                 var top = transform.Transform(new Point(0, 0)).Y;
                 var bottom = top + container.ActualHeight;
-                var viewport = AlbumScrollViewer.ViewportHeight;
-                var offset = AlbumScrollViewer.VerticalOffset;
+                var viewport = _albumScrollViewer.ViewportHeight;
+                var offset = _albumScrollViewer.VerticalOffset;
 
                 if (bottom > viewport)
                 {
                     var target = offset + (bottom - viewport) + 8;
-                    target = Math.Min(Math.Max(0, target), AlbumScrollViewer.ScrollableHeight);
-                    AlbumScrollViewer.ScrollToVerticalOffset(target);
+                    target = Math.Min(Math.Max(0, target), _albumScrollViewer.ScrollableHeight);
+                    _albumScrollViewer.ScrollToVerticalOffset(target);
                 }
                 else if (top < 0)
                 {
                     var target = offset + top - 8;
-                    target = Math.Min(Math.Max(0, target), AlbumScrollViewer.ScrollableHeight);
-                    AlbumScrollViewer.ScrollToVerticalOffset(target);
+                    target = Math.Min(Math.Max(0, target), _albumScrollViewer.ScrollableHeight);
+                    _albumScrollViewer.ScrollToVerticalOffset(target);
                 }
             }
             catch
@@ -310,57 +303,11 @@ namespace musicApp.Views
             FlyoutPanelHeight = FlyoutHeight;
             if (_currentFlyout != null)
             {
-                _albumItems.Remove(_currentFlyout);
+                _rows.Remove(_currentFlyout);
                 _currentFlyout = null;
             }
 
             ClearFlyoutTrackSelection();
-        }
-
-        private void RefreshOpenFlyoutLayout()
-        {
-            if (_isRefreshingFlyoutLayout || _currentFlyout == null || _selectedAlbum == null)
-                return;
-
-            if (!_albumItems.Contains(_selectedAlbum))
-            {
-                CloseAlbumDetail();
-                return;
-            }
-
-            _isRefreshingFlyoutLayout = true;
-            try
-            {
-                double preservedOffset = AlbumScrollViewer?.VerticalOffset ?? 0;
-
-                int existingFlyoutIndex = _albumItems.IndexOf(_currentFlyout);
-                if (existingFlyoutIndex >= 0)
-                    _albumItems.RemoveAt(existingFlyoutIndex);
-
-                AlbumGrid.UpdateLayout();
-
-                int albumIndex = _albumItems.IndexOf(_selectedAlbum);
-                if (albumIndex < 0)
-                {
-                    _currentFlyout = null;
-                    _selectedAlbum = null;
-                    return;
-                }
-
-                int insertIndex = GetRowEndIndex(albumIndex);
-                _albumItems.Insert(insertIndex, _currentFlyout);
-
-                FlyoutPanelWidth = GetWrapPanelWidth();
-                FlyoutPanelHeight = CalculateFlyoutHeight(_currentFlyout.Tracks.Count);
-                UpdateFlyoutArrowOffset(_selectedAlbum);
-
-                if (AlbumScrollViewer != null)
-                    AlbumScrollViewer.ScrollToVerticalOffset(Math.Min(preservedOffset, AlbumScrollViewer.ScrollableHeight));
-            }
-            finally
-            {
-                _isRefreshingFlyoutLayout = false;
-            }
         }
 
         private static double CalculateFlyoutHeight(int trackCount)
@@ -513,63 +460,12 @@ namespace musicApp.Views
         }
         private void AlbumContextMenu_DeleteClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) DeleteRequested?.Invoke(this, _contextMenuSong); }
 
-        private int GetRowEndIndex(int albumIndex)
-        {
-            var gen = AlbumGrid.ItemContainerGenerator;
-            var clickedContainer = gen.ContainerFromIndex(albumIndex) as FrameworkElement;
-            if (clickedContainer == null) return albumIndex + 1;
-
-            GeneralTransform clickedTransform;
-            try { clickedTransform = clickedContainer.TransformToAncestor(AlbumScrollViewer); }
-            catch { return albumIndex + 1; }
-
-            double clickedY = clickedTransform.Transform(new Point(0, 0)).Y;
-
-            int lastOnRow = albumIndex;
-            for (int i = albumIndex + 1; i < _albumItems.Count; i++)
-            {
-                if (_albumItems[i] is not AlbumGridItem) break;
-
-                var container = gen.ContainerFromIndex(i) as FrameworkElement;
-                if (container == null) break;
-
-                GeneralTransform transform;
-                try { transform = container.TransformToAncestor(AlbumScrollViewer); }
-                catch { break; }
-
-                if (Math.Abs(transform.Transform(new Point(0, 0)).Y - clickedY) > 5) break;
-                lastOnRow = i;
-            }
-
-            return lastOnRow + 1;
-        }
-
-        private double GetWrapPanelWidth()
-        {
-            var wrapPanel = FindVisualChild<WrapPanel>(AlbumGrid);
-            return wrapPanel?.ActualWidth ?? Math.Max(UILayoutConstants.AlbumWrapFallbackWidth, ActualWidth - UILayoutConstants.AlbumWrapHorizontalPadding);
-        }
-
+        /// <summary>Points the flyout arrow at the album: its slot in the row times the tile stride.</summary>
         private void UpdateFlyoutArrowOffset(AlbumGridItem album)
         {
-            var wrapPanel = FindVisualChild<WrapPanel>(AlbumGrid);
-            var albumContainer = AlbumGrid.ItemContainerGenerator.ContainerFromItem(album) as FrameworkElement;
-            if (wrapPanel == null || albumContainer == null)
-            {
-                FlyoutArrowOffset = new Thickness(0);
-                return;
-            }
-
-            try
-            {
-                var pos = albumContainer.TransformToAncestor(wrapPanel).Transform(new Point(0, 0));
-                double arrowX = pos.X + CurrentTileSize / 2 - 10;
-                FlyoutArrowOffset = new Thickness(arrowX, 0, 0, 0);
-            }
-            catch
-            {
-                FlyoutArrowOffset = new Thickness(0);
-            }
+            int rowIndex = RowIndexOf(album);
+            int slot = rowIndex >= 0 && _rows[rowIndex] is AlbumTileRow row ? row.Albums.IndexOf(album) : 0;
+            FlyoutArrowOffset = new Thickness(slot * TileStrideX() + CurrentTileSize / 2 - 10, 0, 0, 0);
         }
 
         private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject

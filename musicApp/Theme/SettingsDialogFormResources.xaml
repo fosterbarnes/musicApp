@@ -220,6 +220,29 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <!-- Edit box for IsEditable combos: bare template so MaterialDesign's underline/hint TextBox style never applies. -->
+    <Style x:Key="DarkComboBoxEditableTextBoxStyle" TargetType="TextBox">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary-brush}" />
+        <Setter Property="CaretBrush" Value="{StaticResource TextPrimary-brush}" />
+        <Setter Property="SelectionBrush" Value="{StaticResource Hover-brush}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <ScrollViewer x:Name="PART_ContentHost"
+                                  Focusable="False"
+                                  Background="Transparent"
+                                  VerticalAlignment="Center"
+                                  HorizontalScrollBarVisibility="Hidden"
+                                  VerticalScrollBarVisibility="Hidden" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
     <ControlTemplate x:Key="DarkComboBoxControlTemplate" TargetType="ComboBox">
         <Grid x:Name="templateRoot" SnapsToDevicePixels="True">
             <Popup x:Name="PART_Popup"
@@ -259,8 +282,22 @@
                               TextElement.Foreground="{TemplateBinding Foreground}"
                               IsHitTestVisible="False"
                               SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+
+            <!-- WPF shows an editable combo's value only through PART_EditableTextBox (SelectionBoxItem stays
+                 empty), so without it the Info window's Genre looked blank and could not be typed in. -->
+            <TextBox x:Name="PART_EditableTextBox"
+                     Style="{StaticResource DarkComboBoxEditableTextBoxStyle}"
+                     Margin="{StaticResource ComboBoxContentMargin-thk}"
+                     HorizontalAlignment="Stretch"
+                     VerticalAlignment="Center"
+                     Visibility="Collapsed"
+                     IsReadOnly="{Binding IsReadOnly, RelativeSource={RelativeSource TemplatedParent}}" />
         </Grid>
         <ControlTemplate.Triggers>
+            <Trigger Property="IsEditable" Value="True">
+                <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible" />
+                <Setter TargetName="ContentSite" Property="Visibility" Value="Hidden" />
+            </Trigger>
             <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="templateRoot" Property="Opacity" Value="0.55" />
             </Trigger>

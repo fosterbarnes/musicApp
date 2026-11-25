@@ -1030,7 +1030,7 @@ namespace musicApp
             }
         }
 
-        // Text-only: the progress bar belongs to StatusProgressCoordinator. Grid hydration
+        // Text-only: the progress bar belongs to StatusProgressCoordinator. Grid art loading
         // is quiet background work; while a coordinator phase is active it owns the text too.
         private void UpdateStatusBarAlbumGridRebuild(AlbumsGridRebuildPhase phase, int done, int total, int songCount)
         {
@@ -1208,7 +1208,7 @@ namespace musicApp
             }
 
             // Text first; art loads full-res off the UI thread (same source as albums flyout).
-            // AlbumArtLoader prefers the 250px disk thumbnail cache — too soft for the large art panel.
+            // AlbumArtLoader prefers the 250px disk thumbnail cache: too soft for the large art panel.
             _miniPlayerWindow.SetTrackInfo(track.Title, track.Artist, track.Album, null);
             _ = LoadMiniPlayerAlbumArtAsync(_miniPlayerWindow, track);
         }
@@ -1260,7 +1260,7 @@ namespace musicApp
             artistsViewControl?.RefreshTrackListBindings();
             genresViewControl?.RefreshTrackListBindings();
 
-            // Always refresh albums after batch edits — navigating back with IsGridCurrentFor
+            // Always refresh albums after batch edits: navigating back with IsGridCurrentFor
             // would otherwise keep first-run placeholder tiles.
             if (albumsViewControl != null)
             {
