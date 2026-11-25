@@ -71,6 +71,7 @@ namespace musicApp
 
             ApplySidebarPreferences();
             ApplyPlaybackPreferences();
+            ApplyShortcutPreferences();
             _ = titleBarPlayer.ReloadPlayerSettingsFromDiskAsync();
         }
 
@@ -134,6 +135,15 @@ namespace musicApp
                     }
                 }
 
+                // Files left on disk load again next launch, so don't report a reset that did not happen.
+                if (movedFiles == 0)
+                {
+                    MessageDialog.Show(this, "Error",
+                        "Could not move the settings files to the Recycle Bin. Nothing was cleared.",
+                        MessageDialog.Buttons.Ok);
+                    return;
+                }
+
                 allTracks.Clear();
                 ResetLibraryPathRegistry();
                 filteredTracks.Clear();
@@ -158,9 +168,11 @@ namespace musicApp
                 ApplySidebarPreferences();
                 ApplyPlaybackPreferences();
 
+                var notMoved = jsonFiles.Length - movedFiles;
                 MessageDialog.Show(this, "Settings Cleared",
-                    $"Successfully cleared {movedFiles} settings files.\n\n" +
-                    "The app has been reset to a clean state.",
+                    notMoved == 0
+                        ? $"Successfully cleared {movedFiles} settings files.\n\nThe app has been reset to a clean state."
+                        : $"Cleared {movedFiles} of {jsonFiles.Length} settings files. {notMoved} could not be moved to the Recycle Bin and will load again next launch.",
                     MessageDialog.Buttons.Ok);
             }
             catch (Exception ex)

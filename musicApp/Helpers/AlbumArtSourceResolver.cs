@@ -18,8 +18,10 @@ public static class AlbumArtSourceResolver
             using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             var atlTrack = new Track(fs);
             var embeddedPictures = atlTrack.EmbeddedPictures;
+            // Files can carry a back cover or artist photo before the front cover.
             if (embeddedPictures != null && embeddedPictures.Count > 0)
-                return embeddedPictures[0].PictureData;
+                return (embeddedPictures.FirstOrDefault(p => p.PicType == PictureInfo.PIC_TYPE.Front)
+                        ?? embeddedPictures[0]).PictureData;
         }
         catch
         {
@@ -44,7 +46,9 @@ public static class AlbumArtSourceResolver
         var result = imageFiles.FirstOrDefault(file =>
         {
             var name = Path.GetFileNameWithoutExtension(file).ToLowerInvariant();
-            return name.Contains("album") || name.Contains("cover") || name.Contains("art") || name.Contains("folder");
+            // "art" only as the whole name: as a substring it also matched artist.jpg, party.jpg, heart.png.
+            return name.Contains("album") || name.Contains("cover") || name.Contains("artwork") ||
+                   name.Contains("folder") || name == "art";
         }) ?? imageFiles.FirstOrDefault();
         DirectoryCoverCache[directory] = result ?? "";
         return result;

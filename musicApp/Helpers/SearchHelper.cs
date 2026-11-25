@@ -21,8 +21,10 @@ public static class SearchHelper
             return new SearchResults();
 
         var q = query.Trim();
-        var queryWords = q.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (queryWords.Length == 0)
+        // Split the query the same way ContainsWordStartingWith splits the text, or "AC/DC" and "Don't"
+        // stay one word and can never match the text's "AC", "DC", "Don", "t".
+        var queryWords = SplitWords(q);
+        if (queryWords.Count == 0)
             return new SearchResults();
         var results = new SearchResults();
 
@@ -40,11 +42,11 @@ public static class SearchHelper
         var distinctArtists = tracks
             .Where(t => !string.IsNullOrWhiteSpace(t.Artist) && MatchesQueryWords(t.Artist, queryWords))
             .Select(t => t.Artist)
-            .Distinct()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(ArtistLimit);
         foreach (var name in distinctArtists)
         {
-            var artistTracks = tracks.Where(t => t.Artist == name).ToList();
+            var artistTracks = tracks.Where(t => string.Equals(t.Artist, name, IgnoreCase)).ToList();
             var representative = GetArtistOldestAlbumRepresentativeTrack(artistTracks);
             results.Artists.Add(new ArtistSearchItem
             {
@@ -103,6 +105,23 @@ public static class SearchHelper
         }
 
         return true;
+    }
+
+    private static List<string> SplitWords(string text)
+    {
+        var words = new List<string>();
+        int index = 0;
+        while (index < text.Length)
+        {
+            while (index < text.Length && !char.IsLetterOrDigit(text[index]))
+                index++;
+            int start = index;
+            while (index < text.Length && char.IsLetterOrDigit(text[index]))
+                index++;
+            if (start < index)
+                words.Add(text[start..index]);
+        }
+        return words;
     }
 
     private static bool ContainsWordStartingWith(string text, string queryWord)

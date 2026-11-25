@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using musicApp.Constants;
 using musicApp.Helpers;
@@ -46,6 +47,8 @@ namespace musicApp
             public double Left { get; set; } = 100;
             public double Top { get; set; } = 100;
             public double SidebarWidth { get; set; } = UILayoutConstants.SidebarMinWidth;
+            /// <summary>Set once the legacy 250 px default was checked, so a width the user later sets to 250 stays.</summary>
+            public bool SidebarWidthMigrated { get; set; }
             public Dictionary<string, double> SongsViewColumnWidths { get; set; } = new Dictionary<string, double>();
             public Dictionary<string, Dictionary<string, double>> ColumnWidths { get; set; } = new Dictionary<string, Dictionary<string, double>>();
             public Dictionary<string, List<string>> ColumnVisibility { get; set; } = new Dictionary<string, List<string>>();
@@ -81,8 +84,11 @@ namespace musicApp
         private static void MigrateLegacySidebarWidth(WindowStateSettings ws)
         {
             const double legacyDefaultSidebarWidth = 250;
+            if (ws.SidebarWidthMigrated)
+                return;
             if (Math.Abs(ws.SidebarWidth - legacyDefaultSidebarWidth) < 0.5)
                 ws.SidebarWidth = UILayoutConstants.SidebarMinWidth;
+            ws.SidebarWidthMigrated = true;
         }
 
         #region Settings Management
@@ -121,38 +127,36 @@ namespace musicApp
             };
         }
 
-        public async Task<AppSettings> LoadSettingsAsync()
+        public async Task<AppSettings> LoadSettingsAsync() =>
+            await TryLoadSettingsAsync() ?? new AppSettings();
+
+        /// <summary>Defaults when there is no file yet; null when the file exists but could not be read.</summary>
+        private static async Task<AppSettings?> TryLoadSettingsAsync()
         {
             try
             {
-                if (File.Exists(SettingsFilePath))
-                {
-                    var json = await File.ReadAllTextAsync(SettingsFilePath);
-                    var options = new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    };
-                    var settings = JsonSerializer.Deserialize<AppSettings>(json, options);
+                if (!File.Exists(SettingsFilePath))
+                    return new AppSettings();
 
-                    if (settings != null)
-                    {
-                        settings.Player ??= new PlayerSettings();
-                        settings.WindowState ??= new WindowStateSettings();
-                        settings.MiniPlayerWindow ??= new MiniPlayerWindowStateSettings();
-                        MigrateLegacySidebarWidth(settings.WindowState);
-                        return settings;
-                    }
-                }
+                var json = await File.ReadAllTextAsync(SettingsFilePath);
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+                var settings = JsonSerializer.Deserialize<AppSettings>(json, options);
+                if (settings == null)
+                    return null;
+
+                settings.Player ??= new PlayerSettings();
+                settings.WindowState ??= new WindowStateSettings();
+                settings.MiniPlayerWindow ??= new MiniPlayerWindowStateSettings();
+                MigrateLegacySidebarWidth(settings.WindowState);
+                return settings;
             }
             catch
             {
+                return null;
             }
-
-            return new AppSettings
-            {
-                Player = new PlayerSettings(),
-                WindowState = new WindowStateSettings()
-            };
         }
 
         public async Task SaveSettingsAsync(AppSettings settings)
@@ -169,6 +173,30 @@ namespace musicApp
             }
             catch
             {
+            }
+        }
+
+        private static readonly SemaphoreSlim UpdateGate = new(1, 1);
+
+        /// <summary>
+        /// Loads the file, applies one change, and saves, one caller at a time. Writers that save a whole
+        /// AppSettings they loaded earlier overwrite fields others changed since (columns, shuffle, volume).
+        /// Continues on the caller's context, so <paramref name="mutate"/> may read UI state.
+        /// </summary>
+        public async Task UpdateSettingsAsync(Action<AppSettings> mutate)
+        {
+            await UpdateGate.WaitAsync();
+            try
+            {
+                // An unreadable file (mid-write elsewhere, corrupt) must not be replaced by defaults plus one change.
+                if (await TryLoadSettingsAsync() is not { } settings)
+                    return;
+                mutate(settings);
+                await SaveSettingsAsync(settings);
+            }
+            finally
+            {
+                UpdateGate.Release();
             }
         }
 
@@ -194,15 +222,8 @@ namespace musicApp
             return settings.Player?.IsShuffleEnabled ?? false;
         }
 
-        public async Task SetShuffleStateAsync(bool isEnabled)
-        {
-            var settings = await LoadSettingsAsync();
-            if (settings.Player != null)
-            {
-                settings.Player.IsShuffleEnabled = isEnabled;
-                await SaveSettingsAsync(settings);
-            }
-        }
+        public Task SetShuffleStateAsync(bool isEnabled) =>
+            UpdateSettingsAsync(s => s.Player.IsShuffleEnabled = isEnabled);
 
         public async Task<RepeatMode> GetRepeatModeAsync()
         {
@@ -210,25 +231,11 @@ namespace musicApp
             return settings.Player?.RepeatMode ?? RepeatMode.Off;
         }
 
-        public async Task SetRepeatModeAsync(RepeatMode repeatMode)
-        {
-            var settings = await LoadSettingsAsync();
-            if (settings.Player != null)
-            {
-                settings.Player.RepeatMode = repeatMode;
-                await SaveSettingsAsync(settings);
-            }
-        }
+        public Task SetRepeatModeAsync(RepeatMode repeatMode) =>
+            UpdateSettingsAsync(s => s.Player.RepeatMode = repeatMode);
 
-        public async Task SetTitleBarVolume0To100Async(double volume0To100)
-        {
-            var settings = await LoadSettingsAsync();
-            if (settings.Player != null)
-            {
-                settings.Player.TitleBarVolume0To100 = Math.Clamp(volume0To100, 0, 100);
-                await SaveSettingsAsync(settings);
-            }
-        }
+        public Task SetTitleBarVolume0To100Async(double volume0To100) =>
+            UpdateSettingsAsync(s => s.Player.TitleBarVolume0To100 = Math.Clamp(volume0To100, 0, 100));
 
         public async Task<double> GetTitleBarVolume0To100Async()
         {

@@ -36,7 +36,8 @@ internal static class GitHubTagsVersionService
             {
                 json = await http.GetStringAsync(url, cancellationToken);
             }
-            catch (OperationCanceledException)
+            // A timeout is also an OperationCanceledException; only rethrow a real cancel.
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
@@ -146,7 +147,7 @@ internal static class GitHubTagsVersionService
                 return null;
             return dto;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }

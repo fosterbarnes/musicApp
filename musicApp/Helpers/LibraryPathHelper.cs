@@ -34,8 +34,28 @@ namespace musicApp.Helpers
             var nb = TryNormalizePath(folder);
             if (na == null || nb == null) return false;
             if (string.Equals(nb, na, StringComparison.OrdinalIgnoreCase)) return true;
-            return nb.StartsWith(na + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-                || nb.StartsWith(na + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            // GetFullPath keeps the separator on a drive root ("D:\"), so don't add a second one.
+            var prefix = Path.EndsInDirectorySeparator(na) ? na : na + Path.DirectorySeparatorChar;
+            return nb.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Recursive file scan of a music folder that skips subfolders it cannot read (for example
+        /// "System Volume Information" on a music drive) instead of failing the whole scan.
+        /// </summary>
+        public static IEnumerable<string> EnumerateFilesRecursive(string folderPath)
+        {
+            // IgnoreInaccessible also turns an unreadable root into 0 files, which would make every track in
+            // the folder look deleted. Open the root without it first so that case still throws.
+            using (var root = Directory.EnumerateFileSystemEntries(folderPath).GetEnumerator())
+                root.MoveNext();
+
+            return Directory.EnumerateFiles(folderPath, "*", new EnumerationOptions
+            {
+                RecurseSubdirectories = true,
+                IgnoreInaccessible = true,
+                AttributesToSkip = 0
+            });
         }
 
         public static bool IsFileUnderMusicFolder(string filePath, string folderPath)

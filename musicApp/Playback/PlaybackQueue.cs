@@ -84,7 +84,8 @@ public sealed class PlaybackQueue
 
     public void Clear(bool offerUndo)
     {
-        if (offerUndo && _index < _order.Count)
+        // An empty queue has nothing to restore and must not replace an earlier snapshot.
+        if (offerUndo && _order.Count > 0 && _index < _order.Count)
             _undo = new Snapshot(new List<Entry>(_order), _index);
 
         ClearSongFlags();

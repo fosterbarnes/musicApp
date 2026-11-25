@@ -26,7 +26,8 @@ public static class SettingsBundleIO
 
     public sealed class Bundle
     {
-        public string Format { get; set; } = FormatId;
+        // No default: a JSON without "format" must fail the check in Import, not pass as a bundle.
+        public string? Format { get; set; }
         public int FormatVersion { get; set; } = CurrentFormatVersion;
         public string? ExportedAtUtc { get; set; }
         public string? AppVersion { get; set; }

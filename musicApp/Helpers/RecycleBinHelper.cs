@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Runtime.InteropServices;
 
 namespace musicApp.Helpers;
@@ -43,19 +42,12 @@ public static class RecycleBinHelper
                 fAnyOperationsAborted = false
             };
 
-            return SHFileOperation(ref shf) == 0;
+            return SHFileOperation(ref shf) == 0 && !shf.fAnyOperationsAborted;
         }
         catch
         {
-            try
-            {
-                File.Delete(filePath);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            // No permanent-delete fallback: the caller promised the user a recoverable Recycle Bin move.
+            return false;
         }
     }
 }

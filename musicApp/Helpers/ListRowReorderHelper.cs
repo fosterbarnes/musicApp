@@ -93,7 +93,7 @@ public static class ListRowReorderHelper
 
         if (rowEl == null || rowIndex < 0)
         {
-            toIndex = Math.Max(minIndex, count - 1);
+            toIndex = Math.Max(minIndex, count);
             AlignDropLineToIndex(itemsControl, rows, hitRoot, ref toIndex, ref lineY, count, minIndex);
             if (lineY <= 0 && hitRoot is FrameworkElement fe)
                 lineY = Math.Clamp(listPos.Y, 1, Math.Max(1, fe.ActualHeight - 2));
@@ -132,7 +132,8 @@ public static class ListRowReorderHelper
         int count,
         int minIndex)
     {
-        toIndex = Math.Max(minIndex, Math.Min(toIndex, count - 1));
+        // toIndex is insert-before, so count (after the last row) is a valid slot.
+        toIndex = Math.Max(minIndex, Math.Min(toIndex, count));
         var itemAt = FindRowElementAtIndex(itemsControl, rows, toIndex);
         if (itemAt != null)
             lineY = itemAt.TranslatePoint(new Point(0, 0), relativeTo).Y;

@@ -10,13 +10,14 @@ public class PlaybackEngineTests
 {
     private const int Rate = 44100;
 
-    private sealed class ConstantSource(double seconds, float value, int rate = Rate, int channels = 2) : IAudioSource
+    private sealed class ConstantSource(double seconds, float value, int rate = Rate, int channels = 2,
+        Action? onDispose = null, double? reportedSeconds = null) : IAudioSource
     {
         private long _sample;
         private readonly long _total = (long)(seconds * rate) * channels;
 
         public WaveFormat WaveFormat { get; } = WaveFormat.CreateIeeeFloatWaveFormat(rate, channels);
-        public TimeSpan Duration => TimeSpan.FromSeconds(seconds);
+        public TimeSpan Duration => TimeSpan.FromSeconds(reportedSeconds ?? seconds);
 
         public TimeSpan Position
         {
@@ -32,7 +33,7 @@ public class PlaybackEngineTests
             return n;
         }
 
-        public void Dispose() { }
+        public void Dispose() => onDispose?.Invoke();
     }
 
     private sealed class FakeOutput : IWavePlayer
@@ -79,6 +80,7 @@ public class PlaybackEngineTests
         public readonly AudioEngine Engine;
         public readonly Player Player;
         public readonly List<Song> Songs;
+        private readonly Dictionary<string, int> _openHandles = new();
 
         public Rig(int crossfadeSeconds, double rampSeconds, double trackSeconds = 3)
         {
@@ -90,7 +92,11 @@ public class PlaybackEngineTests
                     Outputs.Add(output);
                     return output;
                 },
-                _ => new ConstantSource(trackSeconds, 0.25f),
+                path =>
+                {
+                    AdjustOpen(path, 1);
+                    return new ConstantSource(trackSeconds, 0.25f, onDispose: () => AdjustOpen(path, -1));
+                },
                 context: null);
             Engine.ApplySettings(new EngineSettings(AudioOutputBackend.WasapiShared, true, Rate,
                 PlaybackOutputBits.IeeeFloat, crossfadeSeconds, rampSeconds));
@@ -98,6 +104,18 @@ public class PlaybackEngineTests
         }
 
         public FakeOutput Output => Outputs[^1];
+
+        public int OpenHandles(string path)
+        {
+            lock (_openHandles)
+                return _openHandles.GetValueOrDefault(path);
+        }
+
+        private void AdjustOpen(string path, int delta)
+        {
+            lock (_openHandles)
+                _openHandles[path] = _openHandles.GetValueOrDefault(path) + delta;
+        }
 
         public async Task PlayAsync(int index = 0)
         {
@@ -143,6 +161,16 @@ public class PlaybackEngineTests
             new ConstantSource(2, 0.5f), new ConstantSource(2, 0.5f, rate: 48000, channels: 1), 1, 1));
 
         Assert.InRange(samples.Length, (int)(2.9 * Rate * 2), (int)(3.1 * Rate * 2));
+    }
+
+    [Fact]
+    public void TrackEndingBeforeItsFadeFadesTheNextOneIn()
+    {
+        // Reports 3 s (like an overestimated VBR length) but has 1 s of audio, so it ends before the fade.
+        var samples = RenderAll(ArmedMixer(new ConstantSource(1, 1f, reportedSeconds: 3), new ConstantSource(2, 1f), 1, 1));
+
+        Assert.Equal(0f, samples[Rate * 2 + 2], 2);
+        Assert.Equal(1f, samples[(int)(Rate * 2.5) * 2], 2);
     }
 
     [Fact]
@@ -210,6 +238,54 @@ public class PlaybackEngineTests
 
         Assert.Equal("a", rig.Player.CurrentTrack?.Title);
         Assert.Equal(1, rig.Songs[0].PlayCount);
+    }
+
+    [Fact]
+    public async Task RemovingThePlayingTrackKeepsTheRestOfTheQueue()
+    {
+        var rig = new Rig(0, 0);
+        await rig.PlayAsync();
+
+        rig.Player.RemoveTracks(new HashSet<string> { rig.Songs[0].FilePath });
+
+        Assert.Equal("b", rig.Player.CurrentTrack?.Title);
+        Assert.Equal("bc", string.Concat(rig.Player.Queue.View().Select(s => s.Title)));
+    }
+
+    [Fact]
+    public async Task FileBeingWrittenStaysClosedUntilItsOwnRestore()
+    {
+        var rig = new Rig(0, 0);
+        await rig.PlayAsync();
+        string next = rig.Songs[1].FilePath, other = rig.Songs[2].FilePath;
+        Assert.Equal(1, rig.OpenHandles(next));
+
+        var nextHold = rig.Player.ReleaseFile(next);
+        var otherHold = rig.Player.ReleaseFile(other);
+        rig.Player.RestoreFile(otherHold);
+        await rig.Engine.PendingArm;
+        Assert.Equal(0, rig.OpenHandles(next));
+
+        rig.Player.RestoreFile(nextHold);
+        await rig.Engine.PendingArm;
+        Assert.Equal(1, rig.OpenHandles(next));
+    }
+
+    [Fact]
+    public async Task PlayingFileReopensOnlyAfterItsLastWriterRestores()
+    {
+        var rig = new Rig(0, 0);
+        await rig.PlayAsync();
+        string playing = rig.Songs[0].FilePath;
+
+        var first = rig.Player.ReleaseFile(playing);
+        var second = rig.Player.ReleaseFile(playing);
+        rig.Player.RestoreFile(first);
+        Assert.Equal(0, rig.OpenHandles(playing));
+
+        rig.Player.RestoreFile(second);
+        Assert.Equal(1, rig.OpenHandles(playing));
+        Assert.Equal("a", rig.Player.CurrentTrack?.Title);
     }
 
     [Fact]

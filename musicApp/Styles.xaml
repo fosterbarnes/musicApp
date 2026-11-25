@@ -448,9 +448,11 @@
                                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                               Margin="{TemplateBinding Padding}"/>
                         </Border>
-                        <!-- Resize gripper for column resizing -->
+                        <!-- Resize gripper, centered on the divider so either side of the line grabs it
+                             (the header row draws each header above the one to its right) -->
                         <Thumb x:Name="PART_HeaderGripper"
-                               Width="8"
+                               Width="12"
+                               Margin="0,0,-6,0"
                                HorizontalAlignment="Right"
                                Cursor="SizeWE">
                             <Thumb.Style>
@@ -460,7 +462,6 @@
                                         <Setter.Value>
                                             <ControlTemplate TargetType="Thumb">
                                                 <Border Background="{TemplateBinding Background}"
-                                                        Width="8"
                                                         Cursor="SizeWE"/>
                                             </ControlTemplate>
                                         </Setter.Value>

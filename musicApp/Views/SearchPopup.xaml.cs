@@ -14,6 +14,7 @@ namespace musicApp.Views;
 public partial class SearchPopupView : UserControl
 {
     private Song? _contextMenuSong;
+    private List<Song>? _contextMenuAlbumSongs;
     private int _heightAdjustGeneration;
     private int _albumArtLoadGeneration;
     private int _searchSongAnchorIndex = -1;
@@ -287,8 +288,17 @@ public partial class SearchPopupView : UserControl
     private void SearchContextMenu_Opened(object sender, RoutedEventArgs e)
     {
         _contextMenuSong = null;
+        _contextMenuAlbumSongs = null;
         if (sender is not ContextMenu menu || menu.PlacementTarget is not DependencyObject placement)
             return;
+
+        // An album row stands for all its songs: Remove from Library takes them all, and the one-file
+        // Delete (which would only hit the album's first track) is not offered.
+        var deleteItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Delete");
+        var albumRow = (placement as FrameworkElement)?.DataContext as AlbumRowViewModel;
+        TrackContextMenuHelper.SetVisible(deleteItem, albumRow == null);
+        if (albumRow != null)
+            _contextMenuAlbumSongs = new List<Song>(albumRow.Album.Songs);
 
         if (placement is FrameworkElement fe && fe.DataContext is SongRowViewModel)
         {
@@ -328,6 +338,12 @@ public partial class SearchPopupView : UserControl
     private void SearchContextMenu_ShowInExplorerClick(object sender, RoutedEventArgs e) { if (_contextMenuSong != null) ShowInExplorerRequested?.Invoke(this, _contextMenuSong); }
     private void SearchContextMenu_RemoveFromLibraryClick(object sender, RoutedEventArgs e)
     {
+        if (_contextMenuAlbumSongs is { Count: > 0 } albumSongs)
+        {
+            RemoveFromLibraryRequested?.Invoke(this, albumSongs);
+            return;
+        }
+
         var songs = GetSelectedSearchSongs();
         if (songs.Count == 0 && _contextMenuSong != null)
             songs.Add(_contextMenuSong);

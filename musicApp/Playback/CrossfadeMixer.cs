@@ -20,6 +20,9 @@ public sealed class CrossfadeMixer : ISampleProvider
     private long _rampFrames;
     private long _rampLength;
     private long _rampPosition;
+    private long _fadeInLength; // fade-in without a tail, after a track ended before its crossfade
+    private long _fadeInPosition;
+    private float _tailGain = 1f; // level the tail starts its fade-out from
     private float[] _tailBuffer = Array.Empty<float>();
 
     public CrossfadeMixer(int sampleRate) =>
@@ -121,7 +124,9 @@ public sealed class CrossfadeMixer : ISampleProvider
                 FinishTail();
                 if (_armed != null)
                 {
-                    Transition(fade: false);
+                    // The track ended before its fade could start (shorter than the previous fade, or a VBR
+                    // length estimate that ran long). Fade the next one in rather than starting it at full volume.
+                    Transition(fade: _armedOverlaps && _overlapFrames > 0, atEnd: true);
                 }
                 else
                 {
@@ -145,13 +150,16 @@ public sealed class CrossfadeMixer : ISampleProvider
         return written;
     }
 
-    private void Transition(bool fade)
+    private void Transition(bool fade, bool atEnd = false)
     {
         var outgoing = _current!;
         _current = _armed;
         _armed = null;
+        // A crossfade can start while the outgoing track is still fading in; it fades out from that level.
+        _tailGain = _fadeInLength > 0 ? FadeInGain(_fadeInPosition) : 1f;
+        _fadeInLength = 0;
 
-        if (fade && _rampFrames > 0)
+        if (fade && _rampFrames > 0 && !atEnd)
         {
             _tail = outgoing;
             _rampLength = Math.Max(1, Math.Min(_rampFrames, outgoing.RemainingFrames));
@@ -160,6 +168,13 @@ public sealed class CrossfadeMixer : ISampleProvider
         else
         {
             _pending.Add((outgoing, false));
+            // The outgoing track already ended, so there is nothing to fade out: just fade the next one in.
+            // No tail is kept, so the next crossfade can start on time even during this fade-in.
+            if (fade && _rampFrames > 0)
+            {
+                _fadeInLength = _rampFrames;
+                _fadeInPosition = 0;
+            }
         }
         _pending.Add((_current!, true));
     }
@@ -167,8 +182,13 @@ public sealed class CrossfadeMixer : ISampleProvider
     private int Render(float[] buffer, int offset, int count)
     {
         int got = ReadFully(_current!, buffer, offset, count);
-        if (_tail == null || got == 0)
+        if (got == 0)
             return got;
+        if (_tail == null)
+        {
+            ApplyFadeIn(buffer, offset, got);
+            return got;
+        }
 
         if (_tailBuffer.Length < got)
             _tailBuffer = new float[got];
@@ -179,7 +199,7 @@ public sealed class CrossfadeMixer : ISampleProvider
         {
             double t = Math.Min(1d, (double)(_rampPosition + frame) / _rampLength);
             float incoming = (float)Math.Sin(t * Math.PI / 2);
-            float outgoing = (float)Math.Cos(t * Math.PI / 2);
+            float outgoing = (float)Math.Cos(t * Math.PI / 2) * _tailGain;
             for (int channel = 0; channel < 2; channel++)
             {
                 int i = frame * 2 + channel;
@@ -193,6 +213,24 @@ public sealed class CrossfadeMixer : ISampleProvider
             FinishTail();
         return got;
     }
+
+    private void ApplyFadeIn(float[] buffer, int offset, int count)
+    {
+        if (_fadeInLength <= 0)
+            return;
+        for (int frame = 0; frame < count / 2; frame++)
+        {
+            float gain = FadeInGain(_fadeInPosition + frame);
+            buffer[offset + frame * 2] *= gain;
+            buffer[offset + frame * 2 + 1] *= gain;
+        }
+        _fadeInPosition += count / 2;
+        if (_fadeInPosition >= _fadeInLength)
+            _fadeInLength = 0;
+    }
+
+    private float FadeInGain(long position) =>
+        (float)Math.Sin(Math.Min(1d, (double)position / _fadeInLength) * Math.PI / 2);
 
     private void FinishTail()
     {

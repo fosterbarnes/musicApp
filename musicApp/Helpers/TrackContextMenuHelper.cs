@@ -138,8 +138,6 @@ internal static class TrackContextMenuHelper
             showAlbums = false;
         else if (string.Equals(contextName, "Songs", StringComparison.OrdinalIgnoreCase))
             showSongs = false;
-        else if (string.Equals(contextName, "Recently Played", StringComparison.OrdinalIgnoreCase))
-            showAlbums = false;
         else if (string.Equals(contextName, "Queue", StringComparison.OrdinalIgnoreCase))
             showQueue = false;
 

@@ -31,10 +31,15 @@ public static class AlbumArtRemoteFetcher
         return new CoverArt("musicApp", ver, MbContactUrl);
     }
 
+    // MUSICBRAINZ_RELEASEID is what this app writes; Picard stores the release id as "MusicBrainz Album Id".
     private static readonly string[] ReleaseIdTagKeys =
     {
         "MUSICBRAINZ_RELEASEID",
-        "MusicBrainz Release Id"
+        "MusicBrainz Release Id",
+        "MUSICBRAINZ_ALBUMID",
+        "MusicBrainz Album Id",
+        "TXXX:MusicBrainz Album Id",
+        "----:com.apple.iTunes:MusicBrainz Album Id"
     };
 
     public static string? TryReadMusicBrainzReleaseIdFromFile(string filePath)
@@ -141,7 +146,7 @@ public static class AlbumArtRemoteFetcher
             results = await query.FindReleasesAsync(q, limit: 10, offset: null, simple: false, cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch
+        catch when (!cancellationToken.IsCancellationRequested)
         {
             var simple = $"{artist} {album}";
             try
@@ -150,7 +155,7 @@ public static class AlbumArtRemoteFetcher
                     .FindReleasesAsync(simple, limit: 10, offset: null, simple: true, cancellationToken)
                     .ConfigureAwait(false);
             }
-            catch
+            catch when (!cancellationToken.IsCancellationRequested)
             {
                 return null;
             }
@@ -190,7 +195,7 @@ public static class AlbumArtRemoteFetcher
             var bytes = ms.ToArray();
             return bytes.Length > 0 ? bytes : null;
         }
-        catch
+        catch when (!cancellationToken.IsCancellationRequested)
         {
             return null;
         }

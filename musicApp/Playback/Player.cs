@@ -181,13 +181,21 @@ public sealed class Player : IDisposable
         return true;
     }
 
-    /// <summary>Removes tracks from the queue and stops first if one of them is playing.</summary>
+    /// <summary>
+    /// Removes tracks from the queue. If the playing one goes, the next track loads (playing only if
+    /// playback was), like removing it from the queue; the rest of the queue is kept.
+    /// </summary>
     public void RemoveTracks(IReadOnlySet<string> paths)
     {
-        if (CurrentTrack != null && paths.Contains(CurrentTrack.FilePath))
-            Stop(clearQueue: true);
+        bool wasPlaying = IsPlaying;
+        bool currentRemoved = CurrentTrack != null && paths.Contains(CurrentTrack.FilePath);
         Queue.RemoveTracks(paths);
-        AfterQueueEdit();
+        if (!currentRemoved)
+            AfterQueueEdit();
+        else if (Queue.Current != null)
+            LoadCurrent(wasPlaying, isNewEntry: true);
+        else
+            Stop(clearQueue: true);
     }
 
     public void ClearAll()
@@ -222,8 +230,8 @@ public sealed class Player : IDisposable
         {
             _engine.RestoreFile(release);
             ArmNext();
-            if (release.ReleasedPlayback)
-                PlaybackStateChanged?.Invoke(IsPlaying);
+            // Any restore can be the one that resumes playback (the last writer of the playing file).
+            PlaybackStateChanged?.Invoke(IsPlaying);
         }
         catch (Exception ex)
         {

@@ -18,6 +18,7 @@ public partial class UpdaterWindow : Window
     private bool _postUpdateLaunchMode;
     private bool _upToDateDoneMode;
     private bool _postUpdateAutoCloseEligible;
+    private bool _installing;
     private VersionBuild _buildKind;
     private DispatcherTimer? _upToDateAutoCloseTimer;
     private int _upToDateAutoCloseSecondsLeft;
@@ -40,8 +41,15 @@ public partial class UpdaterWindow : Window
         }
         SourceInitialized += (_, _) => WindowsTitleBarTheme.ApplyImmersiveDarkMode(this);
         Loaded += UpdaterWindow_Loaded;
-        Closing += (_, _) =>
+        Closing += (_, e) =>
         {
+            // Closing exits the process, which would kill the install mid purge/copy and leave the app half deleted.
+            if (_installing)
+            {
+                e.Cancel = true;
+                return;
+            }
+
             StopUpToDateAutoCloseTimer();
             _cts.Cancel();
         };
@@ -248,7 +256,8 @@ public partial class UpdaterWindow : Window
                 StartAutoInstallAutoCloseCountdownIfNeeded();
             }
         }
-        catch (OperationCanceledException)
+        // HttpClient timeouts also throw OperationCanceledException; only a real cancel closes silently.
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
         {
             Close();
         }
@@ -356,13 +365,21 @@ public partial class UpdaterWindow : Window
             Progress.IsIndeterminate = true;
             CancelButton.IsEnabled = false;
 
-            await Task.Run(() =>
+            _installing = true;
+            try
             {
-                if (_buildKind == VersionBuild.Portable)
-                    ApplyUpdateService.ApplyPortableZip(installRoot, packagePath, workDir, launchAfter);
-                else
-                    ApplyUpdateService.ApplyInstaller(installRoot, packagePath, launchAfter);
-            }, token);
+                await Task.Run(() =>
+                {
+                    if (_buildKind == VersionBuild.Portable)
+                        ApplyUpdateService.ApplyPortableZip(installRoot, packagePath, workDir, launchAfter);
+                    else
+                        ApplyUpdateService.ApplyInstaller(installRoot, packagePath, launchAfter);
+                }, token);
+            }
+            finally
+            {
+                _installing = false;
+            }
 
             Progress.IsIndeterminate = false;
             Progress.Value = 100;
@@ -371,7 +388,7 @@ public partial class UpdaterWindow : Window
                 : $"Update installed ({_remote.LatestVersion}). Launch musicApp from your install folder when ready.");
             updateSucceeded = true;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             SetDone("Update cancelled.");
         }

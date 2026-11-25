@@ -43,6 +43,7 @@ namespace musicApp.Views
         // Pending key changes; copied into preferences on OK/Apply
         private Dictionary<string, string> _shortcutDraft = new();
         private KeyboardShortcutRow? _capturingShortcutRow;
+        private CancellationTokenSource? _libraryAlbumArtScanCts;
 
         public SettingsView(string? launchSection = null)
         {
@@ -57,6 +58,8 @@ namespace musicApp.Views
 
         protected override void OnClosed(EventArgs e)
         {
+            // The scan's progress UI goes away with this window, so the scan stops too.
+            _libraryAlbumArtScanCts?.Cancel();
             CleanupLibraryAlbumArtScanGuiState();
             base.OnClosed(e);
             WindowFocusHelper.ScheduleActivateOwner(this);
@@ -259,10 +262,12 @@ namespace musicApp.Views
                 }), DispatcherPriority.Background);
             });
 
+            using var scanCts = new CancellationTokenSource();
+            _libraryAlbumArtScanCts = scanCts;
             try
             {
                 var (ok, skipped, failed) =
-                    await main.RunScanMissingRemoteAlbumArtAsync(progress, CancellationToken.None).ConfigureAwait(true);
+                    await main.RunScanMissingRemoteAlbumArtAsync(progress, scanCts.Token).ConfigureAwait(true);
 
                 LibraryAlbumArtScanProgressStatusText.Text = ok == 0 && failed == 0
                     ? $"Done. Nothing new to embed (skipped {skipped})."
@@ -278,6 +283,7 @@ namespace musicApp.Views
             }
             finally
             {
+                _libraryAlbumArtScanCts = null;
                 _libraryAlbumArtScanGuiBusy = false;
                 LibraryScanMissingAlbumArtButton.Content = "Scan";
                 LibraryAlbumArtScanProgressBar.IsIndeterminate = false;
@@ -561,8 +567,8 @@ namespace musicApp.Views
         {
             try
             {
+                // Exports the edits on screen without saving them: Cancel on Settings must still discard them.
                 ReadUiIntoPreferences();
-                PreferencesManager.Instance.SavePreferencesSync(_preferences);
 
                 var dlg = new Microsoft.Win32.SaveFileDialog
                 {
@@ -1094,15 +1100,28 @@ namespace musicApp.Views
 
         private void AboutHyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
         {
-            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+            OpenLink(e.Uri);
             e.Handled = true;
         }
 
         private void AboutCreditLineHyperlink_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Hyperlink h && h.NavigateUri != null)
-                Process.Start(new ProcessStartInfo(h.NavigateUri.AbsoluteUri) { UseShellExecute = true });
+                OpenLink(h.NavigateUri);
             e.Handled = true;
+        }
+
+        // Start throws when no browser handles the link; uncaught in a click handler that closes the app.
+        private void OpenLink(Uri uri)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageDialog.Show(this, "Open Link", $"Could not open {uri.AbsoluteUri}: {ex.Message}", MessageDialog.Buttons.Ok);
+            }
         }
 
 

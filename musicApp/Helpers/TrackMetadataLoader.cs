@@ -44,13 +44,13 @@ public static class TrackMetadataLoader
                 if (atlTrack.Duration > 0)
                 {
                     track.DurationTimeSpan = TimeSpan.FromSeconds(atlTrack.Duration);
-                    track.Duration = track.DurationTimeSpan.ToString(@"mm\:ss");
+                    track.Duration = FormatDuration(track.DurationTimeSpan);
                 }
                 else
                 {
                     using var audioFile = new AudioFileReader(filePath);
                     track.DurationTimeSpan = audioFile.TotalTime;
-                    track.Duration = audioFile.TotalTime.ToString(@"mm\:ss");
+                    track.Duration = FormatDuration(audioFile.TotalTime);
                 }
 
                 if (atlTrack.EmbeddedPictures != null && atlTrack.EmbeddedPictures.Count > 0)
@@ -65,7 +65,7 @@ public static class TrackMetadataLoader
                 {
                     using var audioFile = new AudioFileReader(filePath);
                     track.DurationTimeSpan = audioFile.TotalTime;
-                    track.Duration = audioFile.TotalTime.ToString(@"mm\:ss");
+                    track.Duration = FormatDuration(audioFile.TotalTime);
 
                     if (string.IsNullOrEmpty(track.SampleRate))
                     {
@@ -92,6 +92,10 @@ public static class TrackMetadataLoader
             return null;
         }
     }
+
+    // Total minutes, not "mm" (minutes mod 60): a 90 minute track must read 90:00, and startup parses it back.
+    private static string FormatDuration(TimeSpan duration) =>
+        $"{(int)duration.TotalMinutes:D2}:{duration.Seconds:D2}";
 
     private static void TryFillBitrateFromFileSize(Song track)
     {
@@ -156,10 +160,8 @@ public static class TrackMetadataLoader
         var prevAlbum = track.Album ?? "";
         var prevArtist = track.Artist ?? "";
         var prevAlbumArtist = track.AlbumArtist ?? "";
-        var playCount = track.PlayCount;
-        var lastPlayed = track.LastPlayed;
-        var dateAdded = track.DateAdded;
-        var isFavorite = track.IsFavorite;
+        // Play stats and favorite are not tag fields, so they are not copied and restored here: a restore would
+        // undo a play or favorite made while a rescan worker runs this.
 
         try
         {
@@ -170,13 +172,13 @@ public static class TrackMetadataLoader
             if (atlTrack.Duration > 0)
             {
                 track.DurationTimeSpan = TimeSpan.FromSeconds(atlTrack.Duration);
-                track.Duration = track.DurationTimeSpan.ToString(@"mm\:ss");
+                track.Duration = FormatDuration(track.DurationTimeSpan);
             }
             else
             {
                 using var audioFile = new AudioFileReader(track.FilePath);
                 track.DurationTimeSpan = audioFile.TotalTime;
-                track.Duration = audioFile.TotalTime.ToString(@"mm\:ss");
+                track.Duration = FormatDuration(audioFile.TotalTime);
             }
 
             if (atlTrack.EmbeddedPictures != null && atlTrack.EmbeddedPictures.Count > 0)
@@ -211,11 +213,6 @@ public static class TrackMetadataLoader
             AlbumArtCacheManager.InvalidateAlbum(track.Album ?? "", currentCanon);
 
             track.ThumbnailCachePath = AlbumArtCacheManager.GenerateAndCache(track);
-
-            track.PlayCount = playCount;
-            track.LastPlayed = lastPlayed;
-            track.DateAdded = dateAdded;
-            track.IsFavorite = isFavorite;
         }
         catch (Exception ex)
         {

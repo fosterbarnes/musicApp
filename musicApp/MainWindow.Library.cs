@@ -78,7 +78,7 @@ namespace musicApp
                         if (!Directory.Exists(folderPath))
                             continue;
 
-                        var diskPaths = Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories)
+                        var diskPaths = LibraryPathHelper.EnumerateFilesRecursive(folderPath)
                             .Where(file => supportedExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
                             .Select(file => LibraryPathHelper.TryNormalizePath(file) ?? "")
                             .Where(path => path.Length > 0)
@@ -312,7 +312,8 @@ namespace musicApp
             }
 
             var candidateList = candidates.ToList();
-            var skipped = list.Count - candidateList.Count;
+            // Tracks whose check threw are already counted in failed.
+            var skipped = list.Count - candidateList.Count - classificationFailed;
             var failed = classificationFailed;
 
             var groups = candidateList
@@ -472,11 +473,14 @@ namespace musicApp
                             {
                                 Interlocked.Increment(ref ok);
                                 var albumKey = track.Album ?? "";
-                                var artistKey = track.Artist ?? "";
+                                // Thumbnails are keyed by album artist; loaders also read the older track-artist key.
+                                var artistKey = AlbumArtCacheManager.GetThumbnailCacheArtistKey(track);
+                                var legacyArtistKey = track.Artist ?? "";
                                 await Task.Run(
                                         () =>
                                         {
                                             AlbumArtCacheManager.InvalidateAlbum(albumKey, artistKey);
+                                            AlbumArtCacheManager.InvalidateAlbum(albumKey, legacyArtistKey);
                                             AlbumArtThumbnailHelper.InvalidateFullSizeCache(path);
                                             TrackMetadataLoader.ReloadTagFieldsFromFile(track);
                                         },
@@ -486,10 +490,11 @@ namespace musicApp
                         }
                         finally
                         {
+                            // Not cancellable: a cancelled scan must still give playback (and the file hold) back.
                             await Dispatcher.InvokeAsync(
                                 () => RestorePlaybackAfterMetadataWrite(release),
                                 DispatcherPriority.Normal,
-                                ct);
+                                CancellationToken.None);
                         }
                     }
                     finally
@@ -687,11 +692,14 @@ namespace musicApp
                             {
                                 Interlocked.Increment(ref ok);
                                 var albumKey = track.Album ?? "";
-                                var artistKey = track.Artist ?? "";
+                                // Thumbnails are keyed by album artist; loaders also read the older track-artist key.
+                                var artistKey = AlbumArtCacheManager.GetThumbnailCacheArtistKey(track);
+                                var legacyArtistKey = track.Artist ?? "";
                                 await Task.Run(
                                         () =>
                                         {
                                             AlbumArtCacheManager.InvalidateAlbum(albumKey, artistKey);
+                                            AlbumArtCacheManager.InvalidateAlbum(albumKey, legacyArtistKey);
                                             AlbumArtThumbnailHelper.InvalidateFullSizeCache(path);
                                             TrackMetadataLoader.ReloadTagFieldsFromFile(track);
                                         },
@@ -701,10 +709,11 @@ namespace musicApp
                         }
                         finally
                         {
+                            // Not cancellable: a cancelled scan must still give playback (and the file hold) back.
                             await Dispatcher.InvokeAsync(
                                 () => RestorePlaybackAfterMetadataWrite(release),
                                 DispatcherPriority.Normal,
-                                ct);
+                                CancellationToken.None);
                         }
                     }
                     finally

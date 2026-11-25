@@ -67,7 +67,11 @@ namespace musicApp
         public void RemoveTrack(Song track)
         {
             Tracks.Remove(track);
-            TrackFilePaths.Remove(track.FilePath);
+            // Paths match ignoring case everywhere else (AddTrack, ReconstructTracks); an ordinal Remove
+            // left the path saved and the song came back on restart.
+            int index = TrackFilePaths.FindIndex(p => string.Equals(p, track.FilePath, StringComparison.OrdinalIgnoreCase));
+            if (index >= 0)
+                TrackFilePaths.RemoveAt(index);
             LastModified = DateTime.Now;
         }
 

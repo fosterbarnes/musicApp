@@ -38,6 +38,7 @@ public partial class InfoMetadataView : Window
     private byte[]? _pendingFrontCoverPicture;
     private string? _lyricsExternalTempPath;
     private byte[]? _lyricsExternalBaselineHash;
+    private bool _lyricsApplyFailed;
     private DispatcherTimer? _lyricsPollTimer;
 
     public event EventHandler<Song>? ShowInSongsRequested;
@@ -58,7 +59,7 @@ public partial class InfoMetadataView : Window
         InitializeComponent();
         SourceInitialized += (_, _) => WindowsTitleBarTheme.ApplyImmersiveDarkMode(this);
         Closing += InfoMetadataView_Closing;
-        Activated += (_, _) => TryApplyLyricsFromTempIfChanged();
+        Activated += (_, _) => TryApplyLyricsFromTempIfChanged(final: false);
         GenreComboBox.ItemsSource = Array.Empty<string>();
         WirePrimarySortingFieldSync();
         WireSortAsFields();
@@ -244,14 +245,17 @@ public partial class InfoMetadataView : Window
 
         if (!string.IsNullOrWhiteSpace(track.Genre))
         {
+            // Prefer the exact spelling: the list can hold "Rock" and "rock", and saving writes the selected one.
             string? match = null;
             foreach (var g in genres)
             {
-                if (string.Equals(g, track.Genre, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(g, track.Genre, StringComparison.Ordinal))
                 {
                     match = g;
                     break;
                 }
+                if (match == null && string.Equals(g, track.Genre, StringComparison.OrdinalIgnoreCase))
+                    match = g;
             }
 
             if (match != null)
@@ -899,9 +903,10 @@ public partial class InfoMetadataView : Window
 
     private void InfoMetadataView_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        TryApplyLyricsFromTempIfChanged();
         StopLyricsPolling();
-        CleanupLyricsTempFile();
+        // On a failed save the temp file is the only copy of the edits; its path was shown in the error.
+        if (TryApplyLyricsFromTempIfChanged(final: true))
+            CleanupLyricsTempFile();
     }
 
     private void OpenLyricsInExternalEditor_Click(object sender, RoutedEventArgs e)
@@ -954,6 +959,7 @@ public partial class InfoMetadataView : Window
         }
 
         _lyricsExternalTempPath = path;
+        _lyricsApplyFailed = false;
         _lyricsExternalBaselineHash = ComputeUtf8Hash(NormalizeNewlines(initial));
 
         try
@@ -994,7 +1000,7 @@ public partial class InfoMetadataView : Window
 
     private void LyricsPollTimer_Tick(object? sender, EventArgs e)
     {
-        TryApplyLyricsFromTempIfChanged();
+        TryApplyLyricsFromTempIfChanged(final: false);
     }
 
     private void CleanupLyricsTempFile()
@@ -1013,12 +1019,17 @@ public partial class InfoMetadataView : Window
         _lyricsExternalBaselineHash = null;
     }
 
-    private void TryApplyLyricsFromTempIfChanged()
+    /// <summary>
+    /// Saves the external editor's lyrics if they changed. Returns false only when a save was tried and failed.
+    /// <paramref name="final"/> is the close-time pass; polling skips an empty file because editors truncate
+    /// before writing, and saving that would strip the lyrics.
+    /// </summary>
+    private bool TryApplyLyricsFromTempIfChanged(bool final)
     {
         if (_track == null || string.IsNullOrWhiteSpace(_track.FilePath) || !File.Exists(_track.FilePath))
-            return;
+            return true;
         if (string.IsNullOrEmpty(_lyricsExternalTempPath) || !File.Exists(_lyricsExternalTempPath))
-            return;
+            return true;
 
         string raw;
         try
@@ -1027,15 +1038,20 @@ public partial class InfoMetadataView : Window
         }
         catch
         {
-            return;
+            return true;
         }
+
+        // After a failed save, only the close-time pass retries: the error dialog closing re-activates this
+        // window, and retrying on Activated would show the dialog again in a loop.
+        if (!final && (_lyricsApplyFailed || string.IsNullOrWhiteSpace(raw)))
+            return true;
 
         var norm = NormalizeNewlines(raw);
         if (_lyricsExternalBaselineHash != null)
         {
             var curHash = ComputeUtf8Hash(norm);
             if (curHash.AsSpan().SequenceEqual(_lyricsExternalBaselineHash))
-                return;
+                return true;
         }
 
         var snap = ReleasePlaybackForFile?.Invoke(_track.FilePath) ?? default;
@@ -1044,8 +1060,13 @@ public partial class InfoMetadataView : Window
             if (!TrackMetadataSaver.TrySaveLyrics(_track.FilePath, raw, out var err))
             {
                 RestorePlaybackAfterFile?.Invoke(snap);
-                MessageDialog.Show(Owner, "Lyrics", err ?? "Could not save lyrics.", MessageDialog.Buttons.Ok);
-                return;
+                // Stop polling first: the dialog is modal and the timer would otherwise stack a new one each second.
+                StopLyricsPolling();
+                _lyricsApplyFailed = true;
+                MessageDialog.Show(Owner, "Lyrics",
+                    (err ?? "Could not save lyrics.") + $"\n\nYour edited lyrics are still in:\n{_lyricsExternalTempPath}",
+                    MessageDialog.Buttons.Ok);
+                return false;
             }
 
             TrackMetadataLoader.ReloadTagFieldsFromFile(_track);
@@ -1061,11 +1082,17 @@ public partial class InfoMetadataView : Window
             {
                 _lyricsExternalBaselineHash = ComputeUtf8Hash(norm);
             }
+            return true;
         }
         catch (Exception ex)
         {
             RestorePlaybackAfterFile?.Invoke(snap);
-            MessageDialog.Show(Owner, "Lyrics", ex.Message, MessageDialog.Buttons.Ok);
+            StopLyricsPolling();
+            _lyricsApplyFailed = true;
+            MessageDialog.Show(Owner, "Lyrics",
+                ex.Message + $"\n\nYour edited lyrics are still in:\n{_lyricsExternalTempPath}",
+                MessageDialog.Buttons.Ok);
+            return false;
         }
     }
 

@@ -132,7 +132,8 @@ namespace musicApp
                     if (prefs != null)
                     {
                         EnsureInitialized(prefs);
-                        ApplyLegacyUpdatePreferenceMigrations(json, prefs);
+                        if (ApplyLegacyUpdatePreferenceMigrations(json, prefs))
+                            SavePreferencesSync(prefs);
                         return prefs;
                     }
                 }
@@ -156,7 +157,8 @@ namespace musicApp
                     if (prefs != null)
                     {
                         EnsureInitialized(prefs);
-                        ApplyLegacyUpdatePreferenceMigrations(json, prefs);
+                        if (ApplyLegacyUpdatePreferenceMigrations(json, prefs))
+                            await SavePreferencesAsync(prefs);
                         return prefs;
                     }
                 }
@@ -169,19 +171,25 @@ namespace musicApp
             return CreateDefaultPreferences();
         }
 
-        private static void ApplyLegacyUpdatePreferenceMigrations(string rawJson, AppPreferences prefs)
+        /// <summary>
+        /// Returns true when it changed prefs. Callers save it: the separate updater reads the file, and an
+        /// in-memory-only migration left it seeing auto-install off.
+        /// </summary>
+        private static bool ApplyLegacyUpdatePreferenceMigrations(string rawJson, AppPreferences prefs)
         {
             try
             {
                 using var doc = JsonDocument.Parse(rawJson);
                 if (!doc.RootElement.TryGetProperty("general", out var g))
-                    return;
-                if (!g.TryGetProperty("automaticallyInstallUpdates", out _) && prefs.General.CheckForUpdates)
-                    prefs.General.AutomaticallyInstallUpdates = true;
+                    return false;
+                if (g.TryGetProperty("automaticallyInstallUpdates", out _) || !prefs.General.CheckForUpdates)
+                    return false;
+                prefs.General.AutomaticallyInstallUpdates = true;
+                return true;
             }
             catch
             {
-                // ignore
+                return false;
             }
         }
 
@@ -267,6 +275,19 @@ namespace musicApp
                         || Hotkey.ShortcutGesture.TryParse(text) is { } g && g != Hotkey.ShortcutCatalog.Get(action).Default);
                 if (!keep)
                     bindings.Remove(name);
+            }
+
+            // Two actions on one key (e.g. from an edited or imported file): the lookup keeps only the first, so the
+            // other silently did nothing. Drop the later override instead, so that action falls back to its default.
+            var used = new HashSet<Hotkey.ShortcutGesture>();
+            foreach (var def in Hotkey.ShortcutCatalog.All)
+            {
+                var name = def.Action.ToString();
+                if (bindings.ContainsKey(name) &&
+                    Hotkey.ShortcutCatalog.Resolve(def.Action, bindings) is { } overridden && used.Contains(overridden))
+                    bindings.Remove(name);
+                if (Hotkey.ShortcutCatalog.Resolve(def.Action, bindings) is { } effective)
+                    used.Add(effective);
             }
         }
     }

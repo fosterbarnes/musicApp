@@ -156,4 +156,16 @@ public class PlaybackQueueTests
         Assert.Equal("dbcef", Titles(q));
         Assert.False(q.CanUndo);
     }
+
+    [Fact]
+    public void StartingAfterAClearedQueueKeepsItsUndo()
+    {
+        var songs = Songs("abcd");
+        var q = new PlaybackQueue();
+        q.Start(songs, songs[0]);
+        q.Clear(offerUndo: true);
+        q.Start(songs, songs[3]);
+
+        Assert.True(q.CanUndo);
+    }
 }

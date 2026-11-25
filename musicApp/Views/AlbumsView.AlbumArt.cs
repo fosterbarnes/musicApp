@@ -150,7 +150,9 @@ namespace musicApp.Views
                             batch = await Dispatcher.InvokeAsync(() =>
                             {
                                 var list = new List<AlbumGridItem>();
-                                for (int i = s; i < e; i++)
+                                // The grid can shrink after countSnapshot was taken (rebuild, flyout removed).
+                                int end = Math.Min(e, _albumItems.Count);
+                                for (int i = s; i < end; i++)
                                 {
                                     if (_albumItems[i] is AlbumGridItem a && a.AlbumArtSource == null)
                                         list.Add(a);

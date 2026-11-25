@@ -64,6 +64,8 @@ namespace musicApp
                 ordered = allTracks.ToList();
             else if (ReferenceEquals(requestSource, playlistsViewControl))
                 ordered = playlistsViewControl?.SelectedPlaylist?.Tracks.ToList();
+            else if (ReferenceEquals(requestSource, recentlyPlayedViewControl))
+                ordered = recentlyPlayed.ToList();
             else if (ReferenceEquals(requestSource, albumsViewControl))
                 ordered = BuildAlbumsPlayContext(track);
 
@@ -189,6 +191,9 @@ namespace musicApp
                 if (sender is not MiniPlayerWindow)
                     _miniPlayerWindow?.SetVolumeWithoutNotify(volume0To100);
 
+                // Mute moves the slider to 0; saving that would bring the app back silent after a restart.
+                if (isMuted)
+                    return;
                 _pendingVolume0To100 = volume0To100;
                 if (_volumeSaveTimer == null)
                 {
@@ -231,18 +236,23 @@ namespace musicApp
                 _player.RemoveFromQueue(viewIndex);
         }
 
-        private void OnQueueToolbarMoveUpRequested(object? sender, EventArgs e)
-        {
-            int index = GetQueueToolbarSelectedViewIndex(sender);
-            if (index >= 2)
-                _player.MoveInQueue(index, index - 1);
-        }
+        private void OnQueueToolbarMoveUpRequested(object? sender, EventArgs e) => MoveQueueSelection(sender, -1);
 
-        private void OnQueueToolbarMoveDownRequested(object? sender, EventArgs e)
+        private void OnQueueToolbarMoveDownRequested(object? sender, EventArgs e) => MoveQueueSelection(sender, 1);
+
+        private void MoveQueueSelection(object? sender, int step)
         {
+            // Row 0 is the current track only while something is loaded; idle queues start with upcoming.
+            int firstMovable = _player.Queue.Current != null ? 1 : 0;
             int index = GetQueueToolbarSelectedViewIndex(sender);
-            if (index >= 1)
-                _player.MoveInQueue(index, index + 1);
+            if (index < firstMovable || index + step < firstMovable)
+                return;
+
+            var moved = GetQueueToolbarSelectedSong(sender);
+            _player.MoveInQueue(index, index + step);
+            // The refresh replaces the list and drops the selection, which stops a held Alt+Up/Down.
+            if (moved != null && sender is QueueView queueView)
+                queueView.SelectTrack(moved, grabFocus: true);
         }
 
         private Song? GetQueueToolbarSelectedSong(object? sender)
@@ -269,6 +279,9 @@ namespace musicApp
                 return _miniPlayerWindow.GetSelectedViewIndex();
             return queueViewControl?.GetSelectedViewIndex() ?? -1;
         }
+
+        /// <summary>True when the queue has a current track (Play Next inserts after it rather than appending).</summary>
+        public bool HasCurrentQueueTrack => _player.Queue.Current != null;
 
         /// <summary>True when the track is the current song or upcoming.</summary>
         public bool IsTrackInQueue(Song? track) => _player.Queue.Contains(track);
@@ -314,8 +327,10 @@ namespace musicApp
                     SelectCurrentTrackInActiveView(true);
                     return true;
                 case Hotkey.ShortcutAction.PlaySelected:
-                    if (TryResolveTrackToPlayFromActiveView(out var selected, out var requestSource) && selected != null)
-                        PlayTrack(selected, requestSource);
+                    // Nothing to play: let Enter reach the focused control.
+                    if (!TryResolveTrackToPlayFromActiveView(out var selected, out var requestSource) || selected == null)
+                        return false;
+                    PlayTrack(selected, requestSource);
                     return true;
                 case Hotkey.ShortcutAction.PlayNext:
                 case Hotkey.ShortcutAction.AddToQueue:

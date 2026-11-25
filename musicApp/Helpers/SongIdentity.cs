@@ -21,10 +21,10 @@ public static class SongIdentity
             return ReferenceEquals(a, b);
         if (ReferenceEquals(a, b))
             return true;
-        if (!string.IsNullOrWhiteSpace(a.FilePath) &&
-            !string.IsNullOrWhiteSpace(b.FilePath) &&
-            string.Equals(a.FilePath, b.FilePath, StringComparison.OrdinalIgnoreCase))
-            return true;
+        // Two different files are never the same song: untagged files all read "Unknown Title/Artist/Album",
+        // so a tag match would treat them as one. Tags only identify a song that has no path.
+        if (!string.IsNullOrWhiteSpace(a.FilePath) && !string.IsNullOrWhiteSpace(b.FilePath))
+            return string.Equals(a.FilePath, b.FilePath, StringComparison.OrdinalIgnoreCase);
         return string.Equals(a.Title, b.Title, StringComparison.OrdinalIgnoreCase) &&
                string.Equals(a.Artist, b.Artist, StringComparison.OrdinalIgnoreCase) &&
                string.Equals(a.Album, b.Album, StringComparison.OrdinalIgnoreCase);

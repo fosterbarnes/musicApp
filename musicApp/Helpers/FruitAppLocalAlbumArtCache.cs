@@ -424,7 +424,10 @@ public static class FruitAppLocalAlbumArtCache
             if (s.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
             {
                 var uri = new Uri(s);
-                return LibraryPathHelper.TryNormalizePath(uri.LocalPath);
+                // iTunes writes file://localhost/C:/..., which Uri reads as the UNC path \\localhost\C:\...;
+                // the manual parse below strips the host instead.
+                if (!(uri.IsUnc && uri.IsLoopback))
+                    return LibraryPathHelper.TryNormalizePath(uri.LocalPath);
             }
         }
         catch

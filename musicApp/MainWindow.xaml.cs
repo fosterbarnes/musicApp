@@ -394,6 +394,10 @@ namespace musicApp
 
                 PrewarmAlbumsGrid();
 
+                // With no cache files nothing above awaits, so this would run inside the constructor, before
+                // the launch flags are set and before the window is shown (dialogs need a shown owner).
+                await Dispatcher.Yield(DispatcherPriority.Loaded);
+
                 if (_pendingLaunchSettings)
                 {
                     _pendingLaunchSettings = false;
@@ -498,7 +502,7 @@ namespace musicApp
 
                     foreach (var folderPath in musicFolders)
                     {
-                        foreach (var file in Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories))
+                        foreach (var file in LibraryPathHelper.EnumerateFilesRecursive(folderPath))
                         {
                             if (!supportedExtensions.Contains(Path.GetExtension(file).ToLower()))
                                 continue;
@@ -512,7 +516,10 @@ namespace musicApp
                                 continue;
                             }
 
+                            // A file deleted since it was listed must not abort the whole reconcile.
                             var fi = new FileInfo(file);
+                            if (!fi.Exists)
+                                continue;
                             if (fi.Length != known.FileSize ||
                                 (fi.LastWriteTime - known.DateModified).Duration() > TimeSpan.FromSeconds(2))
                             {
@@ -844,7 +851,9 @@ namespace musicApp
 
             Dispatcher.InvokeAsync(() =>
             {
-                if (albumsViewControl != null && !albumsViewControl.IsGridCurrentFor(AlbumsBrowseMode.AllAlbums, allTracks))
+                // Once Albums is on screen it owns its source (for example one album opened from search).
+                if (albumsViewControl != null && !ReferenceEquals(contentHost?.Content, albumsViewControl) &&
+                    !albumsViewControl.IsGridCurrentFor(AlbumsBrowseMode.AllAlbums, allTracks))
                     albumsViewControl.SetBrowseModeAndSource(AlbumsBrowseMode.AllAlbums, allTracks);
             }, DispatcherPriority.Background);
         }
@@ -1023,16 +1032,19 @@ namespace musicApp
                 .OrderBy(t => t.FilePath ?? "", StringComparer.OrdinalIgnoreCase)
                 .ToList());
 
-            const int yieldEvery = 500;
-            allTracks.Clear();
-            filteredTracks.Clear();
-            for (int i = 0; i < sorted.Count; i++)
+            // The library can change while the worker sorts (Remove from Library, Delete). Keep only songs still
+            // in it and append any added meanwhile, then swap in one step: the old slice-by-slice refill yielded
+            // with the list half-empty, so a Remove in between was undone by the refill and then saved.
+            var current = new HashSet<Song>(allTracks, ReferenceEqualityComparer.Instance);
+            var ordered = sorted.Where(current.Contains).ToList();
+            if (ordered.Count != current.Count)
             {
-                allTracks.Add(sorted[i]);
-                filteredTracks.Add(sorted[i]);
-                if ((i + 1) % yieldEvery == 0)
-                    await Dispatcher.Yield(DispatcherPriority.Background);
+                var placed = new HashSet<Song>(ordered, ReferenceEqualityComparer.Instance);
+                ordered.AddRange(allTracks.Where(t => !placed.Contains(t)));
             }
+
+            allTracks.ReplaceAll(ordered);
+            filteredTracks.ReplaceAll(ordered);
         }
 
         /// <summary>
@@ -1544,8 +1556,9 @@ namespace musicApp
             if (ReferenceEquals(current, queueViewControl))
             {
                 requestSource = queueViewControl;
+                // Row 0 is the loaded track; replaying it from Enter would restart it. Idle, row 0 is next up.
                 track = queueViewControl?.SelectedTrack
-                    ?? _player.Queue.View(1).FirstOrDefault();
+                    ?? (_player.CurrentTrack == null ? _player.Queue.View(1).FirstOrDefault() : null);
                 return track != null;
             }
 
@@ -1720,12 +1733,9 @@ namespace musicApp
                 
                 try
                 {
-                    if (appSettings.WindowState != null)
-                    {
-                        appSettings.WindowState.SidebarWidth = sidebarColumn.ActualWidth;
-                        await settingsManager.SaveSettingsAsync(appSettings);
-                        System.Diagnostics.Debug.WriteLine($"MainWindow: Sidebar width saved: {sidebarColumn.ActualWidth}");
-                    }
+                    var width = sidebarColumn.ActualWidth;
+                    appSettings.WindowState.SidebarWidth = width;
+                    await settingsManager.UpdateSettingsAsync(s => s.WindowState.SidebarWidth = width);
                 }
                 catch (Exception ex)
                 {
@@ -1741,22 +1751,35 @@ namespace musicApp
         {
             try
             {
-                appSettings.WindowState = windowManager.GetCurrentWindowState();
-
-                if (appSettings.WindowState != null)
-                {
-                    appSettings.WindowState.SidebarWidth = sidebarColumn.ActualWidth;
-
-                }
-
-                await settingsManager.SaveSettingsAsync(appSettings);
-
-                System.Diagnostics.Debug.WriteLine("MainWindow: Window state saved successfully");
+                var bounds = CaptureWindowBounds();
+                await settingsManager.UpdateSettingsAsync(s => CopyWindowBounds(bounds, s.WindowState));
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"MainWindow: Error saving window state: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Current window bounds and sidebar width, also copied into <see cref="appSettings"/>. Only these fields:
+        /// GetCurrentWindowState carries no column layout, which TrackListView saves on its own.
+        /// </summary>
+        private SettingsManager.WindowStateSettings CaptureWindowBounds()
+        {
+            var bounds = windowManager.GetCurrentWindowState();
+            bounds.SidebarWidth = sidebarColumn.ActualWidth;
+            CopyWindowBounds(bounds, appSettings.WindowState);
+            return bounds;
+        }
+
+        private static void CopyWindowBounds(SettingsManager.WindowStateSettings from, SettingsManager.WindowStateSettings to)
+        {
+            to.IsMaximized = from.IsMaximized;
+            to.Left = from.Left;
+            to.Top = from.Top;
+            to.Width = from.Width;
+            to.Height = from.Height;
+            to.SidebarWidth = from.SidebarWidth;
         }
 
         private void TitleBarPlayer_WindowCloseRequested(object? sender, EventArgs e)
@@ -1856,6 +1879,8 @@ namespace musicApp
                 MessageDialog.Show(this, "Error", $"Could not move file to recycle bin: {track.FilePath}", MessageDialog.Buttons.Ok);
                 return;
             }
+            // Drop the engine's hold on the path without reloading the file that is now gone.
+            RestorePlaybackAfterMetadataWrite(release with { ReleasedPlayback = false });
             await RemoveTrackFromLibraryAsync(track);
         }
 
@@ -1918,6 +1943,7 @@ namespace musicApp
             IReadOnlyDictionary<string, Song>? priorLibraryByPath = null,
             bool reloadExistingTracks = false)
         {
+            var ownsPipeline = false;
             try
             {
                 var priorMap = priorLibraryByPath;
@@ -1937,13 +1963,13 @@ namespace musicApp
                 var supportedExtensions = new[] { ".mp3", ".wav", ".flac", ".m4a", ".aac" };
                 var musicFiles = await Task.Run(() =>
                 {
-                    return Directory.GetFiles(folderPath, "*.*", SearchOption.AllDirectories)
+                    return LibraryPathHelper.EnumerateFilesRecursive(folderPath)
                         .Where(file => supportedExtensions.Contains(Path.GetExtension(file).ToLower()))
                         .ToList();
                 });
 
                 // Own the pipeline phase unless an outer flow (rescan/reconcile) already does.
-                var ownsPipeline = _libraryPipelinePhase == null && musicFiles.Count > 0;
+                ownsPipeline = _libraryPipelinePhase == null && musicFiles.Count > 0;
                 if (ownsPipeline)
                 {
                     _libraryPipelinePhase = runPostScanSystemArtworkIfEnabled
@@ -2099,8 +2125,12 @@ namespace musicApp
             }
             catch (Exception ex)
             {
-                _libraryPipelinePhase?.Dispose();
-                _libraryPipelinePhase = null;
+                // A rescan owns the phase across all folders; one folder failing must not end it.
+                if (ownsPipeline)
+                {
+                    _libraryPipelinePhase?.Dispose();
+                    _libraryPipelinePhase = null;
+                }
                 MessageDialog.Show(this, "Error", $"Error loading music folder: {ex.Message}", MessageDialog.Buttons.Ok);
             }
         }
@@ -2144,26 +2174,27 @@ namespace musicApp
             {
                 try
                 {
-                    appSettings.LastActiveView = GetCurrentMainViewKey();
-
-                    appSettings.Player = new SettingsManager.PlayerSettings
-                    {
-                        IsShuffleEnabled = titleBarPlayer.IsShuffleEnabled,
-                        RepeatMode = titleBarPlayer.RepeatMode,
-                        TitleBarVolume0To100 = titleBarPlayer.Volume
-                    };
-
-                    appSettings.WindowState = windowManager.GetCurrentWindowState();
-
-                    if (appSettings.WindowState != null)
-                    {
-                        appSettings.WindowState.SidebarWidth = sidebarColumn.ActualWidth;
-                    }
-
+                    var lastView = GetCurrentMainViewKey();
+                    var shuffle = titleBarPlayer.IsShuffleEnabled;
+                    var repeat = titleBarPlayer.RepeatMode;
+                    // Muted shows volume 0; keep the saved volume so a restart does not come back silent.
+                    double? volume = titleBarPlayer.IsMuted ? null : titleBarPlayer.Volume;
+                    var bounds = CaptureWindowBounds();
                     if (_miniPlayerWindow != null)
                         CaptureMiniPlayerWindowState(_miniPlayerWindow);
+                    var miniPlayer = appSettings.MiniPlayerWindow;
+                    appSettings.LastActiveView = lastView;
 
-                    await settingsManager.SaveSettingsAsync(appSettings).ConfigureAwait(true);
+                    await settingsManager.UpdateSettingsAsync(s =>
+                    {
+                        s.LastActiveView = lastView;
+                        s.Player.IsShuffleEnabled = shuffle;
+                        s.Player.RepeatMode = repeat;
+                        if (volume.HasValue)
+                            s.Player.TitleBarVolume0To100 = volume;
+                        CopyWindowBounds(bounds, s.WindowState);
+                        s.MiniPlayerWindow = miniPlayer;
+                    }).ConfigureAwait(true);
                 }
                 catch (Exception ex)
                 {

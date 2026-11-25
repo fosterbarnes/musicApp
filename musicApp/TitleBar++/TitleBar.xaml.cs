@@ -69,6 +69,7 @@ namespace musicApp.TitleBarPlus
         private const string SEARCH_PLACEHOLDER_TEXT = "Search";
 
         private DispatcherTimer? _searchDebounceTimer;
+        private bool _searchPlaceholderShown;
 
         // === Properties ===
         public bool IsPlaying
@@ -141,8 +142,7 @@ namespace musicApp.TitleBarPlus
 
             if (txtSearch != null)
             {
-                txtSearch.Text = SEARCH_PLACEHOLDER_TEXT;
-                txtSearch.Foreground = new SolidColorBrush(Color.FromRgb((byte)SEARCH_PLACEHOLDER_COLOR_R, (byte)SEARCH_PLACEHOLDER_COLOR_G, (byte)SEARCH_PLACEHOLDER_COLOR_B));
+                ShowSearchPlaceholder();
                 txtSearch.GotFocus += TxtSearch_GotFocus;
                 txtSearch.LostFocus += TxtSearch_LostFocus;
                 txtSearch.TextChanged += TxtSearch_TextChanged;
@@ -154,14 +154,29 @@ namespace musicApp.TitleBarPlus
             _searchDebounceTimer.Tick += SearchDebounceTimer_Tick;
             if (btnSearchClear != null)
                 btnSearchClear.Visibility = Visibility.Collapsed;
+
+            // Alt+Tab or a popup can take the capture mid-drag; without this the drag (and its volume duck) sticks.
+            seekBarBackground.LostMouseCapture += (_, _) =>
+            {
+                if (isDragging)
+                    EndDragOperation();
+            };
         }
 
         /// <summary>Returns the current search query; empty string if placeholder or blank.</summary>
         public string GetSearchQuery()
         {
-            if (txtSearch == null) return "";
-            var t = txtSearch.Text?.Trim() ?? "";
-            return (t == "" || t == SEARCH_PLACEHOLDER_TEXT) ? "" : t;
+            if (txtSearch == null || _searchPlaceholderShown) return "";
+            return txtSearch.Text?.Trim() ?? "";
+        }
+
+        // The placeholder is real text in the box; a flag (not a text compare) tells it apart from a typed "Search".
+        private void ShowSearchPlaceholder()
+        {
+            if (txtSearch == null) return;
+            _searchPlaceholderShown = true;
+            txtSearch.Text = SEARCH_PLACEHOLDER_TEXT;
+            txtSearch.Foreground = new SolidColorBrush(Color.FromRgb((byte)SEARCH_PLACEHOLDER_COLOR_R, (byte)SEARCH_PLACEHOLDER_COLOR_G, (byte)SEARCH_PLACEHOLDER_COLOR_B));
         }
 
         /// <summary>Search bar border for popup placement.</summary>
@@ -194,16 +209,16 @@ namespace musicApp.TitleBarPlus
         private void BtnSearchClear_Click(object sender, RoutedEventArgs e)
         {
             if (txtSearch == null) return;
-            txtSearch.Text = SEARCH_PLACEHOLDER_TEXT;
-            txtSearch.Foreground = new SolidColorBrush(Color.FromRgb((byte)SEARCH_PLACEHOLDER_COLOR_R, (byte)SEARCH_PLACEHOLDER_COLOR_G, (byte)SEARCH_PLACEHOLDER_COLOR_B));
+            ShowSearchPlaceholder();
             if (btnSearchClear != null) btnSearchClear.Visibility = Visibility.Collapsed;
             SearchTextChanged?.Invoke(this, "");
         }
 
         private void TxtSearch_GotFocus(object sender, RoutedEventArgs e)
         {
-            if (txtSearch != null && txtSearch.Text == SEARCH_PLACEHOLDER_TEXT)
+            if (txtSearch != null && _searchPlaceholderShown)
             {
+                _searchPlaceholderShown = false;
                 txtSearch.Text = "";
                 txtSearch.Foreground = new SolidColorBrush(Colors.White);
             }
@@ -212,10 +227,7 @@ namespace musicApp.TitleBarPlus
         private void TxtSearch_LostFocus(object sender, RoutedEventArgs e)
         {
             if (txtSearch != null && string.IsNullOrWhiteSpace(txtSearch.Text))
-            {
-                txtSearch.Text = SEARCH_PLACEHOLDER_TEXT;
-                txtSearch.Foreground = new SolidColorBrush(Color.FromRgb((byte)SEARCH_PLACEHOLDER_COLOR_R, (byte)SEARCH_PLACEHOLDER_COLOR_G, (byte)SEARCH_PLACEHOLDER_COLOR_B));
-            }
+                ShowSearchPlaceholder();
         }
 
         // === Window Control Events ===
@@ -446,7 +458,11 @@ namespace musicApp.TitleBarPlus
             ApplyOutputVolumeFromUi(sliderVolume.Value);
         }
 
-        private void IconVolume_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => ToggleMute();
+        private void IconVolume_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            ToggleMute();
+            e.Handled = true; // Otherwise it bubbles to the title bar's DragMove.
+        }
 
         // Nudges the slider; any change unmutes
         internal void StepVolume(double delta)

@@ -284,6 +284,7 @@ namespace musicApp.Views
         private ScaleTransform? _dragScaleTransform;
         private AlbumsBrowseMode _lastGridBuildBrowseMode = AlbumsBrowseMode.AllAlbums;
         private bool _isRebuilding;
+        private int _rebuildGeneration;
         private bool _suppressBrowseModeRebuild;
 
         public Action<AlbumsGridRebuildPhase, int, int, int>? AlbumGridRebuildStatus { get; set; }

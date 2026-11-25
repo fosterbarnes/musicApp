@@ -429,6 +429,12 @@ namespace musicApp.Views
             progress?.Report((items.Count, items.Count));
         }
 
+        private static string AlbumGroupArtist(Song t) =>
+            !string.IsNullOrWhiteSpace(t.AlbumArtist) ? t.AlbumArtist : t.Artist ?? string.Empty;
+
+        // Grouped ignoring case like album lookups and play order do, so "OK Computer" and "Ok Computer" are one tile.
+        private static string AlbumGroupKey(Song t) => (t.Album ?? string.Empty) + "\u001F" + AlbumGroupArtist(t);
+
         private static List<AlbumGridItem> BuildGroupedAlbums(IEnumerable<Song> songsEnumerable, AlbumSortMode sortMode, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
@@ -438,17 +444,11 @@ namespace musicApp.Views
 
             var query = songs
                 .Where(t => !string.IsNullOrWhiteSpace(t.Album) && t.Album != "Unknown Album")
-                .GroupBy(t =>
-                {
-                    var albumArtist = !string.IsNullOrWhiteSpace(t.AlbumArtist)
-                        ? t.AlbumArtist
-                        : t.Artist ?? string.Empty;
-                    return (Album: t.Album ?? string.Empty, Artist: albumArtist);
-                })
+                .GroupBy(AlbumGroupKey, StringComparer.OrdinalIgnoreCase)
                 .Select(g =>
                 {
                     var rep = g.First();
-                    return new AlbumGridItem(g.Key.Album, g.Key.Artist, rep, null);
+                    return new AlbumGridItem(rep.Album ?? string.Empty, AlbumGroupArtist(rep), rep, null);
                 });
 
             query = sortMode switch
@@ -475,18 +475,12 @@ namespace musicApp.Views
 
             var list = songs
                 .Where(t => !string.IsNullOrWhiteSpace(t.Album) && t.Album != "Unknown Album")
-                .GroupBy(t =>
-                {
-                    var albumArtist = !string.IsNullOrWhiteSpace(t.AlbumArtist)
-                        ? t.AlbumArtist
-                        : t.Artist ?? string.Empty;
-                    return (Album: t.Album ?? string.Empty, Artist: albumArtist);
-                })
+                .GroupBy(AlbumGroupKey, StringComparer.OrdinalIgnoreCase)
                 .Select(g =>
                 {
                     var maxAdded = g.Max(t => t.DateAdded).Date;
                     var rep = g.OrderByDescending(t => t.DateAdded).First();
-                    return (new AlbumGridItem(g.Key.Album, g.Key.Artist, rep, null), maxAdded);
+                    return (new AlbumGridItem(rep.Album ?? string.Empty, AlbumGroupArtist(rep), rep, null), maxAdded);
                 })
                 .OrderByDescending(x => x.Item2)
                 .ThenBy(x => x.Item1.AlbumTitle, StringComparer.OrdinalIgnoreCase)
@@ -578,6 +572,9 @@ namespace musicApp.Views
         private async Task RebuildAlbumItemsAsync(bool preserveViewState = true)
         {
             _isRebuilding = true;
+            // Only the newest run clears _isRebuilding (in the finally below): a superseded run that stopped
+            // early must not report idle while the newer one is still building.
+            int generation = ++_rebuildGeneration;
 
             (double? scrollRatio, double? scrollOffsetPixels, var mergedPending) = Dispatcher.CheckAccess()
                 ? CaptureRebuildRestoreStateAndCloseFlyout(preserveViewState)
@@ -615,6 +612,10 @@ namespace musicApp.Views
             else
                 layoutHint = await Dispatcher.InvokeAsync(CaptureAlbumGridLayoutHint).Task.ConfigureAwait(false);
 
+            // Copy the live library here (UI thread): enumerating it on the worker while a scan adds
+            // tracks threw "collection was modified", and the catch turned that into an empty grid.
+            var songsSnapshot = songsRef.ToList();
+
             List<object> rows;
             List<AlbumGridItem> albumsOnly;
             try
@@ -623,28 +624,24 @@ namespace musicApp.Views
                 {
                     (rows, albumsOnly) = await Task.Run(() =>
                     {
-                        var pairs = BuildGroupedAlbumsByRecentlyAdded(songsRef, ct);
+                        var pairs = BuildGroupedAlbumsByRecentlyAdded(songsSnapshot, ct);
                         var r = BuildRecentlyAddedRows(pairs, DateTime.Now);
                         return (r, r.OfType<AlbumGridItem>().ToList());
                     }, ct).ConfigureAwait(false);
                 }
                 else
                 {
-                    var grouped = await Task.Run(() => BuildGroupedAlbums(songsRef, sortMode, ct), ct).ConfigureAwait(false);
+                    var grouped = await Task.Run(() => BuildGroupedAlbums(songsSnapshot, sortMode, ct), ct).ConfigureAwait(false);
                     albumsOnly = grouped;
                     rows = grouped.Cast<object>().ToList();
                 }
             }
             catch (OperationCanceledException)
             {
-                _isRebuilding = false;
                 return;
             }
             if (ct.IsCancellationRequested)
-            {
-                _isRebuilding = false;
                 return;
-            }
 
             if (rows.Count == 0)
             {
@@ -722,7 +719,6 @@ namespace musicApp.Views
             }
             catch (OperationCanceledException)
             {
-                _isRebuilding = false;
                 return;
             }
 
@@ -748,7 +744,6 @@ namespace musicApp.Views
                     }
                     catch (OperationCanceledException)
                     {
-                        _isRebuilding = false;
                         return;
                     }
 
@@ -795,7 +790,6 @@ namespace musicApp.Views
                 }
                 catch (OperationCanceledException)
                 {
-                    _isRebuilding = false;
                     return;
                 }
 
@@ -810,7 +804,6 @@ namespace musicApp.Views
                     try { await Task.Delay(5, ct).ConfigureAwait(false); }
                     catch (OperationCanceledException)
                     {
-                        _isRebuilding = false;
                         return;
                     }
                 }
@@ -868,6 +861,8 @@ namespace musicApp.Views
             }
             finally
             {
+                if (generation == _rebuildGeneration)
+                    _isRebuilding = false;
                 ReportPhase(AlbumsGridRebuildPhase.Complete);
             }
         }

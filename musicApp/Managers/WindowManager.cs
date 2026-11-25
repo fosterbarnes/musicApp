@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using musicApp.Helpers;
 
 namespace musicApp
 {
@@ -17,9 +18,6 @@ namespace musicApp
 
         [DllImport("user32.dll")]
         private static extern int GetSystemMetrics(int nIndex);
-
-        [DllImport("user32.dll")]
-        private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, ref RECT pvParam, uint fWinIni);
 
         [DllImport("user32.dll")]
         private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
@@ -57,7 +55,6 @@ namespace musicApp
 
         private const int SM_CXSCREEN = 0;
         private const int SM_CYSCREEN = 1;
-        private const uint SPI_GETWORKAREA = 0x0030;
         private const uint SWP_NOZORDER = 0x0004;
         private const uint SWP_NOACTIVATE = 0x0010;
         private const int SW_MAXIMIZE = 3;
@@ -174,6 +171,19 @@ namespace musicApp
         /// </summary>
         public void SetInitialPosition(double left, double top, double width, double height)
         {
+            // Saved bounds can be on a monitor that is gone. If the top-left of the window (where the title
+            // bar is) is off every screen, center it on the primary work area instead.
+            var virtualScreen = new Rect(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+                SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
+            if (!virtualScreen.IntersectsWith(new Rect(left, top, Math.Min(width, 200), 40)))
+            {
+                var work = SystemParameters.WorkArea;
+                width = Math.Min(width, work.Width);
+                height = Math.Min(height, work.Height);
+                left = work.Left + (work.Width - width) / 2;
+                top = work.Top + (work.Height - height) / 2;
+            }
+
             window.Left = left;
             window.Top = top;
             window.Width = width;
@@ -265,9 +275,9 @@ namespace musicApp
             // Store current window bounds for restoration before maximizing
             normalWindowBounds = new Rect(window.Left, window.Top, window.Width, window.Height);
             
-            // Get the work area (screen area excluding taskbar)
-            RECT workArea = new RECT();
-            if (SystemParametersInfo(SPI_GETWORKAREA, 0, ref workArea, 0))
+            // Work area of the monitor the window is on, in DIPs (SPI_GETWORKAREA was primary-only device pixels,
+            // so above 100% scaling the window overflowed and it always jumped to the primary monitor).
+            if (MonitorWorkArea.TryGet(window, normalWindowBounds, out var workArea))
             {
                 // Ensure we're in normal state for custom positioning
                 window.WindowState = WindowState.Normal;
@@ -280,8 +290,8 @@ namespace musicApp
                 
                 window.Left = workArea.Left;
                 window.Top = workArea.Top;
-                window.Width = (workArea.Right - workArea.Left) + (gapCompensation * 2) + rightExtraCompensation; 
-                window.Height = (workArea.Bottom - workArea.Top) + (gapCompensation * 2) + bottomExtraCompensation;
+                window.Width = workArea.Width + (gapCompensation * 2) + rightExtraCompensation;
+                window.Height = workArea.Height + (gapCompensation * 2) + bottomExtraCompensation;
                 
                 isCustomMaximized = true;
                 UpdateWindowStateIcon(WindowState.Maximized);
@@ -363,22 +373,15 @@ namespace musicApp
                 return;
             }
             
-            // If the window state was changed externally (e.g., by double-clicking title bar),
-            // update our custom tracking
-            if (window.WindowState == WindowState.Normal && isCustomMaximized)
-            {
-                isCustomMaximized = false;
-                UpdateWindowStateIcon(WindowState.Normal);
-            }
-            else if (window.WindowState == WindowState.Maximized && !isCustomMaximized)
+            // Custom maximize keeps WindowState Normal, so Normal alone does not mean restored (a taskbar
+            // restore from minimized used to clear the flag while the window still filled the screen).
+            if (window.WindowState == WindowState.Maximized && !isCustomMaximized)
             {
                 isCustomMaximized = true;
                 UpdateWindowStateIcon(WindowState.Maximized);
             }
-            else if (window.WindowState == WindowState.Normal && !isCustomMaximized)
+            else if (window.WindowState == WindowState.Normal)
             {
-                // Window is in normal state, but check if it's actually visually maximized
-                // This can happen when restoring a minimized maximized window
                 CheckIfWindowIsVisuallyMaximized();
             }
         }
@@ -396,17 +399,17 @@ namespace musicApp
             }
             
             // Get the work area to compare against
-            RECT workArea = new RECT();
-            if (SystemParametersInfo(SPI_GETWORKAREA, 0, ref workArea, 0))
+            var bounds = new Rect(window.Left, window.Top, window.Width, window.Height);
+            if (MonitorWorkArea.TryGet(window, bounds, out var workArea))
             {
                 // Calculate the expected maximized dimensions (with our gap compensation)
                 const int gapCompensation = 6;
                 const int topExtraCompensation = 6;
                 const int rightExtraCompensation = -12;
                 const int bottomExtraCompensation = topExtraCompensation - 18;
-                
-                double expectedWidth = (workArea.Right - workArea.Left) + (gapCompensation * 2) + rightExtraCompensation;
-                double expectedHeight = (workArea.Bottom - workArea.Top) + (gapCompensation * 2) + bottomExtraCompensation;
+
+                double expectedWidth = workArea.Width + (gapCompensation * 2) + rightExtraCompensation;
+                double expectedHeight = workArea.Height + (gapCompensation * 2) + bottomExtraCompensation;
                 
                 // Check if current window dimensions match maximized dimensions (with some tolerance)
                 const double tolerance = 5.0;
@@ -438,6 +441,8 @@ namespace musicApp
             {
                 isCustomMaximized = false;
                 UpdateWindowStateIcon(WindowState.Normal);
+                // It still has the maximized size; keep the bounds saved before maximizing.
+                return;
             }
             
             // Update normal window bounds when window is moved (but not during restore or maximize operations)
@@ -453,8 +458,9 @@ namespace musicApp
         /// </summary>
         public void OnSizeChanged()
         {
-            // Update normal window bounds when window is resized (but not during restore or maximize operations)
-            if (window.WindowState == WindowState.Normal && !isRestoring && !isMaximizing)
+            // Update normal window bounds when window is resized (but not during restore or maximize operations,
+            // or while custom maximized, which is also WindowState.Normal)
+            if (window.WindowState == WindowState.Normal && !isRestoring && !isMaximizing && !isCustomMaximized)
             {
                 normalWindowBounds = new Rect(window.Left, window.Top, window.Width, window.Height);
                 MarkDirty();

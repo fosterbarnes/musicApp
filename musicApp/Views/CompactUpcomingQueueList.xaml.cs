@@ -17,6 +17,7 @@ public partial class CompactUpcomingQueueList : UserControl
     private const string RowReorderDragFormat = "musicApp.CompactUpcomingQueue.RowReorder";
 
     private Song? _contextMenuSong;
+    private List<Song>? _contextMenuSongs; // set when the menu opened over several selected rows
     private int _queueAnchorIndex = -1;
     private CancellationTokenSource? _queueArtCts;
     private Point _rowReorderPressPos;
@@ -285,9 +286,14 @@ public partial class CompactUpcomingQueueList : UserControl
         e.Handled = true;
     }
 
+    // Items that only make sense for one song; hidden when several rows are selected.
+    private static readonly string[] SingleSongMenuHeaders =
+        { "Info", "Show in Explorer", "Delete", "Show in Artists", "Show in Albums", "Show in Songs", "Show in Queue" };
+
     private void QueueContextMenu_Opened(object sender, RoutedEventArgs e)
     {
         _contextMenuSong = null;
+        _contextMenuSongs = null;
         if (sender is not ContextMenu menu || menu.PlacementTarget is not DependencyObject placement)
             return;
 
@@ -295,11 +301,23 @@ public partial class CompactUpcomingQueueList : UserControl
         var removeFromQueueItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Remove from Queue");
         TrackContextMenuHelper.SetVisible(removeFromQueueItem, false);
 
+        // Several rows: Play Next, Add to Queue, Add to Playlist and Remove from Library act on all of them
+        // (they used to do nothing); single-song items are hidden.
         if (EnableMultiSelect && CountSelectedRows() > 1)
         {
+            _contextMenuSongs = GetSelectedSongs();
+            _contextMenuSong = _contextMenuSongs[0];
+            TrackContextMenuHelper.ApplyStandardOpened(
+                menu.Items,
+                contextMenuViewName: null,
+                selectedSong: null,
+                (Application.Current?.MainWindow as MainWindow)?.Playlists,
+                QueueContextMenu_PlaylistSubmenuClick);
+            SetSingleSongItemsVisible(menu, false);
             UpdateSwapMenuItemVisibility(menu, show: false);
             return;
         }
+        SetSingleSongItemsVisible(menu, true);
 
         if (!TrackContextMenuHelper.TryResolveSong(placement, out var song) || song == null)
         {
@@ -317,18 +335,20 @@ public partial class CompactUpcomingQueueList : UserControl
             QueueContextMenu_PlaylistSubmenuClick);
         TrackContextMenuHelper.SetVisible(removeFromQueueItem, true);
 
-        bool isFirstRow = IsFirstRowSong(song);
+        // Swap always swaps with the first upcoming row, so offer it only on that row (not a later copy).
+        bool isFirstRow = ListRowReorderHelper.TryGetRowIndexFromSource(
+            placement, QueueItemsList.ItemsSource as ObservableCollection<SongRowViewModel>) == 0;
         UpdateSwapMenuItemVisibility(menu, show: isFirstRow);
     }
 
-    private bool IsFirstRowSong(Song song)
+    private static void SetSingleSongItemsVisible(ContextMenu menu, bool visible)
     {
-        if (QueueItemsList.ItemsSource is not ObservableCollection<SongRowViewModel> rows || rows.Count == 0)
-            return false;
-        var first = rows[0].Song;
-        if (first == null || song == null) return false;
-        return SongIdentity.Matches(first, song);
+        foreach (var header in SingleSongMenuHeaders)
+            TrackContextMenuHelper.SetVisible(TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, header), visible);
     }
+
+    private IReadOnlyList<Song> MenuTargets() =>
+        _contextMenuSongs ?? (IReadOnlyList<Song>)(_contextMenuSong != null ? new[] { _contextMenuSong } : Array.Empty<Song>());
 
     private static void UpdateSwapMenuItemVisibility(ContextMenu menu, bool show)
     {
@@ -348,9 +368,10 @@ public partial class CompactUpcomingQueueList : UserControl
 
     private void QueueContextMenu_PlaylistSubmenuClick(object sender, RoutedEventArgs e)
     {
-        if (_contextMenuSong == null || sender is not MenuItem mi || mi.Tag is not Playlist playlist)
+        if (sender is not MenuItem mi || mi.Tag is not Playlist playlist)
             return;
-        AddTrackToPlaylistRequested?.Invoke(this, (_contextMenuSong, playlist));
+        foreach (var song in MenuTargets())
+            AddTrackToPlaylistRequested?.Invoke(this, (song, playlist));
     }
 
     private void QueueContextMenu_SwapWithCurrentClick(object sender, RoutedEventArgs e)
@@ -360,11 +381,17 @@ public partial class CompactUpcomingQueueList : UserControl
 
     private void QueueContextMenu_PlayNextClick(object sender, RoutedEventArgs e)
     {
-        if (_contextMenuSong != null) PlayNextRequested?.Invoke(this, _contextMenuSong);
+        // Each Play Next goes right after the current track, so going last-to-first keeps the list order.
+        // With nothing loaded Play Next appends instead, so then go in order.
+        var targets = MenuTargets();
+        bool hasCurrent = (Application.Current?.MainWindow as MainWindow)?.HasCurrentQueueTrack ?? true;
+        for (int i = 0; i < targets.Count; i++)
+            PlayNextRequested?.Invoke(this, targets[hasCurrent ? targets.Count - 1 - i : i]);
     }
     private void QueueContextMenu_AddToQueueClick(object sender, RoutedEventArgs e)
     {
-        if (_contextMenuSong != null) AddToQueueRequested?.Invoke(this, _contextMenuSong);
+        foreach (var song in MenuTargets())
+            AddToQueueRequested?.Invoke(this, song);
     }
     private void QueueContextMenu_RemoveFromQueueClick(object sender, RoutedEventArgs e)
     {
@@ -401,8 +428,9 @@ public partial class CompactUpcomingQueueList : UserControl
     }
     private void QueueContextMenu_RemoveFromLibraryClick(object sender, RoutedEventArgs e)
     {
-        if (_contextMenuSong != null)
-            RemoveFromLibraryRequested?.Invoke(this, new List<Song> { _contextMenuSong });
+        var targets = MenuTargets();
+        if (targets.Count > 0)
+            RemoveFromLibraryRequested?.Invoke(this, targets);
     }
     private void QueueContextMenu_DeleteClick(object sender, RoutedEventArgs e)
     {

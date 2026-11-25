@@ -10,19 +10,24 @@ internal static class ApplyUpdateService
     private const string MainExe = "musicApp.exe";
     private const string SwapExe = "musicApp-updater-swap.exe";
 
+    // TrimEndingDirectorySeparator keeps a drive root as "D:\" (plain TrimEnd made it the drive-relative "D:").
+    private static string NormalizeInstallRoot(string installRoot) =>
+        Path.TrimEndingDirectorySeparator(Path.GetFullPath(installRoot));
+
     /// <summary>True if <paramref name="mainModulePath"/> is <c>musicApp.exe</c> from this install folder.</summary>
     private static bool IsMusicAppMainModuleForInstall(string? mainModulePath, string installRootNormalized)
     {
         if (mainModulePath == null)
             return false;
         var root = installRootNormalized;
-        return mainModulePath.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+        var prefix = Path.EndsInDirectorySeparator(root) ? root : root + Path.DirectorySeparatorChar;
+        return mainModulePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
                || string.Equals(mainModulePath, Path.Combine(root, MainExe), StringComparison.OrdinalIgnoreCase);
     }
 
     public static bool IsMusicAppRunningFromInstallRoot(string installRoot)
     {
-        var root = Path.GetFullPath(installRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var root = NormalizeInstallRoot(installRoot);
         foreach (var p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(MainExe)))
         {
             try
@@ -45,7 +50,7 @@ internal static class ApplyUpdateService
 
     public static void KillMusicAppProcesses(string installRoot)
     {
-        var root = Path.GetFullPath(installRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var root = NormalizeInstallRoot(installRoot);
         foreach (var p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(MainExe)))
         {
             try
@@ -53,6 +58,8 @@ internal static class ApplyUpdateService
                 if (!IsMusicAppMainModuleForInstall(p.MainModule?.FileName, root))
                     continue;
                 p.Kill();
+                // Kill is async; the purge that follows needs the exe and its dlls unlocked.
+                p.WaitForExit(10_000);
             }
             catch
             {
@@ -74,12 +81,24 @@ internal static class ApplyUpdateService
 
         ZipFile.ExtractToDirectory(zipPath, extractDir);
 
-        var root = Path.GetFullPath(installRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var root = NormalizeInstallRoot(installRoot);
         KillMusicAppProcesses(root);
 
-        PurgeInstallExceptUpdater(root);
-
-        var stagedNewUpdater = CopyPortableExtractToInstall(extractDir, root);
+        // The old app is moved aside, not deleted, until the new one is fully copied. Deleting first left the
+        // folder with no app when the copy failed (disk full, file in use).
+        var backup = Path.Combine(root, BackupDirName);
+        MoveInstallToBackup(root, backup);
+        bool stagedNewUpdater;
+        try
+        {
+            stagedNewUpdater = CopyPortableExtractToInstall(extractDir, root);
+        }
+        catch
+        {
+            RestoreInstallFromBackup(root, backup);
+            throw;
+        }
+        TryDeleteDirectory(backup);
 
         if (launchMusicApp)
             TryLaunchMusicAppFromInstallRoot(root);
@@ -90,7 +109,7 @@ internal static class ApplyUpdateService
 
     public static void ApplyInstaller(string installRoot, string installerPath, bool launchMusicApp)
     {
-        var root = Path.GetFullPath(installRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var root = NormalizeInstallRoot(installRoot);
         KillMusicAppProcesses(root);
 
         var psi = new ProcessStartInfo
@@ -116,35 +135,70 @@ internal static class ApplyUpdateService
     /// </summary>
     public static bool TryLaunchMusicAppFromInstallRoot(string installRoot)
     {
-        var root = Path.GetFullPath(installRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var root = NormalizeInstallRoot(installRoot);
         if (IsMusicAppRunningFromInstallRoot(root))
             return false;
         return TryLaunch(Path.Combine(root, MainExe), root);
     }
 
+    private const string BackupDirName = ".update-backup";
+
     /// <summary>
-    /// Removes the main app from the install tree while preserving anything whose name starts with
-    /// <c>musicApp-updater</c> (live updater, staged <c>-n</c> payloads, and <c>musicApp-updater-swap</c>).
+    /// Moves the main app out of the install tree into <paramref name="backup"/> (same relative paths), keeping
+    /// anything named <c>musicApp-updater*</c> (live updater, staged <c>-n</c> payloads, swap). If a move fails,
+    /// everything already moved goes back and the error is thrown, so the install is never left half-empty.
     /// </summary>
-    private static void PurgeInstallExceptUpdater(string installRoot)
+    private static void MoveInstallToBackup(string installRoot, string backup)
     {
-        foreach (var file in Directory.EnumerateFiles(installRoot, "*", SearchOption.AllDirectories))
+        // A leftover backup: if the app is missing, an update was killed mid-way and the backup holds the only
+        // copy of the old app, so put it back. If the app is there, the backup is just one that could not be
+        // deleted after a good update; restoring it would put old files over the good install.
+        if (File.Exists(Path.Combine(installRoot, MainExe)))
+            TryDeleteDirectory(backup);
+        else
+            RestoreInstallFromBackup(installRoot, backup);
+
+        var backupPrefix = backup + Path.DirectorySeparatorChar;
+        var files = Directory.EnumerateFiles(installRoot, "*", SearchOption.AllDirectories)
+            .Where(f => !Path.GetFileName(f).StartsWith("musicApp-updater", StringComparison.OrdinalIgnoreCase)
+                        && !f.StartsWith(backupPrefix, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        try
         {
-            var name = Path.GetFileName(file);
-            if (name.StartsWith("musicApp-updater", StringComparison.OrdinalIgnoreCase))
-                continue;
-            try
+            foreach (var file in files)
             {
+                var target = Path.Combine(backup, Path.GetRelativePath(installRoot, file));
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                 File.SetAttributes(file, FileAttributes.Normal);
-                File.Delete(file);
-            }
-            catch
-            {
-                throw new IOException($"Could not delete file in install folder: {file}");
+                File.Move(file, target);
             }
         }
+        catch (Exception ex)
+        {
+            RestoreInstallFromBackup(installRoot, backup);
+            throw new IOException($"Could not move the old app aside in the install folder: {ex.Message}", ex);
+        }
 
-        foreach (var dir in Directory.EnumerateDirectories(installRoot, "*", SearchOption.AllDirectories)
+        DeleteEmptyDirectories(installRoot);
+    }
+
+    /// <summary>Moves every backed-up file back over whatever the failed copy wrote.</summary>
+    private static void RestoreInstallFromBackup(string installRoot, string backup)
+    {
+        if (!Directory.Exists(backup))
+            return;
+        foreach (var file in Directory.EnumerateFiles(backup, "*", SearchOption.AllDirectories).ToList())
+        {
+            var target = Path.Combine(installRoot, Path.GetRelativePath(backup, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Move(file, target, overwrite: true);
+        }
+        TryDeleteDirectory(backup);
+    }
+
+    private static void DeleteEmptyDirectories(string root)
+    {
+        foreach (var dir in Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories)
                      .OrderByDescending(d => d.Length))
         {
             try
@@ -154,8 +208,21 @@ internal static class ApplyUpdateService
             }
             catch
             {
-                // ignore
+                // A folder still in use or not empty stays; the new files are copied around it.
             }
+        }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
+        }
+        catch
+        {
+            // Leftover backup only costs disk space; the next update clears it.
         }
     }
 
@@ -220,10 +287,12 @@ internal static class ApplyUpdateService
         if (!File.Exists(swapPath))
             throw new IOException($"New updater files were staged but {SwapExe} was not found in the install folder.");
 
+        // A drive root ends in '\', and "D:\" would read as an escaped quote that swallows the other arguments.
+        var rootArg = Path.EndsInDirectorySeparator(installRoot) ? installRoot + "." : installRoot;
         var psi = new ProcessStartInfo
         {
             FileName = swapPath,
-            Arguments = $"\"{installRoot}\" --pid {Environment.ProcessId} --max-wait-sec 90",
+            Arguments = $"\"{rootArg}\" --pid {Environment.ProcessId} --max-wait-sec 90",
             WorkingDirectory = installRoot,
             UseShellExecute = true,
             WindowStyle = ProcessWindowStyle.Hidden,

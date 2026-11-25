@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using musicApp.Helpers;
@@ -45,6 +46,11 @@ public sealed class AudioEngine : IDisposable
     private float _volume = 1f;
     private int _generation;
     private int _armVersion;
+    private readonly Dictionary<string, int> _heldFiles = new(StringComparer.OrdinalIgnoreCase); // UI thread
+    private readonly object _openLock = new();
+    private readonly List<AudioDeck> _openedNotArmed = new(); // opened on a worker, not yet armed; under _openLock
+    private readonly List<(Task Open, string Path)> _opening = new(); // background opens; UI thread
+    private MetadataAudioReleaseResult? _pendingPlaybackRestore; // waiting for the file's last hold to end
 
     public AudioEngine(
         Func<AudioOutputBackend, IWavePlayer> createOutput,
@@ -83,6 +89,7 @@ public sealed class AudioEngine : IDisposable
     {
         TeardownOutput();
         _releasedSong = null;
+        _pendingPlaybackRestore = null;
         _current = null;
 
         var deck = new AudioDeck(song, _openSource(song.FilePath), _settings.SampleRateHz);
@@ -137,6 +144,7 @@ public sealed class AudioEngine : IDisposable
         TeardownOutput();
         _current = null;
         _releasedSong = null;
+        _pendingPlaybackRestore = null;
     }
 
     /// <summary>Opens the next track off the UI thread shortly before the transition needs it.</summary>
@@ -167,6 +175,11 @@ public sealed class AudioEngine : IDisposable
         _settings = settings;
         _mixer?.SetCrossfade(settings.CrossfadeSeconds, settings.RampSeconds);
 
+        // The pending open was timed for the old crossfade length; a longer fade needs the next file sooner.
+        if (previous.CrossfadeSeconds != settings.CrossfadeSeconds && _mixer is { } liveMixer &&
+            _armSong is { } pendingSong && !_armOpened)
+            ScheduleArm(liveMixer, pendingSong, _armOverlap);
+
         bool rebuild = previous.Backend != settings.Backend || previous.SoftwareVolume != settings.SoftwareVolume ||
                        previous.SampleRateHz != settings.SampleRateHz || previous.Bits != settings.Bits;
         if (!rebuild || _current == null)
@@ -177,36 +190,104 @@ public sealed class AudioEngine : IDisposable
         ArmNext(armSong, armOverlap);
     }
 
-    /// <summary>Closes any open handle on the file so its tags can be rewritten.</summary>
+    /// <summary>
+    /// Closes any open handle on the file so its tags can be rewritten, and keeps it closed until the
+    /// matching <see cref="RestoreFile"/>: other writers' restores re-arm the next track, which used to reopen
+    /// a file still being written.
+    /// </summary>
     public MetadataAudioReleaseResult ReleaseFile(string path)
     {
-        if (_mixer is not { } mixer)
+        if (string.IsNullOrWhiteSpace(path))
             return default;
+        _heldFiles[path] = _heldFiles.GetValueOrDefault(path) + 1;
+        var held = new MetadataAudioReleaseResult { HeldPath = path };
+
+        if (_mixer is not { } mixer)
+        {
+            CloseDeckBeingOpened(path);
+            return held;
+        }
 
         if (!mixer.IsPlayingFile(path))
         {
             if (mixer.IsArmedWith(path) || (_armSong != null &&
                 string.Equals(_armSong.FilePath, path, StringComparison.OrdinalIgnoreCase)))
                 ArmNext(null, false);
-            return default;
+            CloseDeckBeingOpened(path);
+            return held;
         }
 
         var result = new MetadataAudioReleaseResult
         {
             ReleasedPlayback = true,
             Position = Position,
-            WasPlaying = IsPlaying
+            WasPlaying = IsPlaying,
+            HeldPath = path
         };
         _releasedSong = CurrentSong;
         TeardownOutput();
         _current = null;
+        CloseDeckBeingOpened(path);
         return result;
     }
 
     public void RestoreFile(MetadataAudioReleaseResult release)
     {
-        if (release.ReleasedPlayback && _releasedSong is { } song)
-            Load(song, release.WasPlaying, release.Position);
+        if (release.HeldPath is { } path && _heldFiles.TryGetValue(path, out int holds))
+        {
+            if (holds <= 1)
+                _heldFiles.Remove(path);
+            else
+                _heldFiles[path] = holds - 1;
+        }
+
+        // Playback comes back only when the last writer of the playing file is done; two overlapping writers
+        // (an artwork batch and an Info edit) used to reopen it while the second was still writing.
+        // Only a snapshot of the song that is released now counts; one from an earlier release would reload
+        // a different song at the old position.
+        if (release.ReleasedPlayback && _releasedSong != null &&
+            string.Equals(release.HeldPath, _releasedSong.FilePath, StringComparison.OrdinalIgnoreCase))
+            _pendingPlaybackRestore = release;
+        if (_pendingPlaybackRestore is { } pending && _releasedSong is { } song &&
+            (pending.HeldPath == null || !_heldFiles.ContainsKey(pending.HeldPath)))
+        {
+            _pendingPlaybackRestore = null;
+            Load(song, pending.WasPlaying, pending.Position);
+        }
+        else if (_mixer is { } mixer && _armSong is { } armSong && !_armOpened)
+            ScheduleArm(mixer, armSong, _armOverlap); // its open may have been skipped while the file was held
+    }
+
+    /// <summary>
+    /// Background opens of this file can be in flight when a write starts. Wait for them (they never need the UI
+    /// thread) and close the decks they produced, so the writer never meets an open handle.
+    /// </summary>
+    private void CloseDeckBeingOpened(string path)
+    {
+        foreach (var (open, openPath) in _opening.ToArray())
+        {
+            if (!string.Equals(openPath, path, StringComparison.OrdinalIgnoreCase))
+                continue;
+            try
+            {
+                open.Wait();
+            }
+            catch
+            {
+                // A failed open holds no handle.
+            }
+        }
+
+        lock (_openLock)
+        {
+            foreach (var deck in _openedNotArmed.ToArray())
+            {
+                if (!string.Equals(deck.Song.FilePath, path, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                deck.Dispose();
+                _openedNotArmed.Remove(deck);
+            }
+        }
     }
 
     public void Dispose() => Stop();
@@ -237,6 +318,7 @@ public sealed class AudioEngine : IDisposable
 
     private IWavePlayer CreateInitializedOutput(IWaveProvider wave)
     {
+        // _output is not set yet, so a device that fails Init must be disposed here or it leaks.
         var output = _createOutput(_settings.Backend);
         try
         {
@@ -248,8 +330,21 @@ public sealed class AudioEngine : IDisposable
             // Exclusive mode can reject the format at Init, after the device was created.
             output.Dispose();
             var shared = _createOutput(AudioOutputBackend.WasapiShared);
-            shared.Init(wave);
-            return shared;
+            try
+            {
+                shared.Init(wave);
+                return shared;
+            }
+            catch
+            {
+                shared.Dispose();
+                throw;
+            }
+        }
+        catch
+        {
+            output.Dispose();
+            throw;
         }
     }
 
@@ -310,16 +405,48 @@ public sealed class AudioEngine : IDisposable
                 return;
         }
 
-        AudioDeck deck;
+        // A file being written stays closed; RestoreFile schedules this again once the write is done.
+        if (_heldFiles.ContainsKey(song.FilePath))
+            return;
+
+        int sampleRate = _settings.SampleRateHz;
+        var open = Task.Run(() =>
+        {
+            var opened = new AudioDeck(song, _openSource(song.FilePath), sampleRate);
+            // Checked under the lock so a ReleaseFile that disarmed meanwhile either sees this deck or makes
+            // this check fail; either way the deck is closed before the writer touches the file.
+            lock (_openLock)
+            {
+                if (version != Volatile.Read(ref _armVersion))
+                {
+                    opened.Dispose();
+                    return null;
+                }
+                _openedNotArmed.Add(opened);
+                return opened;
+            }
+        });
+        // Every open is tracked (not just the latest), so a queue change mid-open can't hide one from ReleaseFile.
+        _opening.RemoveAll(o => o.Open.IsCompleted);
+        _opening.Add((open, song.FilePath));
+
+        AudioDeck? deck;
         try
         {
-            int sampleRate = _settings.SampleRateHz;
-            deck = await Task.Run(() => new AudioDeck(song, _openSource(song.FilePath), sampleRate));
+            deck = await open;
         }
         catch (Exception)
         {
             // A bad next track surfaces when playback actually reaches it.
             return;
+        }
+        if (deck == null)
+            return;
+
+        lock (_openLock)
+        {
+            if (!_openedNotArmed.Remove(deck))
+                return; // ReleaseFile already closed it
         }
 
         if (version != Volatile.Read(ref _armVersion))

@@ -25,8 +25,8 @@ internal static class Program
                 return ExitFailure;
             }
 
-            var installRoot = Path.GetFullPath(args[0].Trim().Trim('"'))
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            // TrimEndingDirectorySeparator keeps a drive root as "D:\" instead of the drive-relative "D:".
+            var installRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(args[0].Trim().Trim('"')));
 
             int? waitPid = null;
             var maxWaitSec = 90;
@@ -40,13 +40,16 @@ internal static class Program
                     maxWaitSec = m;
             }
 
+            // The updater window can stay open after a portable update, so wait for it with no deadline;
+            // the deadline only bounds the file retries once it has exited.
             if (waitPid is { } p)
-                WaitForProcessExit(p, TimeSpan.FromSeconds(maxWaitSec));
+                WaitForProcessExit(p);
 
             if (!Directory.Exists(installRoot))
                 return ExitFailure;
 
             var deadline = DateTime.UtcNow.AddSeconds(maxWaitSec);
+            var allSwapped = true;
             foreach (var (final, staged) in Pairs)
             {
                 var finalPath = Path.Combine(installRoot, final);
@@ -55,10 +58,10 @@ internal static class Program
                     continue;
 
                 TryDeleteWithRetry(finalPath, deadline);
-                TryMoveWithRetry(stagedPath, finalPath, deadline);
+                allSwapped &= TryMoveWithRetry(stagedPath, finalPath, deadline);
             }
 
-            return ExitSuccess;
+            return allSwapped ? ExitSuccess : ExitFailure;
         }
         catch
         {
@@ -66,27 +69,22 @@ internal static class Program
         }
     }
 
-    private static void WaitForProcessExit(int pid, TimeSpan maxWait)
+    // One handle held for the whole wait: Windows does not reuse a PID while a handle to it is open, so this
+    // cannot end up waiting on an unrelated process that got the updater's PID.
+    private static void WaitForProcessExit(int pid)
     {
-        var deadline = DateTime.UtcNow + maxWait;
-        while (DateTime.UtcNow < deadline)
+        try
         {
-            try
-            {
-                using var p = Process.GetProcessById(pid);
-                if (p.HasExited)
-                    return;
-            }
-            catch (ArgumentException)
-            {
-                return;
-            }
-            catch (InvalidOperationException)
-            {
-                return;
-            }
-
-            Thread.Sleep(200);
+            using var p = Process.GetProcessById(pid);
+            p.WaitForExit();
+        }
+        catch (ArgumentException)
+        {
+            // Already exited.
+        }
+        catch (InvalidOperationException)
+        {
+            // Already exited.
         }
     }
 
@@ -109,10 +107,10 @@ internal static class Program
         }
     }
 
-    private static void TryMoveWithRetry(string sourcePath, string destPath, DateTime deadlineUtc)
+    private static bool TryMoveWithRetry(string sourcePath, string destPath, DateTime deadlineUtc)
     {
         if (!File.Exists(sourcePath))
-            return;
+            return true;
         while (DateTime.UtcNow < deadlineUtc)
         {
             try
@@ -124,12 +122,14 @@ internal static class Program
                 }
 
                 File.Move(sourcePath, destPath, overwrite: true);
-                return;
+                return true;
             }
             catch
             {
                 Thread.Sleep(300);
             }
         }
+
+        return false;
     }
 }

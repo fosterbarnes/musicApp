@@ -107,6 +107,9 @@ namespace musicApp.Views
 
         public void ScrollToSong(Song song, bool grabFocus = false)
         {
+            // Selecting a song that is not in this list makes WPF clear the user's selection instead.
+            if (!lstTracks.Items.Contains(song))
+                return;
             lstTracks.SelectedItem = song;
             lstTracks.ScrollIntoView(song);
 
@@ -137,6 +140,7 @@ namespace musicApp.Views
         private const string RowReorderDragFormat = "musicApp.TrackList.RowReorder";
         private Point _rowReorderPressPos;
         private int _rowReorderSourceIndex = -1;
+        private bool _singleClickPlayedThisPress;
 
         public TrackListView()
         {
@@ -285,6 +289,10 @@ namespace musicApp.Views
                 minWidth = UILayoutConstants.TrackListQueueOrderColumnMinWidth;
             if (!double.IsNaN(col.Width) && col.Width < minWidth)
                 col.Width = minWidth;
+            // The last column fills the rest; resizing another column has to resize it too.
+            if (lstTracks.View is GridView gridView && gridView.Columns.Count > 0 &&
+                !ReferenceEquals(col, gridView.Columns[^1]))
+                UpdateLastColumnFillWidth();
             MarkColumnWidthDirty();
         }
 
@@ -480,12 +488,12 @@ namespace musicApp.Views
             _columnWidthSaveTimer?.Stop();
             try
             {
-                var settings = await SettingsManager.Instance.LoadSettingsAsync();
-                if (settings?.WindowState == null) return;
-                if (settings.WindowState.ColumnWidths == null)
-                    settings.WindowState.ColumnWidths = new Dictionary<string, Dictionary<string, double>>();
-                if (lstTracks.View is GridView gridView)
+                // Widths are read inside the update (after the file load), so a resize made meanwhile is saved too.
+                await SettingsManager.Instance.UpdateSettingsAsync(settings =>
                 {
+                    if (lstTracks.View is not GridView gridView)
+                        return;
+                    settings.WindowState.ColumnWidths ??= new Dictionary<string, Dictionary<string, double>>();
                     var columnWidths = new Dictionary<string, double>();
                     int lastIndex = gridView.Columns.Count - 1;
                     for (int i = 0; i < gridView.Columns.Count; i++)
@@ -499,8 +507,7 @@ namespace musicApp.Views
                     settings.WindowState.ColumnWidths[ViewName] = columnWidths;
                     if (ViewName == "Songs")
                         settings.WindowState.SongsViewColumnWidths = columnWidths;
-                }
-                await SettingsManager.Instance.SaveSettingsAsync(settings);
+                });
             }
             catch (Exception ex)
             {
@@ -573,12 +580,17 @@ namespace musicApp.Views
 
         private async System.Threading.Tasks.Task UpdateColumnVisibilityAsync(List<string> visibleColumns)
         {
-            var settings = await SettingsManager.Instance.LoadSettingsAsync();
-            if (settings?.WindowState == null) return;
-            if (settings.WindowState.ColumnVisibility == null)
-                settings.WindowState.ColumnVisibility = new Dictionary<string, List<string>>();
-            settings.WindowState.ColumnVisibility[ViewName] = visibleColumns;
-            await SettingsManager.Instance.SaveSettingsAsync(settings);
+            // Update the cache first: a second toggle before this save finishes builds its list from it,
+            // so it keeps this toggle instead of overwriting it.
+            EnsureSettingsLoaded();
+            _cachedSettings!.WindowState.ColumnVisibility ??= new Dictionary<string, List<string>>();
+            _cachedSettings.WindowState.ColumnVisibility[ViewName] = visibleColumns;
+
+            await SettingsManager.Instance.UpdateSettingsAsync(settings =>
+            {
+                settings.WindowState.ColumnVisibility ??= new Dictionary<string, List<string>>();
+                settings.WindowState.ColumnVisibility[ViewName] = visibleColumns;
+            });
             _cachedSettings = null;
             EnsureSettingsLoaded();
             BuildGridViewColumns();
@@ -602,7 +614,8 @@ namespace musicApp.Views
 
         private void AlignReorderDropLineToIndex(ref int toIndex, ref double lineY, int count)
         {
-            toIndex = Math.Max(1, Math.Min(toIndex, count - 1));
+            // toIndex is insert-before, so count (after the last row) is a valid slot.
+            toIndex = Math.Max(1, Math.Min(toIndex, count));
             var gen = lstTracks.ItemContainerGenerator;
             if (gen.Status == GeneratorStatus.ContainersGenerated &&
                 gen.ContainerFromIndex(toIndex) is ListViewItem itemAt)
@@ -630,7 +643,7 @@ namespace musicApp.Views
 
             if (row == null)
             {
-                toIndex = Math.Max(1, count - 1);
+                toIndex = count;
                 AlignReorderDropLineToIndex(ref toIndex, ref lineY, count);
                 if (lineY <= 0)
                     lineY = Math.Clamp(listPos.Y, 1, Math.Max(1, lstTracks.ActualHeight - 2));
@@ -640,7 +653,7 @@ namespace musicApp.Views
             int rowIndex = lstTracks.Items.IndexOf(row.DataContext);
             if (rowIndex < 0)
             {
-                toIndex = Math.Max(1, count - 1);
+                toIndex = count;
                 AlignReorderDropLineToIndex(ref toIndex, ref lineY, count);
                 if (lineY <= 0)
                     lineY = Math.Clamp(listPos.Y, 1, Math.Max(1, lstTracks.ActualHeight - 2));
@@ -698,6 +711,9 @@ namespace musicApp.Views
 
         private void LstTracks_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            if (e.ClickCount == 1)
+                _singleClickPlayedThisPress = false;
+
             if (!AllowRowReorder)
             {
                 _rowReorderSourceIndex = -1;
@@ -800,7 +816,10 @@ namespace musicApp.Views
             if ((mods & ModifierKeys.Control) != 0 || (mods & ModifierKeys.Shift) != 0)
                 return;
             if (lstTracks.SelectedItem is Song track)
+            {
+                _singleClickPlayedThisPress = true;
                 PlayTrackRequested?.Invoke(this, track);
+            }
         }
 
         private void LstTracks_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -814,6 +833,9 @@ namespace musicApp.Views
 
         private void LstTracks_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
+            // The first click of this double-click already started the song; playing again would restart it.
+            if (_singleClickPlayedThisPress)
+                return;
             if (lstTracks.SelectedItem is Song track)
                 PlayTrackRequested?.Invoke(this, track);
         }

@@ -49,7 +49,8 @@ namespace musicApp
 
         private static LibraryManager? _instance;
         private static readonly object _lock = new object();
-        private static readonly SemaphoreSlim JsonWriteGate = new(1, 1);
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> FileGates =
+            new(StringComparer.OrdinalIgnoreCase);
 
         public static LibraryManager Instance
         {
@@ -77,7 +78,8 @@ namespace musicApp
             string path, T value, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
         {
             var tempPath = path + ".tmp";
-            await JsonWriteGate.WaitAsync();
+            var gate = FileGate(path);
+            await gate.WaitAsync();
             try
             {
                 using (var stream = File.Create(tempPath))
@@ -86,9 +88,33 @@ namespace musicApp
             }
             finally
             {
-                JsonWriteGate.Release();
+                gate.Release();
             }
         }
+
+        // Loads take the same per-file gate as saves: a save's File.Move cannot replace a file a load still
+        // has open (it fails even with FileShare.Delete), and that failure was swallowed, losing the save.
+        // Per file, so the startup loads of different files still run in parallel.
+        private static async Task<T?> LoadJsonAsync<T>(
+            string path, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo) where T : class
+        {
+            var gate = FileGate(path);
+            await gate.WaitAsync();
+            try
+            {
+                if (!File.Exists(path))
+                    return null;
+                using var stream = File.OpenRead(path);
+                return await JsonSerializer.DeserializeAsync(stream, typeInfo);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        private static SemaphoreSlim FileGate(string path) =>
+            FileGates.GetOrAdd(path, _ => new SemaphoreSlim(1, 1));
 
         #region Library Cache Management
 
@@ -96,13 +122,8 @@ namespace musicApp
         {
             try
             {
-                if (File.Exists(LibraryCacheFilePath))
-                {
-                    using var stream = File.OpenRead(LibraryCacheFilePath);
-                    var cache = await JsonSerializer.DeserializeAsync(
-                        stream, LibraryJsonContext.Default.LibraryCache);
-                    return cache ?? new LibraryCache();
-                }
+                return await LoadJsonAsync(LibraryCacheFilePath, LibraryJsonContext.Default.LibraryCache)
+                       ?? new LibraryCache();
             }
             catch (Exception ex)
             {
@@ -131,13 +152,8 @@ namespace musicApp
         {
             try
             {
-                if (File.Exists(RecentlyPlayedFilePath))
-                {
-                    using var stream = File.OpenRead(RecentlyPlayedFilePath);
-                    var recentlyPlayed = await JsonSerializer.DeserializeAsync(
-                        stream, LibraryJsonContext.Default.RecentlyPlayedCache);
-                    return recentlyPlayed ?? new RecentlyPlayedCache();
-                }
+                return await LoadJsonAsync(RecentlyPlayedFilePath, LibraryJsonContext.Default.RecentlyPlayedCache)
+                       ?? new RecentlyPlayedCache();
             }
             catch (Exception ex)
             {
@@ -166,12 +182,9 @@ namespace musicApp
         {
             try
             {
-                if (File.Exists(LibraryFoldersFilePath))
+                var result = await LoadJsonAsync(LibraryFoldersFilePath, LibraryJsonContext.Default.LibraryFolders);
+                if (result != null)
                 {
-                    using var stream = File.OpenRead(LibraryFoldersFilePath);
-                    var folders = await JsonSerializer.DeserializeAsync(
-                        stream, LibraryJsonContext.Default.LibraryFolders);
-                    var result = folders ?? new LibraryFolders();
                     ApplyMusicFolderNormalization(result);
                     return result;
                 }
@@ -220,13 +233,8 @@ namespace musicApp
         {
             try
             {
-                if (File.Exists(PlaylistsFilePath))
-                {
-                    using var stream = File.OpenRead(PlaylistsFilePath);
-                    var playlists = await JsonSerializer.DeserializeAsync(
-                        stream, LibraryJsonContext.Default.PlaylistsCache);
-                    return playlists ?? new PlaylistsCache();
-                }
+                return await LoadJsonAsync(PlaylistsFilePath, LibraryJsonContext.Default.PlaylistsCache)
+                       ?? new PlaylistsCache();
             }
             catch (Exception ex)
             {
@@ -283,9 +291,9 @@ namespace musicApp
                 if (!Path.IsPathRooted(path) && !string.IsNullOrWhiteSpace(m3uDir))
                     path = Path.GetFullPath(Path.Combine(m3uDir, path));
 
-                playlist.TrackFilePaths.Add(path);
-
                 var match = availableTracks.FirstOrDefault(t => string.Equals(t.FilePath, path, StringComparison.OrdinalIgnoreCase));
+                // Store the library's spelling of the path so later removes, which compare paths, find it.
+                playlist.TrackFilePaths.Add(match?.FilePath ?? path);
                 if (match != null)
                 {
                     playlist.Tracks.Add(match);
@@ -401,24 +409,43 @@ namespace musicApp
             return folders.MusicFolders ?? new List<string>();
         }
 
-        public async Task AddMusicFolderAsync(string folderPath)
+        private static readonly SemaphoreSlim FoldersUpdateGate = new(1, 1);
+
+        // One load-change-save at a time: a folder add and a scan-time stamp used to load the same old copy,
+        // and whichever saved last dropped the other's change. mutate returns false when nothing changed.
+        private async Task UpdateLibraryFoldersAsync(Func<LibraryFolders, bool> mutate)
         {
-            var normalized = LibraryPathHelper.TryNormalizePath(folderPath);
-            if (normalized == null) return;
-            var folders = await LoadLibraryFoldersAsync();
-            if (folders.MusicFolders.Any(f => LibraryPathHelper.PathsEqual(f, normalized))) return;
-            folders.MusicFolders.Add(normalized);
-            await SaveLibraryFoldersAsync(folders);
+            await FoldersUpdateGate.WaitAsync();
+            try
+            {
+                var folders = await LoadLibraryFoldersAsync();
+                if (mutate(folders))
+                    await SaveLibraryFoldersAsync(folders);
+            }
+            finally
+            {
+                FoldersUpdateGate.Release();
+            }
         }
 
-        public async Task RemoveMusicFolderAsync(string folderPath)
+        public Task AddMusicFolderAsync(string folderPath)
         {
-            var folders = await LoadLibraryFoldersAsync();
-            var match = folders.MusicFolders.FirstOrDefault(f => LibraryPathHelper.PathsEqual(f, folderPath));
-            if (match == null) return;
-            folders.MusicFolders.Remove(match);
-            await SaveLibraryFoldersAsync(folders);
+            var normalized = LibraryPathHelper.TryNormalizePath(folderPath);
+            if (normalized == null) return Task.CompletedTask;
+            return UpdateLibraryFoldersAsync(folders =>
+            {
+                if (folders.MusicFolders.Any(f => LibraryPathHelper.PathsEqual(f, normalized))) return false;
+                folders.MusicFolders.Add(normalized);
+                return true;
+            });
         }
+
+        public Task RemoveMusicFolderAsync(string folderPath) =>
+            UpdateLibraryFoldersAsync(folders =>
+            {
+                var match = folders.MusicFolders.FirstOrDefault(f => LibraryPathHelper.PathsEqual(f, folderPath));
+                return match != null && folders.MusicFolders.Remove(match);
+            });
 
         #endregion
 
@@ -477,9 +504,11 @@ namespace musicApp
             {
                 var normalized = LibraryPathHelper.TryNormalizePath(folderPath);
                 if (normalized == null) return;
-                var folders = await LoadLibraryFoldersAsync();
-                folders.FolderLastScanned[normalized] = DateTime.Now;
-                await SaveLibraryFoldersAsync(folders);
+                await UpdateLibraryFoldersAsync(folders =>
+                {
+                    folders.FolderLastScanned[normalized] = DateTime.Now;
+                    return true;
+                });
             }
             catch (Exception ex)
             {
