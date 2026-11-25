@@ -1670,6 +1670,19 @@ namespace musicApp
             }
         }
 
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            windowManager.FitToScreen();
+        }
+
+        protected override void OnContentRendered(EventArgs e)
+        {
+            base.OnContentRendered(e);
+            if (appSettings.MiniPlayerWindow.IsOpen && _miniPlayerWindow == null)
+                ShowMiniPlayerWindow();
+        }
+
         /// <summary>
         /// Handles window location and size changes to update state tracking
         /// </summary>
@@ -2180,8 +2193,7 @@ namespace musicApp
                     // Muted shows volume 0; keep the saved volume so a restart does not come back silent.
                     double? volume = titleBarPlayer.IsMuted ? null : titleBarPlayer.Volume;
                     var bounds = CaptureWindowBounds();
-                    if (_miniPlayerWindow != null)
-                        CaptureMiniPlayerWindowState(_miniPlayerWindow);
+                    CaptureMiniPlayerWindowState(_miniPlayerWindow, isOpen: _miniPlayerWindow != null);
                     var miniPlayer = appSettings.MiniPlayerWindow;
                     appSettings.LastActiveView = lastView;
 

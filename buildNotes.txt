@@ -1,25 +1,6 @@
-v0.3.6 cyberbussyKimmie [fix > settings, library, queue, updater]
+v0.3.7 kickKevin [feat. > restore miniplayer; fix > settings tab bar]
 
-- Column widths, shuffle, repeat and volume no longer reset after moving the window or changing other settings.
-- Maximize now fits the screen at any display scaling and stays on the monitor the window is on, and the window no longer opens off-screen after a monitor is unplugged.
-- Muting no longer brings the app back silent after a restart.
-- A folder you can't read no longer stops a library scan, and files deleted during a scan no longer break it.
-- Removing a song while a scan finishes no longer brings it back, and the Playlists pane no longer blanks during scans.
-- Library, playlist and folder changes are no longer lost when two saves overlap.
-- Long tracks show their full length, and plays or favorites made during a rescan are kept.
-- Songs removed from imported playlists stay removed, and imported .m3u playlists with accented names in older formats now match your songs.
-- "Move to Recycle Bin" never deletes a file permanently.
-- Removing or deleting the playing song keeps the rest of your queue.
-- You can drag a song to the very end of the queue, and holding Alt+Up/Down keeps moving it.
-- Double-clicking in Recently Played plays that list once instead of the whole library or twice.
-- Songs that end before their crossfade now fade the next song in instead of starting abruptly.
-- Saving tags or artwork on the next song near the end of the current one no longer fails with "file in use".
-- In the miniplayer and queue popup, right-click actions now work with several songs selected.
-- Searches like "AC/DC" or "Don't" now find results, and typing the word "Search" works.
-- Album art prefers the front cover, Picard-tagged MusicBrainz ids are used, and iTunes artwork is found.
-- Editing lyrics in an outside editor no longer wipes them or repeats error popups.
-- Closing Settings stops a running missing-artwork scan, and a sidebar set to exactly 250 px stays that width.
-- If two shortcuts end up on the same key, the later one goes back to its default instead of silently doing nothing.
-- Recently Played's right-click menu now includes Show in Albums.
-- The column resize handle is wider and centered on the divider, so it is easier to grab.
-- The updater shows an error on slow connections instead of silently closing, can't be closed mid-install, and puts the old app back if a portable update fails.
+- If you close musicApp with the miniplayer open, it opens again next launch at the same size and spot.
+- Closing and reopening the miniplayer keeps its last size and position, even if it was minimized.
+- Windows saved on a monitor that is gone, or that no longer fit the screen, are pulled fully back on screen when they open; a window saved completely off screen opens centered (the miniplayer on the main window).
+- The tab bar at the top of Settings now looks the same no matter which tab is selected: every divider shows and the selected tab's outline is even.

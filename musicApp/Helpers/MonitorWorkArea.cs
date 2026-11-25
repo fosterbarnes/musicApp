@@ -38,6 +38,47 @@ internal static class MonitorWorkArea
         return true;
     }
 
+    /// <summary>True when any part of the bounds is on a monitor's work area.</summary>
+    public static bool IsOnScreen(Visual visual, double left, double top, double width, double height)
+    {
+        if (!double.IsFinite(left) || !double.IsFinite(top) || !double.IsFinite(width) || !double.IsFinite(height))
+            return false;
+        var bounds = new Rect(left, top, Math.Max(width, 1), Math.Max(height, 1));
+        return TryGet(visual, bounds, out var work) && work.IntersectsWith(bounds);
+    }
+
+    /// <summary>
+    /// Moves and shrinks saved bounds so the whole window sits on the nearest monitor's work area.
+    /// False when the bounds are not finite or <paramref name="visual"/> has no window handle yet.
+    /// </summary>
+    public static bool TryFit(Visual visual, double left, double top, double width, double height,
+        Size minSize, out Rect fitted)
+    {
+        fitted = default;
+        if (!double.IsFinite(left) || !double.IsFinite(top) || !double.IsFinite(width) || !double.IsFinite(height))
+            return false;
+
+        width = Math.Max(width, minSize.Width);
+        height = Math.Max(height, minSize.Height);
+        if (!TryGet(visual, new Rect(left, top, width, height), out var work))
+            return false;
+
+        width = Math.Min(width, work.Width);
+        height = Math.Min(height, work.Height);
+        // Fully off this screen (monitor gone, garbage values): center it instead of hugging the nearest edge.
+        if (!work.IntersectsWith(new Rect(left, top, width, height)))
+        {
+            left = work.Left + (work.Width - width) / 2;
+            top = work.Top + (work.Height - height) / 2;
+        }
+        // Clamp the offset, not the edge: work.Right - work.Width can round below work.Left and make Clamp throw.
+        fitted = new Rect(
+            work.Left + Math.Clamp(left - work.Left, 0, work.Width - width),
+            work.Top + Math.Clamp(top - work.Top, 0, work.Height - height),
+            width, height);
+        return true;
+    }
+
     [DllImport("user32.dll")]
     private static extern IntPtr MonitorFromRect(ref RECT rect, uint flags);
 

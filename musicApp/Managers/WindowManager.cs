@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using musicApp.Constants;
 using musicApp.Helpers;
 
 namespace musicApp
@@ -171,19 +172,7 @@ namespace musicApp
         /// </summary>
         public void SetInitialPosition(double left, double top, double width, double height)
         {
-            // Saved bounds can be on a monitor that is gone. If the top-left of the window (where the title
-            // bar is) is off every screen, center it on the primary work area instead.
-            var virtualScreen = new Rect(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
-                SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
-            if (!virtualScreen.IntersectsWith(new Rect(left, top, Math.Min(width, 200), 40)))
-            {
-                var work = SystemParameters.WorkArea;
-                width = Math.Min(width, work.Width);
-                height = Math.Min(height, work.Height);
-                left = work.Left + (work.Width - width) / 2;
-                top = work.Top + (work.Height - height) / 2;
-            }
-
+            // FitToScreen (from MainWindow.OnSourceInitialized) pulls these onto a screen before the window shows.
             window.Left = left;
             window.Top = top;
             window.Width = width;
@@ -191,6 +180,31 @@ namespace musicApp
             
             // Store these as initial bounds
             normalWindowBounds = new Rect(left, top, width, height);
+        }
+
+        /// <summary>Moves the current bounds fully onto a screen. Needs the window handle (SourceInitialized or later).</summary>
+        public void FitToScreen()
+        {
+            var fitted = FitToWorkArea(window.Left, window.Top, window.Width, window.Height);
+            SetInitialPosition(fitted.Left, fitted.Top, fitted.Width, fitted.Height);
+        }
+
+        /// <summary>
+        /// Saved bounds can be off every screen (monitor unplugged, resolution dropped) or garbage (NaN).
+        /// Unusable bounds fall back to the defaults. The minimum size drops if the monitor is smaller,
+        /// otherwise WPF would grow the window back past the screen edge.
+        /// </summary>
+        private Rect FitToWorkArea(double left, double top, double width, double height)
+        {
+            var min = new Size(window.MinWidth, window.MinHeight);
+            if (!MonitorWorkArea.TryFit(window, left, top, width, height, min, out var fitted) &&
+                !MonitorWorkArea.TryFit(window, UILayoutConstants.DefaultWindowLeft, UILayoutConstants.DefaultWindowTop,
+                    UILayoutConstants.DefaultWindowWidth, UILayoutConstants.DefaultWindowHeight, min, out fitted))
+                return new Rect(left, top, Math.Max(0, width), Math.Max(0, height));
+
+            window.MinWidth = Math.Min(window.MinWidth, fitted.Width);
+            window.MinHeight = Math.Min(window.MinHeight, fitted.Height);
+            return fitted;
         }
 
         /// <summary>
@@ -482,7 +496,9 @@ namespace musicApp
         public void RestoreWindowState(double width, double height, double left, double top, bool isMaximized)
         {
             System.Diagnostics.Debug.WriteLine($"WindowManager: RestoreWindowState - Restoring from settings: Width={width}, Height={height}, Left={left}, Top={top}, IsMaximized={isMaximized}");
-            
+            var fitted = FitToWorkArea(left, top, width, height);
+            (left, top, width, height) = (fitted.Left, fitted.Top, fitted.Width, fitted.Height);
+
             // Only update if the position has changed significantly to prevent unnecessary flicker
             bool positionChanged = Math.Abs(window.Left - left) > 1 || Math.Abs(window.Top - top) > 1;
             bool sizeChanged = Math.Abs(window.Width - width) > 1 || Math.Abs(window.Height - height) > 1;

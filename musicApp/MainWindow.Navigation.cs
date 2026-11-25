@@ -136,28 +136,28 @@ namespace musicApp
             try { w.SetVolumeWithoutNotify(titleBarPlayer.Volume); } catch { }
             w.Show();
             PushMiniPlayerState(w);
+            // Saved now too, so a crash or force-kill still brings it back next launch.
+            appSettings.MiniPlayerWindow.IsOpen = true;
+            _ = settingsManager.UpdateSettingsAsync(s => s.MiniPlayerWindow.IsOpen = true);
         }
 
         private void RestoreMiniPlayerWindowState(MiniPlayerWindow window, SettingsManager.MiniPlayerWindowStateSettings state)
         {
-            if (state == null || !state.Left.HasValue || !state.Top.HasValue ||
-                !double.IsFinite(state.Width) || !double.IsFinite(state.Height) ||
-                !double.IsFinite(state.Left.Value) || !double.IsFinite(state.Top.Value))
+            // Never placed, or saved fully off every screen: center on the main window, then fit.
+            double left = Left + (ActualWidth - state.Width) / 2;
+            double top = Top + (ActualHeight - state.Height) / 2;
+            if (state is { Left: { } savedLeft, Top: { } savedTop } &&
+                MonitorWorkArea.IsOnScreen(this, savedLeft, savedTop, state.Width, state.Height))
+                (left, top) = (savedLeft, savedTop);
+            if (!MonitorWorkArea.TryFit(this, left, top, state.Width, state.Height,
+                    new Size(window.MinWidth, window.MinHeight), out var fitted))
                 return;
-
-            var saved = new Rect(state.Left.Value, state.Top.Value, state.Width, state.Height);
-            if (!MonitorWorkArea.TryGet(this, saved, out var workArea))
-                return;
-            double width = Math.Clamp(state.Width, window.MinWidth, workArea.Width);
-            double height = Math.Clamp(state.Height, window.MinHeight, workArea.Height);
-            double left = Math.Clamp(state.Left.Value, workArea.Left, workArea.Right - width);
-            double top = Math.Clamp(state.Top.Value, workArea.Top, workArea.Bottom - height);
 
             window.WindowStartupLocation = WindowStartupLocation.Manual;
-            window.Width = width;
-            window.Height = height;
-            window.Left = left;
-            window.Top = top;
+            window.Width = fitted.Width;
+            window.Height = fitted.Height;
+            window.Left = fitted.Left;
+            window.Top = fitted.Top;
         }
 
         private async void MiniPlayerWindow_Closed(object? sender, EventArgs e)
@@ -168,26 +168,37 @@ namespace musicApp
             if (!ReferenceEquals(_miniPlayerWindow, window))
                 return;
 
-            CaptureMiniPlayerWindowState(window);
             _miniPlayerWindow = null;
+            // Closing the app closes owned windows too; shutdown already saved it as open.
+            if (_shutdownCloseFinalized)
+                return;
+
+            CaptureMiniPlayerWindowState(window, isOpen: false);
             var miniPlayer = appSettings.MiniPlayerWindow;
             await settingsManager.UpdateSettingsAsync(s => s.MiniPlayerWindow = miniPlayer);
         }
 
-        private void CaptureMiniPlayerWindowState(MiniPlayerWindow window)
+        /// <summary>Minimized: its pre-minimize bounds. Gone or unreadable: the last saved bounds.</summary>
+        private void CaptureMiniPlayerWindowState(MiniPlayerWindow? window, bool isOpen)
         {
-            if (window.WindowState != WindowState.Normal ||
-                !double.IsFinite(window.Width) || !double.IsFinite(window.Height) ||
-                !double.IsFinite(window.Left) || !double.IsFinite(window.Top))
-                return;
-
-            appSettings.MiniPlayerWindow = new SettingsManager.MiniPlayerWindowStateSettings
+            var saved = appSettings.MiniPlayerWindow;
+            var state = new SettingsManager.MiniPlayerWindowStateSettings
             {
-                Width = window.Width,
-                Height = window.Height,
-                Left = window.Left,
-                Top = window.Top
+                Width = saved.Width, Height = saved.Height, Left = saved.Left, Top = saved.Top, IsOpen = isOpen
             };
+            var bounds = window == null ? Rect.Empty
+                : window.WindowState == WindowState.Normal
+                    ? new Rect(window.Left, window.Top, window.Width, window.Height)
+                    : window.RestoreBounds;
+            if (!bounds.IsEmpty && double.IsFinite(bounds.X) && double.IsFinite(bounds.Y) &&
+                double.IsFinite(bounds.Width) && double.IsFinite(bounds.Height))
+            {
+                state.Width = bounds.Width;
+                state.Height = bounds.Height;
+                state.Left = bounds.X;
+                state.Top = bounds.Y;
+            }
+            appSettings.MiniPlayerWindow = state;
         }
 
         private void MiniPlayer_SongPlayRequested(object? sender, Song song)

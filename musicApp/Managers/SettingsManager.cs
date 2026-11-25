@@ -28,6 +28,7 @@ namespace musicApp
             public double Height { get; set; } = 900;
             public double? Left { get; set; }
             public double? Top { get; set; }
+            public bool IsOpen { get; set; }
         }
 
         public class PlayerSettings
