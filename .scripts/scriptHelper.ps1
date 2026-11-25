@@ -151,19 +151,14 @@ function getShippedChangesSinceRelease {
     @($changed | Where-Object { $_ -match $shippedPaths })
 }
 
-# True when buildNotes.txt differs from HEAD or is not tracked yet. git diff --quiet exits 1 for
-# a difference; any other nonzero exit is a git failure, not a changed file.
+# True when buildNotes.txt holds a new message: line 1 is set and differs from the last commit's
+# subject. The file is local (gitignored), so its line 1 is compared instead of a git diff.
 function testBuildNotesChanged {
-    $tracked = @(& git -C $repoRoot ls-files -- $buildNotes)
-    if ($LASTEXITCODE) { throw "git ls-files failed (exit $LASTEXITCODE)." }
-    if (-not $tracked) { return $true }
-    # core.safecrlf=false only drops the "LF will be replaced by CRLF" warnings from read-only output.
-    & git -C $repoRoot -c core.safecrlf=false diff --quiet HEAD -- $buildNotes
-    switch ($LASTEXITCODE) {
-        0 { return $false }
-        1 { return $true }
-        default { throw "git diff failed (exit $LASTEXITCODE)." }
-    }
+    if (-not (Test-Path -LiteralPath $buildNotes)) { return $false }
+    $subject = "$(Get-Content -LiteralPath $buildNotes -TotalCount 1)".Trim()
+    $last = (& git -C $repoRoot log -1 --format=%s | Out-String).Trim()
+    if ($LASTEXITCODE) { throw "git log failed (exit $LASTEXITCODE)." }
+    [bool]$subject -and $subject -ne $last
 }
 
 # buildNotes.md entries stamped after the last commit. The file is untracked and oldest-first, so

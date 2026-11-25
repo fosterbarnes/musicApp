@@ -1,6 +1,0 @@
-v0.3.7 kickKevin [feat. > restore miniplayer; fix > settings tab bar]
-
-- If you close musicApp with the miniplayer open, it opens again next launch at the same size and spot.
-- Closing and reopening the miniplayer keeps its last size and position, even if it was minimized.
-- Windows saved on a monitor that is gone, or that no longer fit the screen, are pulled fully back on screen when they open; a window saved completely off screen opens centered (the miniplayer on the main window).
-- The tab bar at the top of Settings now looks the same no matter which tab is selected: every divider shows and the selected tab's outline is even.
