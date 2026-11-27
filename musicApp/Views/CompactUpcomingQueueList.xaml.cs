@@ -99,18 +99,20 @@ public partial class CompactUpcomingQueueList : UserControl
         QueueChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public int GetSelectedViewIndex()
+    // Rows skip the current track, so row i is queue view index i + 1
+    public List<int> GetSelectedViewIndexes()
     {
+        var indexes = new List<int>();
         if (QueueItemsList.ItemsSource is not IEnumerable en)
-            return -1;
+            return indexes;
         int i = 0;
         foreach (var item in en)
         {
             if (item is SongRowViewModel vm && vm.IsSelected)
-                return i + 1;
+                indexes.Add(i + 1);
             i++;
         }
-        return -1;
+        return indexes;
     }
 
     public Song? GetPrimarySelectedSong()
@@ -297,12 +299,12 @@ public partial class CompactUpcomingQueueList : UserControl
         if (sender is not ContextMenu menu || menu.PlacementTarget is not DependencyObject placement)
             return;
 
-        // Queue removal handles one row, so only offer it for a single resolved song
+        // Hidden until a song resolves; removal then covers every selected row
         var removeFromQueueItem = TrackContextMenuHelper.FindMenuItemByHeader(menu.Items, "Remove from Queue");
         TrackContextMenuHelper.SetVisible(removeFromQueueItem, false);
 
-        // Several rows: Play Next, Add to Queue, Add to Playlist and Remove from Library act on all of them
-        // (they used to do nothing); single-song items are hidden.
+        // Several rows: Play Next, Add to Queue, Add to Playlist, Remove from Queue and Remove from
+        // Library act on all of them; single-song items are hidden.
         if (EnableMultiSelect && CountSelectedRows() > 1)
         {
             _contextMenuSongs = GetSelectedSongs();
@@ -313,6 +315,7 @@ public partial class CompactUpcomingQueueList : UserControl
                 selectedSong: null,
                 (Application.Current?.MainWindow as MainWindow)?.Playlists,
                 QueueContextMenu_PlaylistSubmenuClick);
+            TrackContextMenuHelper.SetVisible(removeFromQueueItem, true);
             SetSingleSongItemsVisible(menu, false);
             UpdateSwapMenuItemVisibility(menu, show: false);
             return;

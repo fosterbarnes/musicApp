@@ -28,7 +28,9 @@ namespace musicApp.Views
 
         private void RemoveFromQueueMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            if (TryGetTrackListView(sender, out var view, out _))
+            // Not TryGetTrackListView: that needs a single selection, and this removes all selected rows
+            var listView = ((sender as MenuItem)?.Parent as ContextMenu)?.PlacementTarget as ListView;
+            if (TrackContextMenuHelper.TryFindTrackListView(listView, out var view))
                 view.RequestRemoveFromQueue();
         }
 

@@ -92,7 +92,7 @@ public partial class QueuePopupView : UserControl
     public event EventHandler<IReadOnlyList<Song>>? RemoveFromLibraryRequested;
     public event EventHandler<Song>? DeleteRequested;
 
-    public int GetSelectedViewIndex() => UpcomingQueue.GetSelectedViewIndex();
+    public List<int> GetSelectedViewIndexes() => UpcomingQueue.GetSelectedViewIndexes();
     public Song? GetPrimarySelectedSong() => UpcomingQueue.GetPrimarySelectedSong();
 
     private void QueueToolbarRemove_Click(object sender, RoutedEventArgs e) =>

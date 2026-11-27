@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using musicApp.Helpers;
 
@@ -19,12 +20,10 @@ namespace musicApp.Views
         public event EventHandler? QueueToolbarMoveUpRequested;
         public event EventHandler? QueueToolbarMoveDownRequested;
 
-        public int GetSelectedViewIndex()
-        {
-            if (trackList.SelectedTrack is not Song selected)
-                return -1;
-            return SongIdentity.FindViewIndex(trackList.ItemsSource, selected);
-        }
+        // ItemsSource is the queue view, so its positions are queue view indexes
+        public List<int> GetSelectedViewIndexes() => trackList.ItemsSource is IList items
+            ? trackList.GetSelectedTracks().Select(items.IndexOf).Where(i => i >= 0).ToList()
+            : [];
 
         private void QueueToolbarRemove_Click(object sender, System.Windows.RoutedEventArgs e) =>
             QueueToolbarRemoveRequested?.Invoke(this, EventArgs.Empty);

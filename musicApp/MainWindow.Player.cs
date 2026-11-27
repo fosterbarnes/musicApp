@@ -231,9 +231,9 @@ namespace musicApp
 
         private void OnQueueToolbarRemoveRequested(object? sender, EventArgs e)
         {
-            int viewIndex = GetQueueToolbarSelectedViewIndex(sender);
-            if (viewIndex >= 0)
-                _player.RemoveFromQueue(viewIndex);
+            var viewIndexes = GetQueueSelectedViewIndexes(sender);
+            if (viewIndexes.Count > 0)
+                _player.RemoveFromQueue(viewIndexes);
         }
 
         private void OnQueueToolbarMoveUpRequested(object? sender, EventArgs e) => MoveQueueSelection(sender, -1);
@@ -273,11 +273,17 @@ namespace musicApp
                     return index;
             }
 
+            var indexes = GetQueueSelectedViewIndexes(sender);
+            return indexes.Count > 0 ? indexes[0] : -1;
+        }
+
+        private List<int> GetQueueSelectedViewIndexes(object? sender)
+        {
             if (queuePopupView != null && ReferenceEquals(sender, queuePopupView))
-                return queuePopupView.GetSelectedViewIndex();
+                return queuePopupView.GetSelectedViewIndexes();
             if (_miniPlayerWindow != null && ReferenceEquals(sender, _miniPlayerWindow))
-                return _miniPlayerWindow.GetSelectedViewIndex();
-            return queueViewControl?.GetSelectedViewIndex() ?? -1;
+                return _miniPlayerWindow.GetSelectedViewIndexes();
+            return queueViewControl?.GetSelectedViewIndexes() ?? [];
         }
 
         /// <summary>True when the queue has a current track (Play Next inserts after it rather than appending).</summary>

@@ -91,40 +91,4 @@ public static class SongIdentity
 
         return fallback;
     }
-
-    public static int FindViewIndex(IEnumerable? items, Song? selected)
-    {
-        if (items == null || selected == null)
-            return -1;
-
-        if (!string.IsNullOrWhiteSpace(selected.FilePath))
-        {
-            int i = 0;
-            foreach (var item in items)
-            {
-                if (item is Song s && !string.IsNullOrWhiteSpace(s.FilePath) &&
-                    string.Equals(s.FilePath, selected.FilePath, StringComparison.OrdinalIgnoreCase))
-                    return i;
-                i++;
-            }
-        }
-
-        int j = 0;
-        foreach (var item in items)
-        {
-            if (item is Song s && Matches(s, selected))
-                return j;
-            j++;
-        }
-
-        int k = 0;
-        foreach (var item in items)
-        {
-            if (ReferenceEquals(item, selected))
-                return k;
-            k++;
-        }
-
-        return -1;
-    }
 }

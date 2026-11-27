@@ -253,6 +253,18 @@ public class PlaybackEngineTests
     }
 
     [Fact]
+    public async Task RemovingSeveralRowsIncludingThePlayingOneKeepsTheRest()
+    {
+        var rig = new Rig(0, 0);
+        await rig.PlayAsync();
+
+        rig.Player.RemoveFromQueue(new[] { 0, 2 });
+
+        Assert.Equal("b", rig.Player.CurrentTrack?.Title);
+        Assert.Equal("b", string.Concat(rig.Player.Queue.View().Select(s => s.Title)));
+    }
+
+    [Fact]
     public async Task FileBeingWrittenStaysClosedUntilItsOwnRestore()
     {
         var rig = new Rig(0, 0);

@@ -159,7 +159,7 @@ public partial class MiniPlayerWindow : Window
         _seekBarTimer?.Start();
     }
 
-    public int GetSelectedViewIndex() => UpcomingQueue.GetSelectedViewIndex();
+    public List<int> GetSelectedViewIndexes() => UpcomingQueue.GetSelectedViewIndexes();
     public Song? GetPrimarySelectedSong() => UpcomingQueue.GetPrimarySelectedSong();
     public void SetQueue(IEnumerable? tracks) => UpcomingQueue.SetQueue(tracks);
 

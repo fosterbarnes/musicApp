@@ -149,10 +149,14 @@ public sealed class Player : IDisposable
             AfterQueueEdit();
     }
 
-    public void RemoveFromQueue(int viewIndex)
+    public void RemoveFromQueue(IEnumerable<int> viewIndexes)
     {
         bool wasPlaying = IsPlaying;
-        if (!Queue.RemoveAt(viewIndex))
+        bool currentRemoved = false;
+        // Highest first, so each removal leaves the lower indexes valid
+        foreach (int viewIndex in viewIndexes.Distinct().OrderDescending())
+            currentRemoved |= Queue.RemoveAt(viewIndex);
+        if (!currentRemoved)
         {
             AfterQueueEdit();
             return;

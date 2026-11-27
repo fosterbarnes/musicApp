@@ -36,7 +36,7 @@
                     materialDesign:RippleAssist.IsDisabled="True"
                     Width="32" Height="32"
                     Margin="8,0,0,0"
-                    ToolTip="Remove selected song from queue"
+                    ToolTip="Remove selected songs from queue"
                     Click="QueueToolbarRemove_Click">
                 <materialDesign:PackIcon Kind="Minus" Width="20" Height="20"/>
             </Button>
